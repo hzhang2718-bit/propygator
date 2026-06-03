@@ -2,7 +2,7 @@
 
 A Python library for orbital simulation and satellite tracking, built on Orekit.
 
-**Status:** Phase 1 design, revised. Package name: `propygator` (renamed from `orbitkit` to avoid acoustic/visual collision with `orekit`). Documented import alias: `pgr`.
+**Status:** Phase 1 design, revised. Package name: `propygator`. Documented import alias: `pgr`.
 
 ---
 
@@ -156,7 +156,9 @@ propygator/
 ├── notebooks/                   # numbered demos: 01_intro.ipynb, etc.
 ├── docs/                        # MkDocs source
 │   └── verified_environments/   # conda list snapshots for sanity checks
-├── data/                        # small reference data (NOT orekit-data)
+├── data/                        # small reference data (NOT orekit-data),
+|                                # the bundled low-resolution Natural Earth
+|                                # coastline lives here
 ├── scripts/
 │   └── download_orekit_data.py  # downloads & extracts orekit-data
 ├── pyproject.toml               # project metadata, pip dependencies
@@ -229,6 +231,15 @@ Python wrapper for a time value. Carries an explicit time scale and lazily const
 
 - The integer part is always **TAI seconds since the J2000 epoch**, regardless of the user-visible `scale`. The reference instant is Orekit's `AbsoluteDate.J2000_EPOCH`: 2000-01-01T12:00:00 TT, which is 2000-01-01T11:59:27.816 TAI (the TT−TAI offset is a fixed 32.184 s). The same physical instant is named differently in different scales; the count of seconds we store is measured in TAI, which is the only continuous, leap-second-free linear scale. The `scale` field tags the *presentation* scale for output (`to_iso`, `to_datetime`) but never changes what the integer means.
 - `_frac_seconds ∈ [0.0, 1.0)`. Operations that produce out-of-range fractions (e.g. `shifted_by` with a non-integer offset, or scale conversions that introduce sub-second offsets) must renormalize back into the canonical form.
+- Leap-second source. UTC↔TAI at construction needs a leap-second table.
+Because Epoch construction must work before JVM start (§10), propygator
+bundles a small static table (core/_leap_seconds.py, refreshed per release)
+rather than reading orekit-data. This keeps the TAI integer eager and all
+Epoch methods pure-Python; at first JVM touch the bundled table is
+cross-checked against orekit-data's UTC-TAI.history (mismatch → warning).
+UT1 is the exception: UT1↔TAI needs continuously-varying EOP, which cannot
+be bundled, so UT1-scale construction defers normalization to first JVM
+touch and is NOT part of the safe-before-init surface.
 
 ```python
 @dataclass(frozen=True)
@@ -305,6 +316,13 @@ class State:
             )
         if self.position.dtype != np.float64 or self.velocity.dtype != np.float64:
             raise ValueError("position and velocity must be float64")
+        
+        # Finiteness: reject NaN/inf at the construction site so a bad state
+        # can't reach the propagator and surface later as an opaque Orekit
+        # failure. np.isfinite is False for both NaN and inf.
+        if not (np.all(np.isfinite(self.position))
+                and np.all(np.isfinite(self.velocity))):
+            raise ValueError("position and velocity must be finite (no NaN or inf)")
 
     def to_frame(self, target_frame: Frame) -> "State": ...
     def to_keplerian(self) -> "KeplerianElements": ...
@@ -323,6 +341,24 @@ The classical-element representation returned by `State.to_keplerian()` and acce
 
 - **Angle convention:** the stored angular anomaly is the **true anomaly** ν. Mean and eccentric anomaly are available via methods (`.mean_anomaly()`, `.eccentric_anomaly()`), not as alternate fields. A single canonical anomaly avoids the "which one is this?" class of bugs.
 - **Units:** SI throughout (semi-major axis in meters, angles in radians, time-derivatives where applicable in SI). Conversion to degrees happens at the user-facing boundary, not in the dataclass.
+- Frame. Classical elements are frame-dependent (i and Ω are measured against
+  the frame's equator/reference direction). to_keplerian() computes in the
+  State's own frame; no implicit conversion. CSV element columns are computed
+  in the trajectory's frame, named in the column headers. For 1.3 this is the
+  EME2000 display frame unless TEME is requested — distinct from TLE.from_state,
+  which uses TEME by design (features §1.3).
+- Singularities. ω and ν are individually ill-conditioned as e→0 (only their
+  sum, the argument of latitude, is well-defined); Ω is ill-conditioned as
+  i→0. Orekit returns finite values but they go erratic for the near-circular
+  LEO orbits this library targets. Documented in the docstring; equinoctial
+  elements are a future opt-in.
+
+### `Orientation`
+A propygator-native rotation: the body→inertial orientation returned by
+CustomAttitude laws, so user code never imports Hipparchus. Built from a
+quaternion, axis-angle, or 3×3 matrix; lazily constructs the Orekit/Hipparchus
+Rotation in to_orekit() (same lazy-JVM pattern as Epoch). Orientation only —
+attitude rates are out of scope for v1 and default to zero.
 
 ### `Trajectory`
 
@@ -462,6 +498,14 @@ class TrajectoryMetadata(TypedDict, total=False):
     integrator_tolerances: dict
     output_step_s: float
     created_at: str                        # ISO UTC
+    spacecraft: str
+    attitude: str
+    name: str
+    tle_line1: str
+    tle_line2: str
+    norad_id: str
+    tle_epoch: str                         # ISO 8601 UTC
+    start: str                             # ISO 8601 UTC
     # Extensible: user code may add arbitrary keys (e.g. "experiment_id").
 ```
 
@@ -482,6 +526,9 @@ class TLE:
     def from_strings(cls, line1: str, line2: str, name=None) -> "TLE": ...
     @classmethod
     def from_norad_id(cls, norad_id: int, source: str = "celestrak") -> "TLE": ...
+    @classmethod
+    def from_state(cls, state: State, *, norad_id: int | None = None,
+                   bstar: float | None = None, name: str | None = None) -> "TLE": ...
 
     @property
     def epoch(self) -> Epoch: ...
@@ -493,6 +540,8 @@ class TLE:
     else:
         def to_orekit(self): ...
 ```
+
+`from_state` builds a *format-valid* TLE from a state's osculating elements (converted to TEME internally, with true anomaly mapped to mean anomaly); `norad_id` and `bstar` default to placeholders (`00000` / `0.0`) when not supplied. It is not round-trip-faithful — osculating elements placed in mean-element fields do not reproduce the state under SGP4. For a faithful fit use `fit_tle` (§8 / feature 1.2). See `features.md` §1.3 for the full rationale.
 
 ### `GroundStation`
 
@@ -542,7 +591,12 @@ class Pass:
 src/propygator/
 ├── __init__.py
 │       Exposes most-used names: State, Trajectory, TLE, Epoch, Frame,
-│       propagate_numerical, fetch_tle, propagate_tle, etc.
+|       TimeScale, KeplerianElements, GroundStation, Pass, GeodeticPosition,
+|       ForceModelConfig, SpacecraftConfig, SpacecraftGeometry, VariableCd,
+|       IntegratorConfig, the attitude family, propagate_numerical,
+|       propagate_tle, fit_tle, fetch_tle, current_position, current_ground_position,
+|       find_passes, the plot_*/export* functions, init, clear_cache,
+|       and the exception types.
 │       Also exposes init() for explicit JVM configuration.
 │       Attaches logging.NullHandler() to the "propygator" logger so the
 │       library is silent unless the application configures handlers.
@@ -581,10 +635,14 @@ src/propygator/
 │   │                    defaults to DOP853 with sensible tolerances.
 │   ├── force_models.py  ForceModelConfig + presets (leo_default,
 │   │                    geo_default, keplerian)
+|   ├── attitude.py      holds the AttitudeConfig family
 │   └── integrators.py   IntegratorConfig (tolerances, min/max step)
 │
 ├── tle/
-│   ├── propagator.py    propagate_tle(tle, start, duration, output_step)
+│   ├── propagator.py    propagate_tle(tle, *, duration, output_step=60.0,
+│   │                    start=None, name=None)
+│   │                    duration required (kw-only); output_step defaults
+│   │                    to 60 s; start defaults to tle.epoch.
 │   │                    Default output frame: TEME.
 │   ├── fitter.py        fit_tle(reference, fitting_span, ...)
 │   │                    Accepts State (then propagates internally) or
@@ -803,18 +861,19 @@ Three init paths:
 
 **What does NOT touch the JVM.** For the explicit-init path to be usable, the user must be able to do work between `import propygator` and `propygator.init(...)` without inadvertently starting the JVM. The supported "safe before init" surface is:
 
-- All `Epoch` constructors and methods *except* `to_orekit()` (see §6).
+- All `Epoch` constructors and methods *except* `to_orekit()`, and except construction in the UT1 scale (defers leap/EOP resolution to first JVM touch — see §6).
 - All `Frame` enum access *except* `to_orekit()`.
 - `State.__init__` and its validation (no Orekit calls in `__post_init__`).
 - `Trajectory.from_states` / `from_arrays` shape and dtype validation.
 - `TLE.from_strings` parsing and checksum validation.
 - `GroundStation` and `Pass` construction.
+- VariableCd table construction and validation (the Orekit DragSensitive it lowers to is built inside propagate_numerical, not at config time).
 
 JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `current_position`, `current_ground_position`, `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
 
 ### Orekit types stay internal
 
-Public APIs accept and return `propygator` types (`Epoch`, `Frame`, `State`, `Trajectory`, `TLE`). Orekit's Java-backed objects appear only inside module implementations. Where a public method exists to convert to an Orekit type (e.g. `State.to_orekit()`), the annotation uses `TYPE_CHECKING` so no runtime Orekit import is needed at the public type level. Benefits:
+Public APIs accept and return `propygator` types (`Epoch`, `Frame`, `State`, `Trajectory`, `TLE`, `Orientation`). Custom attitude laws return propygator.Orientation, not a Hipparchus Rotation, so the rule holds with no exception. Orekit's Java-backed objects appear only inside module implementations. Where a public method exists to convert to an Orekit type (e.g. `State.to_orekit()`), the annotation uses `TYPE_CHECKING` so no runtime Orekit import is needed at the public type level. Benefits:
 
 - Users don't need to know Orekit to use `propygator`
 - Swapping backends affects only implementation
@@ -825,7 +884,7 @@ Private cached references to Orekit objects (e.g. the `Ephemeris` cached on a `T
 
 ### Frame conversions are explicit
 
-No automatic conversions on `State`-returning paths. TLE propagation returns TEME; numerical propagation returns whatever frame the initial state was in (typically EME2000); `current_position(tle)` returns TEME. Users explicitly call `.to_frame(...)` to convert. Verbose, but it prevents silent frame-mismatch bugs.
+No automatic conversions on `State`-returning paths. TLE propagation returns TEME; numerical propagation returns whatever frame the initial state was in (always EME2000); `current_position(tle)` returns TEME. Users explicitly call `.to_frame(...)` to convert. Verbose, but it prevents silent frame-mismatch bugs.
 
 The rule applies specifically to functions that return `State` or `Trajectory` — types that carry a `Frame`. Functions returning derived non-`State` types (`GeodeticPosition`, `Pass`, scalar magnitudes) may convert internally because the result does not carry a frame and so no frame ambiguity escapes the function. For example:
 
@@ -956,6 +1015,7 @@ Suggested implementation sequence:
 - **`Satellite` convenience class** — deliberately not provided in v1. Function-based API is the contract; if a `Satellite` class is added later, it will be sugar over the same functions and won't change the underlying contract.
 - **Versioning policy** — semver, pre-1.0 may break in minor releases.
 - **Package name** — renamed from `orbitkit` to `propygator` before build to avoid acoustic/visual collision with `orekit`. Documented import alias is `pgr` (`import propygator as pgr`); shown throughout the §9 examples.
+- **Attitude family** — Native-provider-backed modes: `Inertial` (`FrameAlignedProvider`), `SunPointing` (`CelestialBodyPointed` or `AlignedAndConstrained`), `NadirPointing` and `InPlaneTracking` (`AlignedAndConstrained`), plus `LofAligned`/`LofOffset` (`LofOffset`). `CustomAttitude` (user law returning `propygator.Orientation`) is the only non-native escape hatch. `NadirPointing` is exact only for circular orbits (nadir primary, velocity secondary, for eccentric).
 
 ### Still open
 
@@ -967,5 +1027,6 @@ Suggested implementation sequence:
 - **Per-feature plot specifications and CSV/JSON output shapes.** Backend decisions are locked (Plotly for interactive 3D, matplotlib for everything else) but the exact figures and tabular outputs each feature produces will be designed in a separate doc.
 - **RTN/LVLH frames.** Dropped from v1's supported frame set because none of features 1.1–1.5 need satellite-local frames. Returns to the supported set when formation flying, rendezvous, or relative-motion features are added. Note: re-adding these is *not* a drop-in extension of the `Frame` enum — they are relative-motion frames parameterized by a reference state (and possibly a reference epoch), so they'll require a new type (e.g. `RelativeFrame(reference: State)`) rather than a new enum value. Plan for this when the feature lands; don't expect the deferral to be trivial to undo.
 - **`FitResult` return type for `fit_tle`** — backward-compatible to add later (introduce `fit_tle_detailed()` or extend the return). v1 returns a bare `TLE`.
+- **Coefficient of drag modeling.** The numerical integrator interpolates avariable Cd from a table keyed on geocentric radius and total density. v1 ships this for the sphere (VariableCd) and a box density-varying scalar Cd (Tier A): Orekit's box computes projected area from attitude, the table supplies the scalar Cd. An attitude/incidence-keyed box table (Tier B, IncidenceVariableCd, generated offline by a panel method or DSMC) is the documented faithful extension. Full per-facet free-molecular Sentman remains deferred for plumbing reasons (Orekit's DragSensitive is passed only total density). The table is keyed on geocentric radius, not geodetic altitude, to avoid a per-substep frame transform; the geodetic reconciliation is done once during offline table generation.
 
 None of these block starting the build.
