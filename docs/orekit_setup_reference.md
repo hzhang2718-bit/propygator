@@ -1,6 +1,6 @@
 # Orekit Setup Reference
 
-A working reference for the Orekit Python (`orekit_jpype`) environment on Windows.
+A working reference for the Orekit Python (`orekit_jpype`) environment on Windows. **NOTE**: some parts of this guide may be out of date, and it should not be used as a source of truth without double-checking. The architecture and features documents are sources of truth when in doubt.
 
 ## Installed Stack
 
