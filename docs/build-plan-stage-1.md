@@ -44,7 +44,7 @@ Feature 1.3+ credentials; harmless to have early.
 
 ---
 
-## Chunk 1 — Packaging foundation: `src/` tree + `pyproject.toml` + `environment.yml`
+## Chunk 1 — Packaging foundation: `src/` tree + `pyproject.toml` + `environment.yml` - Completed and verified
 
 **Goal:** make `propygator` a real, importable, editable-installed package whose
 import does **not** start the JVM.

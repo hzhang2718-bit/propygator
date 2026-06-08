@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "propygator"
+version = "0.1.0"
+description = "Orbital simulation and satellite tracking, built on Orekit."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Henry Zhang", email = "hzhang2718@gmail.com" }]
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "plotly",
+    "requests",
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy", "pre-commit", "nbstripout"]
+
+[project.urls]
+Homepage = "https://github.com/hzhang2718-bit/propygator"
+Repository = "https://github.com/hzhang2718-bit/propygator"
+
+[tool.setuptools.packages.find]
+where = ["src"]

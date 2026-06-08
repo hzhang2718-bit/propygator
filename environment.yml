@@ -1,0 +1,16 @@
+name: propygator
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - openjdk=17
+  - orekit_jpype=13.1.*
+  - jpype1=1.5.*
+  - numpy=2.*
+  - pandas=3
+  - matplotlib
+  - plotly
+  - jupyterlab=4.5.*
+  - pip
+  - pip:
+      - -e .[dev]
