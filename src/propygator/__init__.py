@@ -14,6 +14,9 @@ from .core.exceptions import (
     OrekitDataMissingError,
     PropygatorError,
 )
+from .core.frames import Frame
+from .core.observation import GeodeticPosition, GroundStation, Pass
+from .core.states import State
 from .core.time import Epoch, TimeScale
 
 __version__ = version("propygator")
@@ -30,4 +33,9 @@ __all__ = [
     "JVMAlreadyStartedError",
     "Epoch",
     "TimeScale",
+    "Frame",
+    "State",
+    "GroundStation",
+    "GeodeticPosition",
+    "Pass",
 ]
