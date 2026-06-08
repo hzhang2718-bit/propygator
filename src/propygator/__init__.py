@@ -9,6 +9,7 @@ import logging
 from importlib.metadata import version
 
 from ._orekit_init import clear_cache, init
+from .core.elements import KeplerianElements
 from .core.exceptions import (
     JVMAlreadyStartedError,
     OrekitDataMissingError,
@@ -16,7 +17,7 @@ from .core.exceptions import (
 )
 from .core.frames import Frame
 from .core.observation import GeodeticPosition, GroundStation, Pass
-from .core.states import State
+from .core.states import Orientation, State, Trajectory
 from .core.time import Epoch, TimeScale
 
 __version__ = version("propygator")
@@ -35,6 +36,9 @@ __all__ = [
     "TimeScale",
     "Frame",
     "State",
+    "Trajectory",
+    "KeplerianElements",
+    "Orientation",
     "GroundStation",
     "GeodeticPosition",
     "Pass",

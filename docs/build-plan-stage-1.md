@@ -158,7 +158,7 @@ test).
 
 ---
 
-## Chunk 4 — `core/frames.py` + `core/states.py::State` + `core/observation.py`
+## Chunk 4 — `core/frames.py` + `core/states.py::State` + `core/observation.py` - Complete and Claude verified
 
 **Goal:** the frame enum and the simple frozen dataclasses with validation.
 
@@ -185,7 +185,7 @@ test).
 
 ---
 
-## Chunk 5 — `Trajectory` + `TrajectoryMetadata` + `KeplerianElements` + `Orientation`
+## Chunk 5 — `Trajectory` + `TrajectoryMetadata` + `KeplerianElements` + `Orientation` - Complete and Claude verified
 
 **Goal:** the complex data-model types as validated skeletons (no Orekit math).
 

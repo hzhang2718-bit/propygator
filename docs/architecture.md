@@ -74,6 +74,8 @@ conda env create -f environment.yml
 conda activate propygator
 ```
 
+**Always activate the env before running Python.** The conda env's library directory must be on the search path so NumPy's BLAS/LAPACK backend (this build links Intel MKL) loads; an interpreter launched without activation hard-crashes on the first linear-algebra call (`a @ b`, `np.linalg.*`) with a DLL delay-load error rather than a Python exception. This is primarily a Windows-local-dev hazard — WSL2 and CI run in an activated env. (Detailed troubleshooting lives in the README.)
+
 For dependency updates after the initial install, use `conda env update -f environment.yml --prune` so conda re-evaluates the pip block and removes anything no longer specified. Note that `--prune` has historical quirks with pip-managed entries in the lockfile; if pip dependencies get out of sync, the reliable recovery is to recreate the env rather than to update it. Document this in the README. The verified-environment snapshot (`docs/verified_environments/2026-05.txt`) records the `conda` / `mamba` versions this guidance was tested against; `--prune` behaviour has shifted across versions in the past, so re-verify if the snapshot is more than a few minor versions behind the current tooling.
 
 ### Orekit data

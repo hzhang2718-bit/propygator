@@ -26,7 +26,7 @@ There is no `environment.yml` on disk yet (it's specified in `architecture.md` �
 - `orekit_jpype` 13.1.x, `jpype1` 1.5.x, NumPy 2.x, pandas 3.x — all from `conda-forge`
 - **Never** use the legacy JCC-based `orekit` package (pulls OpenJDK 8).
 
-Activate before running anything Python: `conda activate propygator`. On this Windows machine, PowerShell needs a one-time `conda init powershell`; the conda interpreter is at `C:\Users\hzhan\miniconda3\envs\propygator\python.exe`.
+Activate before running anything Python: `conda activate propygator`. On this Windows machine, PowerShell needs a one-time `conda init powershell`; the conda interpreter is at `C:\Users\hzhan\miniconda3\envs\propygator\python.exe`. Activation is mandatory, not cosmetic — NumPy here links Intel MKL whose runtime DLLs only resolve in the activated env, so calling that interpreter path directly hard-crashes on the first NumPy linear-algebra call (`@`, `np.linalg.*`) with `Windows fatal exception 0xC06D007F` instead of a Python error. For non-interactive runs prefer `conda run -n propygator <cmd>` (note: `conda run` rejects newlines in `python -c`; use a script file).
 
 Commands (most don't work until the corresponding files are created):
 - Run the JPype/NumPy/Orekit boundary smoke test (works today): `python test_numpy_compat.py` (requires `orekit-data/` resolvable from CWD)
