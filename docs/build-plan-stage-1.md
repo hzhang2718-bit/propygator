@@ -129,7 +129,7 @@ Remove-Item Env:\OREKIT_DATA_PATH
 
 ---
 
-## Chunk 3 — `core/time.py`: `Epoch` + `TimeScale` (full, pure-Python)
+## Chunk 3 — `core/time.py`: `Epoch` + `TimeScale` (full, pure-Python) - Completed and verified
 
 **Goal:** the most-used "safe before init" type, fully implemented and tested
 without touching the JVM.

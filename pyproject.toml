@@ -29,3 +29,10 @@ Repository = "https://github.com/hzhang2718-bit/propygator"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+# Only collect propygator's own tests. Without this, a bare `pytest` from the
+# repo root recurses into the vendored ./orekit-data/ tree and tries to import
+# its PyInstaller test module (architecture treats orekit-data as an external
+# dependency, not project code).
+testpaths = ["tests"]

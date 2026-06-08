@@ -14,6 +14,7 @@ from .core.exceptions import (
     OrekitDataMissingError,
     PropygatorError,
 )
+from .core.time import Epoch, TimeScale
 
 __version__ = version("propygator")
 
@@ -27,4 +28,6 @@ __all__ = [
     "PropygatorError",
     "OrekitDataMissingError",
     "JVMAlreadyStartedError",
+    "Epoch",
+    "TimeScale",
 ]
