@@ -87,7 +87,7 @@ editable (`Location` pointing at `src`) install.
 
 ---
 
-## Chunk 2 — Lazy JVM init + exceptions + orekit-data resolution
+## Chunk 2 — Lazy JVM init + exceptions + orekit-data resolution - Completed and Claude verified
 
 **Goal:** the one-JVM-per-process lazy-init machinery and clean, typed errors.
 
@@ -105,7 +105,11 @@ editable (`Location` pointing at `src`) install.
   - an internal `_ensure_started()` that Orekit-touching code calls.
   - `clear_cache()` — recursively empties `~/.propygator/cache/` (dir preserved).
   - Use `pathlib.Path` throughout; `logger = logging.getLogger(__name__)`.
-- Re-export `init`, `clear_cache` from top-level `__init__.py`.
+- Re-export `init`, `clear_cache`, and the exception types (`PropygatorError`,
+  `OrekitDataMissingError`, `JVMAlreadyStartedError`) from top-level
+  `__init__.py`. The exceptions are now defined and `init()` raises them, so
+  they belong on the top-level surface (architecture §7 lists "the exception
+  types" there); all three are pure-Python and carry no Orekit-import risk.
 
 **Reuse:** the exact boilerplate ordering from
 `docs/orekit_setup_reference.md` (`initVM()` before any `from org.orekit...`;
