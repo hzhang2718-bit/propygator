@@ -216,7 +216,7 @@ test).
 
 ---
 
-## Chunk 6 — Test harness: `conftest.py` + stack-compatibility boundary test
+## Chunk 6 — Test harness: `conftest.py` + stack-compatibility boundary test - Complete and verified
 
 **Goal:** session-scoped JVM/data init for tests, and the boundary guard ported
 from `test_numpy_compat.py`.
@@ -242,7 +242,7 @@ root.
 
 ---
 
-## Chunk 7 — Tooling: pre-commit + lint/type config + orekit-data download script
+## Chunk 7 — Tooling: pre-commit + lint/type config + orekit-data download script - Complete and verified
 
 **Goal:** enforce hygiene locally; make orekit-data reproducible for CI/fresh setups.
 
@@ -265,7 +265,7 @@ re-run until clean). Optionally smoke the script with `--help` /a temp dir.
 
 ---
 
-## Chunk 8 — CI + docs polish + housekeeping
+## Chunk 8 — CI + docs polish + housekeeping - Complete and verified (CI run pending push)
 
 **Goal:** wire up CI and bring the repo docs/structure to a clean baseline.
 

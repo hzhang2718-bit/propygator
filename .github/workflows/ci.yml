@@ -1,0 +1,51 @@
+name: CI
+
+# Run on every push to any branch and on every pull request (project_meta §7).
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Test (Ubuntu, Python 3.11)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Login shell so the micromamba-activated `propygator` env persists
+        # across steps; pytest, mypy, and pre-commit all need the env's
+        # interpreter and installed dependencies on PATH.
+        shell: bash -el {0}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Restore orekit-data (~500 MB) from cache so CI does not re-download half a
+      # gigabyte every run. Keyed on a version string — bump the suffix to force a
+      # refresh (project_meta §7). On a hit the directory is restored before the
+      # provisioning step below, which then no-ops.
+      - name: Cache orekit-data
+        uses: actions/cache@v4
+        with:
+          path: ~/.propygator/orekit-data
+          key: orekit-data-master-v1
+
+      # Build the conda env from environment.yml (pins Python 3.11, OpenJDK 17,
+      # orekit_jpype 13.1.x, and `pip: -e .[dev]`). cache-environment speeds
+      # re-runs (project_meta §7 setup pattern).
+      - name: Set up propygator environment
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: environment.yml
+          cache-environment: true
+
+      # Idempotent: no-ops when the cache restored a populated directory, fetches
+      # on a miss into ~/.propygator/orekit-data/ — the second entry in the
+      # resolution order, so tests and user code find it the same way (§3).
+      - name: Provision orekit-data
+        run: python scripts/download_orekit_data.py
+
+      - name: Run tests
+        run: pytest
+
+      - name: Run pre-commit hooks
+        run: pre-commit run --all-files
