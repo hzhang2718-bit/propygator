@@ -17,23 +17,23 @@ jobs:
         shell: bash -el {0}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Restore orekit-data (~500 MB) from cache so CI does not re-download half a
       # gigabyte every run. Keyed on a version string — bump the suffix to force a
       # refresh (project_meta §7). On a hit the directory is restored before the
       # provisioning step below, which then no-ops.
       - name: Cache orekit-data
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.propygator/orekit-data
-          key: orekit-data-master-v1
+          key: orekit-data-main-v1
 
       # Build the conda env from environment.yml (pins Python 3.11, OpenJDK 17,
       # orekit_jpype 13.1.x, and `pip: -e .[dev]`). cache-environment speeds
       # re-runs (project_meta §7 setup pattern).
       - name: Set up propygator environment
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: environment.yml
           cache-environment: true

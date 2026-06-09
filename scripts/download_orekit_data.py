@@ -38,10 +38,10 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-#: Canonical orekit-data archive (master branch) on the Orekit GitLab.
+#: Canonical orekit-data archive (default `main` branch) on the Orekit GitLab.
+#: The repo's default branch is `main`; the legacy `master` ref now 404s.
 ARCHIVE_URL = (
-    "https://gitlab.orekit.org/orekit/orekit-data/-/archive/master/"
-    "orekit-data-master.zip"
+    "https://gitlab.orekit.org/orekit/orekit-data/-/archive/main/orekit-data-main.zip"
 )
 #: Default install location — the second entry in propygator's search order (§3).
 DEFAULT_TARGET = Path.home() / ".propygator" / "orekit-data"
@@ -63,7 +63,7 @@ def _single_subdir(directory: Path) -> Path:
     """Return the one directory a GitLab archive wraps its contents in.
 
     GitLab archives place everything under a single top-level folder (e.g.
-    ``orekit-data-master/``). Raise if the layout is not exactly that one entry,
+    ``orekit-data-main/``). Raise if the layout is not exactly that one entry,
     so an unexpected archive shape fails loudly rather than silently mislaying
     the data.
     """
@@ -89,7 +89,7 @@ def download_orekit_data(
     target:
         Directory to populate with the orekit-data files. Created if absent.
     url:
-        Archive URL to fetch. Defaults to the master-branch zip on the Orekit
+        Archive URL to fetch. Defaults to the main-branch zip on the Orekit
         GitLab.
     force:
         Overwrite ``target`` if it already contains files. Without this, a
