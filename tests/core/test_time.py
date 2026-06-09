@@ -105,7 +105,9 @@ def test_now_is_recent_and_utc_default():
     e = Epoch.now()
     after = datetime.now(timezone.utc)
     assert e.scale is TimeScale.UTC
-    assert before - timedelta(seconds=2) <= e.to_datetime() <= after + timedelta(seconds=2)
+    assert (
+        before - timedelta(seconds=2) <= e.to_datetime() <= after + timedelta(seconds=2)
+    )
 
 
 # --- shifted_by renormalization --------------------------------------------

@@ -150,7 +150,7 @@ def init(vmargs: str | None = None) -> None:
     if vmargs is None:
         vmargs = os.environ.get("PROPYGATOR_VM_ARGS")
 
-    if jpype.isJVMStarted():
+    if jpype.isJVMStarted():  # type: ignore[attr-defined]  # jpype stubs omit it
         if _initialized:
             if vmargs != _init_vmargs:
                 raise JVMAlreadyStartedError(

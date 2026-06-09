@@ -334,9 +334,7 @@ class Trajectory:
                 )
 
         if self._epochs_int.dtype != np.int64:
-            raise ValueError(
-                f"_epochs_int must be int64, got {self._epochs_int.dtype}"
-            )
+            raise ValueError(f"_epochs_int must be int64, got {self._epochs_int.dtype}")
         for name in ("_epochs_frac", "positions", "velocities"):
             if named[name].dtype != np.float64:
                 raise ValueError(f"{name} must be float64, got {named[name].dtype}")

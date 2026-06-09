@@ -63,9 +63,7 @@ class KeplerianElements:
         e = self.eccentricity
         i = self.inclination_rad
         if not math.isfinite(a) or a == 0.0:
-            raise ValueError(
-                f"semi_major_axis_m must be finite and nonzero, got {a!r}"
-            )
+            raise ValueError(f"semi_major_axis_m must be finite and nonzero, got {a!r}")
         if not math.isfinite(e) or e < 0.0:
             raise ValueError(f"eccentricity must be finite and >= 0, got {e!r}")
         # The sign of a is tied to the orbit class. Parabolic (e == 1) has an

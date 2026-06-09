@@ -318,7 +318,7 @@ class State:
             )
         if self.position.dtype != np.float64 or self.velocity.dtype != np.float64:
             raise ValueError("position and velocity must be float64")
-        
+
         # Finiteness: reject NaN/inf at the construction site so a bad state
         # can't reach the propagator and surface later as an opaque Orekit
         # failure. np.isfinite is False for both NaN and inf.

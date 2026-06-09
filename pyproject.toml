@@ -53,3 +53,47 @@ testpaths = ["tests"]
 # possible: pytest configures faulthandler once per invocation, and the
 # pure-Python tests share that invocation with the JVM tests.
 addopts = ["-p", "no:faulthandler"]
+
+[tool.ruff]
+# Tell ruff (and its isort) which directories hold first-party code (src layout).
+src = ["src", "tests", "scripts"]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+# ruff subsumes flake8 (E/F/W) and isort (I); ruff-format subsumes black. Kept
+# intentionally focused on the architecture's "flake8/black/isort" mapping;
+# broader rule families (UP, B, ...) are a deliberate, separate pass.
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["propygator"]
+
+[tool.mypy]
+python_version = "3.11"
+# Type-gate the shipped package and the utility script. Tests are exercised by
+# pytest, not type-gated: py.typed is a promise about src/ to consumers.
+files = ["src", "scripts"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+# The JPype-generated Java namespaces (org.orekit.*, java.*) and the JPype/Orekit
+# wrappers carry no type information; pandas 3 and requests likewise expose no
+# stubs mypy can resolve in this environment. Treat them as untyped — this is the
+# "ignore_missing_imports for the org.orekit.* runtime-stub namespace" called for
+# in architecture §6.
+module = [
+    "jpype",
+    "jpype.*",
+    "orekit_jpype",
+    "orekit_jpype.*",
+    "org.orekit.*",
+    "java",
+    "java.*",
+    "pandas",
+    "pandas.*",
+    "requests",
+    "requests.*",
+]
+ignore_missing_imports = true

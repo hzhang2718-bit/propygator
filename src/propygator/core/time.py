@@ -209,7 +209,9 @@ class Epoch:
         if self.scale is TimeScale.UT1:
             raise NotImplementedError(_UT1_MESSAGE)
         if not math.isfinite(self._frac_seconds):
-            raise ValueError(f"_frac_seconds must be finite, got {self._frac_seconds!r}")
+            raise ValueError(
+                f"_frac_seconds must be finite, got {self._frac_seconds!r}"
+            )
         if not (0.0 <= self._frac_seconds < 1.0):
             raise ValueError(
                 f"_frac_seconds must be in [0.0, 1.0), got {self._frac_seconds!r}; "
@@ -233,8 +235,12 @@ class Epoch:
             raise ValueError(f"Could not parse ISO 8601 datetime: {iso!r}")
         g = m.groupdict()
         whole_dt = datetime(
-            int(g["year"]), int(g["month"]), int(g["day"]),
-            int(g["hour"]), int(g["minute"]), int(g["second"]),
+            int(g["year"]),
+            int(g["month"]),
+            int(g["day"]),
+            int(g["hour"]),
+            int(g["minute"]),
+            int(g["second"]),
         )
         frac = float(g["frac"]) if g["frac"] else 0.0
         tz = g["tz"]
@@ -263,7 +269,9 @@ class Epoch:
             )
         utc_dt = dt.astimezone(timezone.utc)
         whole_dt = utc_dt.replace(microsecond=0, tzinfo=None)
-        int_s, fr = _count_from_wallclock(whole_dt, utc_dt.microsecond * 1e-6, TimeScale.UTC)
+        int_s, fr = _count_from_wallclock(
+            whole_dt, utc_dt.microsecond * 1e-6, TimeScale.UTC
+        )
         return cls(int_s, fr, scale)
 
     @classmethod
@@ -330,8 +338,10 @@ class Epoch:
         )
 
     if TYPE_CHECKING:
+
         def to_orekit(self) -> "org.orekit.time.AbsoluteDate": ...
     else:
+
         def to_orekit(self):
             """Build the Orekit ``AbsoluteDate`` for this instant.
 

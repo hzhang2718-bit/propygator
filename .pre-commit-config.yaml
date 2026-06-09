@@ -1,0 +1,51 @@
+# Pre-commit hooks for propygator (architecture §5, "Pre-commit hooks").
+#
+#   one-time, per clone:  pre-commit install
+#   run across the repo:  pre-commit run --all-files
+#
+# CI runs the same hooks via `pre-commit run --all-files`, so contributors who
+# skip the local install are still caught. Run from an activated `propygator`
+# conda env (the mypy hook below uses the env's interpreter and dependencies).
+
+repos:
+  # File hygiene.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+
+  # Lint + format. ruff subsumes flake8/isort (lint) and black (format). Pinned
+  # to the ruff version in environment.yml so the hook and the CLI agree.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.16
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # Strip notebook outputs so notebook diffs stay reviewable and the repo does
+  # not bloat with cell outputs. Architecture §5: "This hook alone justifies the
+  # pre-commit setup for this project." Inert until notebooks/ lands (Chunk 8).
+  - repo: https://github.com/kynan/nbstripout
+    rev: "0.9.1"
+    hooks:
+      - id: nbstripout
+
+  # mypy runs as a local/system hook rather than via the mypy mirror: it must see
+  # the conda env's installed type information (numpy, the editable propygator
+  # install) to type-check correctly. The mirror's isolated venv would require an
+  # `additional_dependencies` list that duplicates and drifts from
+  # environment.yml. `pass_filenames: false` lets mypy use the scope configured
+  # in pyproject.toml ([tool.mypy] files) instead of the staged file list.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
