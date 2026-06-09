@@ -265,7 +265,7 @@ re-run until clean). Optionally smoke the script with `--help` /a temp dir.
 
 ---
 
-## Chunk 8 — CI + docs polish + housekeeping - Complete and verified (CI run pending push)
+## Chunk 8 — CI + docs polish + housekeeping - Complete and verified (CI succeeded)
 
 **Goal:** wire up CI and bring the repo docs/structure to a clean baseline.
 
@@ -295,7 +295,7 @@ captured in Chunk 1; decide whether to push to trigger the first CI run.
 
 ---
 
-## End-state verification (groundwork complete → ready for Feature 1)
+## End-state verification (groundwork complete → ready for Feature 1) - Complete
 
 From repo root, `conda activate propygator`:
 1. `python -c "import propygator, jpype; print(propygator.__version__, jpype.isJVMStarted())"`

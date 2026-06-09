@@ -6,7 +6,6 @@ The public verb/type surface is re-exported as later chunks land.
 """
 
 import logging
-from importlib.metadata import PackageNotFoundError, version
 
 from ._orekit_init import clear_cache, init
 from .core.elements import KeplerianElements
@@ -17,15 +16,13 @@ from .core.exceptions import (
 )
 from .core.frames import Frame
 from .core.observation import GeodeticPosition, GroundStation, Pass
-from .core.states import Orientation, State, Trajectory
+from .core.states import Orientation, State, Trajectory, _propygator_version
 from .core.time import Epoch, TimeScale
 
-try:
-    __version__ = version("propygator")
-except PackageNotFoundError:
-    # Running from a source tree without an install (no distribution metadata).
-    # Mirror core.states._propygator_version so import never hard-fails here.
-    __version__ = "unknown"
+# Single-sourced via core.states._propygator_version (importlib.metadata), which
+# returns "unknown" when running from a source tree without distribution metadata
+# (the same value Trajectory metadata records), so import never hard-fails here.
+__version__ = _propygator_version()
 
 # Silent by default; applications opt in via logging.basicConfig(...).
 logging.getLogger(__name__).addHandler(logging.NullHandler())

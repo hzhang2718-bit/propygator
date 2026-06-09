@@ -42,6 +42,39 @@ def test_epoch_to_orekit_constructs_absolutedate():
     assert isinstance(ad, AbsoluteDate)
 
 
+@pytest.mark.parametrize(
+    "iso, scale",
+    [
+        ("2026-06-15T12:34:56.5", TimeScale.UTC),  # modern UTC
+        ("2017-01-01T00:00:00", TimeScale.UTC),  # leap-second boundary (TAI-UTC=37)
+        ("2024-01-01T00:00:00", TimeScale.TAI),  # constant-offset TAI route
+        ("2024-01-01T00:00:00", TimeScale.TT),  # constant-offset TT route
+    ],
+)
+def test_epoch_to_orekit_matches_orekit_timescale(iso, scale):
+    """Cross-check the pure-Python time stack against Orekit's authority.
+
+    ``Epoch.to_orekit()`` builds an ``AbsoluteDate`` from propygator's two-double
+    count; this asserts that instant equals the one Orekit parses from the *same*
+    ISO string in the *same* time scale. For the UTC cases this validates the
+    bundled leap-second table directly against orekit-data's UTC-TAI history — the
+    one authority cross-check the otherwise self-referential ``test_time`` suite
+    lacks (it only checks internal round-trips and hard-coded offsets).
+    """
+    from org.orekit.time import AbsoluteDate, TimeScalesFactory
+
+    orekit_scale = {
+        TimeScale.UTC: TimeScalesFactory.getUTC(),
+        TimeScale.TAI: TimeScalesFactory.getTAI(),
+        TimeScale.TT: TimeScalesFactory.getTT(),
+    }[scale]
+    reference = AbsoluteDate(iso, orekit_scale)
+    built = Epoch.from_iso(iso, scale=scale).to_orekit()
+    # The two-double -> AbsoluteDate construction is sub-nanosecond; 1e-6 s is a
+    # safe envelope that still catches a wrong leap count or a sign error.
+    assert abs(built.durationFrom(reference)) < 1e-6
+
+
 # --- (a) Java Vector3D -> NumPy extraction ----------------------------------
 
 

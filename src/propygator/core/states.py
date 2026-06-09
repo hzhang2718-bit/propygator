@@ -270,6 +270,9 @@ def _epoch_arrays_from_datetime64(
     epochs_int = np.empty(n, dtype=np.int64)
     epochs_frac = np.empty(n, dtype=np.float64)
     origin = datetime(1970, 1, 1)
+    # TODO(1.1): this per-sample Python loop is fine for the moderate-N skeleton
+    # but is the hotspot for the ~1e5-sample bulk path (stack-compat part (c));
+    # vectorize the leap-second lookup (np.searchsorted on the thresholds) then.
     for k in range(n):
         whole_s, rem_ns = divmod(int(vals_ns[k]), 1_000_000_000)
         whole_dt = origin + timedelta(seconds=whole_s)
@@ -511,6 +514,9 @@ class Trajectory:
         # Pin the column unit to ns so the dtype is deterministic: pandas would
         # otherwise infer [us] from the microsecond-resolution datetimes (and [s]
         # for an empty trajectory), which surprises dtype-sensitive callers.
+        # TODO(1.1): the per-sample Epoch.to_datetime() list comp is the bulk-path
+        # hotspot exercised by stack-compat part (c) at ~1e5 samples; vectorize the
+        # count->datetime conversion when that test lands.
         epoch_utc = pd.to_datetime(
             [self._epoch_at(i).to_datetime() for i in range(n)], utc=True
         ).as_unit("ns")
