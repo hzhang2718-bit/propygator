@@ -25,10 +25,14 @@ logger = logging.getLogger(__name__)
 _OREKIT_DATA_URL = "https://gitlab.orekit.org/orekit/orekit-data"
 
 # Module-level record of how propygator started the JVM. ``_initialized`` is
-# True only after a successful init(); ``_init_vmargs`` is the (possibly None)
-# vmargs string used, so a later init() can detect a conflicting request.
+# True once propygator owns the running JVM (started or adopted it);
+# ``_init_vmargs`` is the (possibly None) vmargs string used, so a later init()
+# can detect a conflicting request. ``_data_loaded`` tracks the orekit-data
+# context separately, so that if data loading fails *after* the JVM starts, a
+# later call can complete it instead of misreading our own JVM as external.
 _initialized: bool = False
 _init_vmargs: str | None = None
+_data_loaded: bool = False
 
 
 def _data_missing_message(searched: list[tuple[str, Path]]) -> str:
@@ -139,7 +143,7 @@ def init(vmargs: str | None = None) -> None:
     - Subsequent calls with differing args: :class:`JVMAlreadyStartedError`
       (JPype cannot reconfigure a running JVM).
     """
-    global _initialized, _init_vmargs
+    global _initialized, _init_vmargs, _data_loaded
 
     import jpype
 
@@ -148,20 +152,25 @@ def init(vmargs: str | None = None) -> None:
 
     if jpype.isJVMStarted():
         if _initialized:
-            if vmargs == _init_vmargs:
-                return
-            raise JVMAlreadyStartedError(
-                _already_started_message(vmargs, _init_vmargs)
-            )
+            if vmargs != _init_vmargs:
+                raise JVMAlreadyStartedError(
+                    _already_started_message(vmargs, _init_vmargs)
+                )
+            # Same args, JVM already ours. Finish loading the data context if a
+            # prior call started the JVM but failed before the data loaded.
+            if not _data_loaded:
+                _setup_orekit_data(_resolve_data_path())
+                _data_loaded = True
+            return
         # JVM was started outside propygator (e.g. a direct orekit_jpype.initVM
         # by other code). We cannot apply different vmargs to a running JVM.
         if vmargs is not None:
             raise JVMAlreadyStartedError(_already_started_message(vmargs, None))
         # Adopt the running JVM: load our data context once and record state.
-        data_path = _resolve_data_path()
-        _setup_orekit_data(data_path)
+        _setup_orekit_data(_resolve_data_path())
         _initialized = True
         _init_vmargs = None
+        _data_loaded = True
         return
 
     # Fresh start. Resolve data BEFORE touching the JVM so a missing-data
@@ -172,20 +181,32 @@ def init(vmargs: str | None = None) -> None:
 
     logger.info("Starting JVM (vmargs=%r)", vmargs)
     orekit_jpype.initVM(vmargs=vmargs)
-    _setup_orekit_data(data_path)
-
+    # The JVM is running and owned by propygator. Record that immediately, before
+    # loading data, so that if _setup_orekit_data raises, module state stays
+    # consistent (JVM up, data not yet loaded) and a later call can complete the
+    # load — rather than misclassifying our own JVM as externally started.
     _initialized = True
     _init_vmargs = vmargs
+    _setup_orekit_data(data_path)
+    _data_loaded = True
 
 
 def _ensure_started() -> None:
     """Idempotent JVM bootstrap for Orekit-touching code paths.
 
     Feature code calls this before any Orekit access; cheap after the first
-    successful init().
+    successful init(). If a prior init() started the JVM but failed to load the
+    data context, complete the data load here rather than re-entering init()
+    (which compares vmargs and could spuriously reject the implicit retry).
     """
-    if not _initialized:
-        init()
+    global _data_loaded
+    if _initialized and _data_loaded:
+        return
+    if _initialized and not _data_loaded:
+        _setup_orekit_data(_resolve_data_path())
+        _data_loaded = True
+        return
+    init()
 
 
 def clear_cache() -> None:

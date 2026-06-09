@@ -166,16 +166,18 @@ def _wallclock_from_count(
     return _J2000_TT + timedelta(seconds=s_int), s_frac
 
 
-def _format_frac(frac: float) -> str:
-    """Render a sub-second fraction as an ISO suffix (``""`` when zero).
+def _format_frac_ns(ns: int) -> str:
+    """Render an integer nanosecond count as an ISO fractional suffix.
 
-    Up to 9 digits (nanosecond display); trailing zeros stripped. Sub-nanosecond
+    ``ns`` is in ``[0, 1_000_000_000)``. Returns ``""`` for zero; otherwise a
+    ``".ddd"`` suffix with trailing zeros stripped (nanosecond display).
+    Integer-based: unlike formatting a float with ``%.9f``, it cannot round a
+    fraction up to ``1.000000000`` and then silently drop it. Sub-nanosecond
     precision is retained in storage but not shown.
     """
-    if frac == 0.0:
+    if ns == 0:
         return ""
-    s = f"{frac:.9f}"[1:].rstrip("0")  # drop leading "0", keep ".ddd"
-    return "" if s == "." else s
+    return "." + f"{ns:09d}".rstrip("0")
 
 
 def _parse_tz_offset_seconds(tz: str) -> int:
@@ -303,13 +305,22 @@ class Epoch:
         whole_dt, frac = _wallclock_from_count(
             self._int_seconds, self._frac_seconds, self.scale
         )
-        return whole_dt.strftime("%Y-%m-%dT%H:%M:%S") + _format_frac(frac)
+        # Round the fraction to nanoseconds, carrying a full second into the
+        # whole-second part rather than dropping it: a fraction within ~5e-10 of
+        # 1.0 rounds up to 1.000000000 and would otherwise vanish from the string
+        # (losing ~1 s and breaking the round-trip).
+        ns = int(round(frac * 1e9))
+        if ns >= 1_000_000_000:
+            whole_dt += timedelta(seconds=1)
+            ns -= 1_000_000_000
+        return whole_dt.strftime("%Y-%m-%dT%H:%M:%S") + _format_frac_ns(ns)
 
     def to_datetime(self) -> datetime:
         """The instant as a timezone-aware (UTC) ``datetime``, microsecond precision.
 
         Always UTC-referenced regardless of ``scale`` — Python's ``tzinfo`` models
-        civil UTC offsets, not TAI/TT. Sub-microsecond precision is truncated.
+        civil UTC offsets, not TAI/TT. Sub-microsecond precision is rounded to the
+        nearest microsecond (Python ``datetime`` resolution).
         """
         whole_dt, frac = _wallclock_from_count(
             self._int_seconds, self._frac_seconds, TimeScale.UTC

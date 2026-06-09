@@ -244,3 +244,18 @@ def test_ut1_in_scale_deferred():
 def test_out_of_range_frac_rejected(bad_frac):
     with pytest.raises(ValueError):
         Epoch(0, bad_frac, TimeScale.TAI)
+
+
+# --- to_iso sub-nanosecond carry -------------------------------------------
+
+
+def test_to_iso_carries_near_one_fraction():
+    # A fraction within ~5e-10 of 1.0 must carry into the whole second, not be
+    # dropped (previously _format_frac rendered "1.000000000" and lost ~1 s).
+    e = Epoch(1000, 0.9999999996, TimeScale.TT)  # J2000 TT + 1000 s
+    assert e.to_iso() == "2000-01-01T12:16:41"
+
+
+def test_to_iso_high_precision_fraction_not_lost():
+    e = Epoch.from_iso("2024-06-01T12:00:00.9999999996", scale=TimeScale.TT)
+    assert e.to_iso() == "2024-06-01T12:00:01"

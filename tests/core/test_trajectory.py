@@ -156,9 +156,14 @@ def test_from_arrays_does_not_freeze_caller_arrays():
     vel[0, 0] = 1.0
 
 
-def test_getitem_returns_writable_state():
+def test_getitem_returns_immutable_state():
     s = _traj()[0]
-    s.position[0] = 123.0  # materialized State owns a writable copy
+    # Materialized States are immutable value objects (architecture §6): their
+    # backing arrays are read-only copies.
+    with pytest.raises(ValueError):
+        s.position[0] = 123.0
+    with pytest.raises(ValueError):
+        s.velocity[0] = 123.0
 
 
 # --- metadata validation ---------------------------------------------------
@@ -174,6 +179,20 @@ def test_missing_metadata_key_rejected():
             Frame.EME2000,
             metadata={"propagator": "x"},
         )
+
+
+def test_from_arrays_copies_metadata():
+    n = 2
+    meta = _meta()
+    traj = Trajectory.from_arrays(
+        [_epoch(i) for i in range(n)],
+        _positions(n),
+        _velocities(n),
+        Frame.EME2000,
+        metadata=meta,
+    )
+    meta["propagator"] = "mutated"  # caller mutates their own dict afterward
+    assert traj.metadata["propagator"] == "test"  # trajectory record unaffected
 
 
 # --- array validation ------------------------------------------------------
@@ -369,6 +388,37 @@ def test_to_dataframe_shape_columns_attrs():
     assert df.attrs["epoch_scale"] == "UTC"
     assert df.attrs["metadata"]["propagator"] == "test"
     np.testing.assert_array_equal(df["x_m"].to_numpy(), _positions(n)[:, 0])
+
+
+def test_to_dataframe_epoch_dtype_is_ns():
+    df = _traj(3).to_dataframe()
+    assert str(df["epoch_utc"].dtype) == "datetime64[ns, UTC]"
+
+
+def test_to_dataframe_empty_epoch_dtype_is_ns():
+    empty = Trajectory.from_arrays(
+        np.array([], dtype="datetime64[ns]"),
+        np.zeros((0, 3), dtype=np.float64),
+        np.zeros((0, 3), dtype=np.float64),
+        Frame.EME2000,
+        metadata=_meta(),
+    )
+    df = empty.to_dataframe()
+    assert len(df) == 0
+    # The empty case must not regress to datetime64[s] — dtype stays ns.
+    assert str(df["epoch_utc"].dtype) == "datetime64[ns, UTC]"
+
+
+# --- equality --------------------------------------------------------------
+
+
+def test_equality_is_identity():
+    traj = _traj()
+    # Equality must not raise (the dataclass default would, on the ndarray
+    # fields); it falls back to identity.
+    assert traj == traj
+    assert traj != _traj()
+    assert traj != 42
 
 
 # --- deferred methods ------------------------------------------------------

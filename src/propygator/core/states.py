@@ -47,6 +47,12 @@ class State:
     ``(3,)``, ``float64`` — enforced in :meth:`__post_init__` so a buggy path
     producing shape ``(1, 3)``, ``float32``, or a non-finite value fails at the
     construction site rather than surfacing later as an opaque Orekit failure.
+
+    Immutability is real, not just frozen bindings: ``__post_init__`` defensively
+    copies the input arrays and marks them read-only, so a ``State`` never aliases
+    caller memory and its contents cannot change. This makes value-based ``==``
+    and ``hash()`` well-defined (two ``State``s with equal fields compare equal and
+    hash equal).
     """
 
     epoch: Epoch
@@ -76,6 +82,40 @@ class State:
             np.all(np.isfinite(self.position)) and np.all(np.isfinite(self.velocity))
         ):
             raise ValueError("position and velocity must be finite (no NaN or inf)")
+
+        # Immutable value type (architecture §6): defensively copy so the State
+        # does not alias the caller's arrays, then make the contents read-only.
+        # Copying severs aliasing; the read-only flag keeps __eq__/__hash__ sound
+        # (a hash must not change under the caller's feet). Frozen-dataclass
+        # fields are rebound via object.__setattr__.
+        pos = np.array(self.position, dtype=np.float64, copy=True)
+        vel = np.array(self.velocity, dtype=np.float64, copy=True)
+        pos.setflags(write=False)
+        vel.setflags(write=False)
+        object.__setattr__(self, "position", pos)
+        object.__setattr__(self, "velocity", vel)
+
+    def __eq__(self, other: object) -> bool:
+        # The dataclass-generated __eq__ would compare the ndarray fields with
+        # ``==`` and then call bool() on the result, raising "truth value ...
+        # ambiguous". Compare by value instead. Exact array comparison is the
+        # right semantics for a value type; cross-construction float noise makes
+        # two "equivalent" states unequal, same as any float-bearing value type.
+        if not isinstance(other, State):
+            return NotImplemented
+        return (
+            self.epoch == other.epoch
+            and self.frame is other.frame
+            and np.array_equal(self.position, other.position)
+            and np.array_equal(self.velocity, other.velocity)
+        )
+
+    def __hash__(self) -> int:
+        # ndarrays are unhashable; hash their bytes. Sound because the arrays are
+        # read-only (see __post_init__) so the hash is stable for the lifetime.
+        return hash(
+            (self.epoch, self.frame, self.position.tobytes(), self.velocity.tobytes())
+        )
 
     def to_frame(self, target_frame: Frame) -> "State":
         """Return this state expressed in ``target_frame`` (deferred to Feature 1)."""
@@ -239,7 +279,7 @@ def _epoch_arrays_from_datetime64(
     return epochs_int, epochs_frac, epoch_scale
 
 
-@dataclass
+@dataclass(eq=False)
 class Trajectory:
     """A propagation output: column-oriented (p, v) samples over time (architecture §6).
 
@@ -250,6 +290,10 @@ class Trajectory:
     corrupt invariants. Construct via :meth:`from_states` or :meth:`from_arrays`;
     the raw ``__init__`` exists for propagator internals and must be handed a full
     required-key ``metadata`` dict.
+
+    Equality is by identity (``eq=False``): value-comparing two large array-backed
+    trajectories is expensive and unneeded, and the dataclass-generated ``__eq__``
+    would raise on the ndarray fields ("truth value ... ambiguous").
     """
 
     _epochs_int: np.ndarray  # int64, shape (N,), TAI seconds since J2000
@@ -420,7 +464,9 @@ class Trajectory:
         ``datetime64[ns]`` ndarray (wall-clock in ``epoch_scale``, nanosecond
         precision). ``positions`` / ``velocities`` are defensively copied so the
         caller's arrays are not frozen; they must be ``(N, 3)`` ``float64``.
-        ``metadata=None`` populates the minimal required-key user default.
+        ``metadata=None`` populates the minimal required-key user default; a
+        supplied ``metadata`` dict is shallow-copied so later caller mutation
+        cannot alter the trajectory's record.
         """
         if isinstance(epochs, np.ndarray):
             epochs_int, epochs_frac, scale = _epoch_arrays_from_datetime64(
@@ -431,7 +477,11 @@ class Trajectory:
 
         pos = np.array(positions, copy=True)
         vel = np.array(velocities, copy=True)
-        meta = _default_metadata() if metadata is None else metadata
+        # Defensively copy caller-supplied metadata (like positions/velocities) so
+        # later mutation of the caller's dict can't corrupt the trajectory's
+        # reproducibility record (architecture §10). Shallow copy is enough — the
+        # required keys are scalars.
+        meta = _default_metadata() if metadata is None else metadata.copy()
         return cls(epochs_int, epochs_frac, scale, pos, vel, frame, meta)
 
     # --- deferred to Feature 1 --------------------------------------------
@@ -449,8 +499,9 @@ class Trajectory:
     def to_dataframe(self) -> "pd.DataFrame":
         """Return a pandas view of the samples in the trajectory's own frame.
 
-        Columns: ``epoch_utc`` (tz-aware UTC ``datetime64[ns]``; sub-microsecond
-        truncated), ``x_m`` / ``y_m`` / ``z_m``, ``vx_mps`` / ``vy_mps`` /
+        Columns: ``epoch_utc`` (tz-aware UTC, dtype ``datetime64[ns, UTC]``; the
+        values carry microsecond resolution since they come from ``Epoch
+        .to_datetime()``), ``x_m`` / ``y_m`` / ``z_m``, ``vx_mps`` / ``vy_mps`` /
         ``vz_mps``. ``frame``, ``epoch_scale``, and a copy of ``metadata`` are
         carried in ``df.attrs``. Pure-Python — this lightweight in-frame view is
         distinct from the richer 16-column ``export_csv`` (with derived
@@ -459,9 +510,12 @@ class Trajectory:
         import pandas as pd
 
         n = len(self)
+        # Pin the column unit to ns so the dtype is deterministic: pandas would
+        # otherwise infer [us] from the microsecond-resolution datetimes (and [s]
+        # for an empty trajectory), which surprises dtype-sensitive callers.
         epoch_utc = pd.to_datetime(
             [self._epoch_at(i).to_datetime() for i in range(n)], utc=True
-        )
+        ).as_unit("ns")
         df = pd.DataFrame(
             {
                 "epoch_utc": epoch_utc,
@@ -483,13 +537,43 @@ class Trajectory:
 # Orientation
 # ---------------------------------------------------------------------------
 
+# Below this magnitude a quaternion component is treated as "zero" when picking
+# the canonical sign (a unit quaternion always has a larger component to anchor
+# the choice). Well above float round-off, well below any meaningful component.
+_QUAT_SIGN_TOL = 1e-9
+
+
+def _canonicalize_quaternion_sign(q: np.ndarray) -> None:
+    """Flip ``q`` in place so one representative stands for the rotation.
+
+    A unit quaternion and its negation denote the same rotation. Picking ``w >=
+    0`` is ambiguous for 180-degree rotations where ``w`` is ~0 (and its sign is
+    pure round-off), which would store ``q`` and ``-q`` with opposite signs. Anchor
+    on the first significantly-nonzero component of ``(w, x, y, z)`` instead, so an
+    exact ``q`` / ``-q`` pair always canonicalizes to the same array.
+    """
+    for comp in q:
+        if comp > _QUAT_SIGN_TOL:
+            break
+        if comp < -_QUAT_SIGN_TOL:
+            q *= -1.0
+            break
+    # Normalize signed zeros to +0.0. The flip turns 0.0 into -0.0, which compares
+    # equal under np.array_equal but has a different byte pattern — so without this
+    # q and -q would hash differently despite comparing equal. (x + 0.0 leaves
+    # every value unchanged except -0.0, which becomes +0.0.)
+    q += 0.0
+
 
 @dataclass(frozen=True)
 class Orientation:
     """A propygator-native body→inertial rotation (architecture §6).
 
-    Stored canonically as a unit quaternion ``(w, x, y, z)`` with ``w >= 0`` (so
-    ``q`` and ``-q``, which denote the same rotation, compare equal). Construct via
+    Stored canonically as a unit quaternion ``(w, x, y, z)``, sign-normalized so
+    that ``q`` and ``-q`` (which denote the same rotation) store identically and
+    therefore ``==``/``hash`` equal. The sign is anchored on the first
+    significantly-nonzero component (``w >= 0`` alone is ambiguous for 180-degree
+    rotations where ``w`` is ~0). Construct via
     :meth:`from_quaternion`, :meth:`from_axis_angle`, or :meth:`from_matrix`,
     which normalize and validate. Only :meth:`to_orekit` (the Hipparchus
     ``Rotation``) touches the JVM and is deferred to Feature 1. Attitude rates are
@@ -518,6 +602,20 @@ class Orientation:
             )
         q.setflags(write=False)
 
+    def __eq__(self, other: object) -> bool:
+        # The dataclass-generated __eq__ would call bool() on an array comparison
+        # ("truth value ... ambiguous"). Compare the canonical quaternions by
+        # value; canonicalization (see _canonicalize_quaternion_sign) guarantees
+        # an exact q / -q pair stores identical arrays, so this honors the
+        # documented "q and -q compare equal" contract.
+        if not isinstance(other, Orientation):
+            return NotImplemented
+        return np.array_equal(self._quaternion, other._quaternion)
+
+    def __hash__(self) -> int:
+        # ndarrays are unhashable; hash the bytes of the read-only quaternion.
+        return hash(self._quaternion.tobytes())
+
     @classmethod
     def from_quaternion(cls, w: float, x: float, y: float, z: float) -> "Orientation":
         """Build from quaternion components (normalized; sign-canonicalized to w>=0)."""
@@ -528,8 +626,7 @@ class Orientation:
         if norm < 1e-12:
             raise ValueError(f"quaternion must be non-zero, got norm {norm!r}")
         q = q / norm
-        if q[0] < 0.0:
-            q = -q
+        _canonicalize_quaternion_sign(q)
         return cls(np.ascontiguousarray(q, dtype=np.float64))
 
     @classmethod

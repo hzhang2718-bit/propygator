@@ -79,3 +79,52 @@ def test_deferred_methods_raise():
         s.to_keplerian()
     with pytest.raises(NotImplementedError):
         s.to_orekit()
+
+
+# --- equality / hashing ----------------------------------------------------
+
+
+def test_equality_by_value():
+    a = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
+    b = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
+    assert a == b
+    assert hash(a) == hash(b)
+
+
+def test_inequality_distinguishes_fields():
+    base = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
+    assert base != State(
+        _epoch(), _vec(1.0, 2.0, 9.0), _vec(4.0, 5.0, 6.0), Frame.EME2000
+    )
+    assert base != State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.ITRF)
+    # Comparison with a non-State must be False, not raise.
+    assert base != 42
+
+
+def test_hashable_in_set():
+    a = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
+    b = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
+    assert len({a, b}) == 1
+
+
+# --- immutability: read-only contents + defensive copy ---------------------
+
+
+def test_arrays_are_read_only():
+    s = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
+    with pytest.raises(ValueError):
+        s.position[0] = 99.0
+    with pytest.raises(ValueError):
+        s.velocity[0] = 99.0
+
+
+def test_defensively_copies_inputs():
+    pos = _vec(1.0, 2.0, 3.0)
+    vel = _vec(4.0, 5.0, 6.0)
+    s = State(_epoch(), pos, vel, Frame.EME2000)
+    # The caller's arrays remain writable and mutating them must not change the
+    # State (no aliasing).
+    pos[0] = 99.0
+    vel[0] = 99.0
+    assert s.position[0] == 1.0
+    assert s.velocity[0] == 4.0

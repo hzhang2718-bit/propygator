@@ -71,6 +71,20 @@ def test_allows_hyperbolic_negative_semi_major_axis():
     assert k.semi_major_axis_m == -7.0e6
 
 
+def test_rejects_parabolic_eccentricity():
+    # e == 1 (parabolic) has no finite semi-major axis; rejected regardless of a.
+    with pytest.raises(ValueError):
+        _ke(eccentricity=1.0)
+    with pytest.raises(ValueError):
+        _ke(semi_major_axis_m=-7.0e6, eccentricity=1.0)
+
+
+def test_rejects_hyperbolic_positive_semi_major_axis():
+    # e > 1 with a > 0 is physically inconsistent (hyperbola needs a < 0).
+    with pytest.raises(ValueError):
+        _ke(semi_major_axis_m=7.0e6, eccentricity=1.5)
+
+
 @pytest.mark.parametrize("i", [-0.1, math.pi + 0.1, math.nan, math.inf])
 def test_rejects_bad_inclination(i):
     with pytest.raises(ValueError):

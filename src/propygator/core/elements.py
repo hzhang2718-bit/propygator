@@ -68,11 +68,22 @@ class KeplerianElements:
             )
         if not math.isfinite(e) or e < 0.0:
             raise ValueError(f"eccentricity must be finite and >= 0, got {e!r}")
-        # For a bound (elliptical) orbit a must be positive; hyperbolic orbits
-        # (e > 1) legitimately carry a < 0, so only constrain the e < 1 case.
+        # The sign of a is tied to the orbit class. Parabolic (e == 1) has an
+        # undefined/infinite semi-major axis and is not representable in classical
+        # elements; elliptical (e < 1) needs a > 0; hyperbolic (e > 1) needs a < 0.
+        if e == 1.0:
+            raise ValueError(
+                "eccentricity == 1 (parabolic) has no finite semi_major_axis_m "
+                "and is not representable in classical elements; unsupported."
+            )
         if e < 1.0 and a <= 0.0:
             raise ValueError(
                 f"elliptical orbit (e={e!r} < 1) requires semi_major_axis_m > 0, "
+                f"got {a!r}"
+            )
+        if e > 1.0 and a >= 0.0:
+            raise ValueError(
+                f"hyperbolic orbit (e={e!r} > 1) requires semi_major_axis_m < 0, "
                 f"got {a!r}"
             )
         if not math.isfinite(i) or not 0.0 <= i <= math.pi:

@@ -144,3 +144,48 @@ def test_to_orekit_deferred():
     o = Orientation.from_quaternion(1.0, 0.0, 0.0, 0.0)
     with pytest.raises(NotImplementedError):
         o.to_orekit()
+
+
+# --- equality / hashing ----------------------------------------------------
+
+
+def test_equality_by_value():
+    a = Orientation.from_quaternion(1.0, 0.0, 0.0, 0.0)
+    b = Orientation.from_quaternion(1.0, 0.0, 0.0, 0.0)
+    assert a == b
+    assert hash(a) == hash(b)
+    # A genuinely different rotation is unequal; a non-Orientation is too (no error).
+    assert a != Orientation.from_axis_angle((0.0, 0.0, 1.0), math.pi / 2)
+    assert a != 42
+
+
+def test_q_and_negq_compare_equal():
+    # q and -q denote the same rotation and must canonicalize identically.
+    a = Orientation.from_quaternion(0.3, 0.4, 0.5, 0.7)
+    b = Orientation.from_quaternion(-0.3, -0.4, -0.5, -0.7)
+    assert a == b
+    assert hash(a) == hash(b)
+
+
+def test_q_and_negq_equal_for_180_degree_rotation():
+    # w == 0 (180-degree) case: 'w >= 0' alone is ambiguous, so the fix must still
+    # canonicalize q and -q to the same array.
+    a = Orientation.from_quaternion(0.0, 1.0, 0.0, 0.0)
+    b = Orientation.from_quaternion(0.0, -1.0, 0.0, 0.0)
+    assert a == b
+    assert hash(a) == hash(b)
+
+
+def test_axis_angle_180_sign_consistent():
+    # Rotation by pi about +x and about -x are the same rotation; their stored
+    # quaternions must agree on the dominant component sign.
+    a = Orientation.from_axis_angle((1.0, 0.0, 0.0), math.pi)
+    b = Orientation.from_axis_angle((-1.0, 0.0, 0.0), math.pi)
+    # x-component sign must match (the bug stored +1 vs -1).
+    assert a.as_quaternion()[1] == pytest.approx(b.as_quaternion()[1], abs=1e-12)
+
+
+def test_hashable_in_set():
+    a = Orientation.from_quaternion(1.0, 0.0, 0.0, 0.0)
+    b = Orientation.from_quaternion(-1.0, 0.0, 0.0, 0.0)  # same rotation as a
+    assert len({a, b}) == 1

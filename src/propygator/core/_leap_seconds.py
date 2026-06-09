@@ -90,6 +90,13 @@ def tai_minus_utc_for_tai(tai: datetime) -> int:
     The reverse of :func:`tai_minus_utc_for_utc`, used when reconstructing a UTC
     wall-clock from internal TAI storage. ``tai`` is a naive datetime carrying
     TAI wall-clock components. Pre-1972 instants clamp to the earliest offset.
+
+    Leap-second caveat: the inserted leap second itself (UTC 23:59:60) has no
+    representation in a Python ``datetime``, so for the one-second TAI window of a
+    positive leap second this returns the pre-step offset, and the reconstructed
+    UTC reads one second later than the true (unrepresentable) instant. This is a
+    fundamental UTC-representation limit, not a table error, and is out of scope
+    for a J2000+ satellite library; left as-is by design.
     """
     idx = bisect.bisect_right(_TAI_THRESHOLDS, tai) - 1
     if idx < 0:

@@ -30,6 +30,10 @@ Repository = "https://github.com/hzhang2718-bit/propygator"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# Ship the PEP 561 marker so downstream type checkers honor propygator's types.
+propygator = ["py.typed"]
+
 [tool.pytest.ini_options]
 # Only collect propygator's own tests. Without this, a bare `pytest` from the
 # repo root recurses into the vendored ./orekit-data/ tree and tries to import
