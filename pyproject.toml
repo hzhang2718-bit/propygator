@@ -40,3 +40,16 @@ propygator = ["py.typed"]
 # its PyInstaller test module (architecture treats orekit-data as an external
 # dependency, not project code).
 testpaths = ["tests"]
+# Disable pytest's faulthandler plugin. Once the JVM is up (stack-compat tests
+# and, later, every Orekit-touching test), HotSpot deliberately raises and
+# handles access violations / SIGSEGV internally — implicit null checks,
+# safepoint polling, and JVM teardown at interpreter exit. faulthandler can't
+# tell those normal signals from a real crash, so it prints a spurious "fatal
+# exception: access violation" traceback at shutdown (seen on Windows; exit code
+# stays 0 and all tests pass). Disabling the plugin is the standard, portable
+# configuration for JVM-backed suites and avoids faulthandler converting a
+# benign JVM signal into a fatal abort on Linux CI. The standalone JVM smoke
+# path proves the teardown itself is clean. Scoping the disable tighter is not
+# possible: pytest configures faulthandler once per invocation, and the
+# pure-Python tests share that invocation with the JVM tests.
+addopts = ["-p", "no:faulthandler"]

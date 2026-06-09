@@ -29,7 +29,7 @@ There is no `environment.yml` on disk yet (it's specified in `architecture.md` Â
 Activate before running anything Python: `conda activate propygator`. On this Windows machine, PowerShell needs a one-time `conda init powershell`; the conda interpreter is at `C:\Users\hzhan\miniconda3\envs\propygator\python.exe`. Activation is mandatory, not cosmetic â€” NumPy here links Intel MKL whose runtime DLLs only resolve in the activated env, so calling that interpreter path directly hard-crashes on the first NumPy linear-algebra call (`@`, `np.linalg.*`) with `Windows fatal exception 0xC06D007F` instead of a Python error. For non-interactive runs prefer `conda run -n propygator <cmd>` (note: `conda run` rejects newlines in `python -c`; use a script file).
 
 Commands (most don't work until the corresponding files are created):
-- Run the JPype/NumPy/Orekit boundary smoke test (works today): `python test_numpy_compat.py` (requires `orekit-data/` resolvable from CWD)
+- Run the JPype/NumPy/Orekit boundary (stack-compatibility) test: `pytest tests/test_stack_compat.py` (requires `orekit-data/` resolvable from CWD; ported from the former standalone `test_numpy_compat.py`)
 - Create env (once `environment.yml` exists): `conda env create -f environment.yml`
 - Update env: `conda env update -f environment.yml --prune` (if pip deps desync, recreate rather than update)
 - Tests (once `tests/` exists): `pytest`; single test: `pytest tests/path/test_x.py::test_name`
