@@ -7,6 +7,14 @@ re-exported from the top-level package namespace for user convenience.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Type-only; importing Trajectory at runtime would invert the inward dependency
+    # rule (states.py is an outer layer). Under ``from __future__ import annotations``
+    # the attribute annotation below is a string, so no runtime import is needed.
+    from .states import Trajectory
+
 
 class PropygatorError(Exception):
     """Base class for all errors propygator raises deliberately.
@@ -47,4 +55,15 @@ class PropagationError(PropygatorError):
     §1.1). Input-validation problems (non-inertial frame, bad ``duration`` /
     ``output_step``, unresolvable config strings) raise ``ValueError`` *before*
     integration starts and are not wrapped in this type.
+
+    When the failure leaves usable steps behind, :attr:`partial_trajectory` carries
+    the :class:`~propygator.core.states.Trajectory` recovered up to the failure (the
+    drag-validity addendum §6.6 "may carry the partial Trajectory" allowance, for
+    advanced recovery). It is ``None`` when no usable steps were generated — and a
+    drag-driven decay is *not* re-raised at all: it stops and reports
+    ``termination_reason="reentry"`` (a partial ``Trajectory`` returned normally).
     """
+
+    #: Partial trajectory recovered up to a non-re-entry failure, or ``None`` if no
+    #: usable steps were generated. Set by ``propagate_numerical`` before re-raising.
+    partial_trajectory: "Trajectory | None" = None

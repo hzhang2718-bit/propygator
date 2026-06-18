@@ -307,6 +307,14 @@ class TrajectoryMetadata(TypedDict, total=False):
     tle_epoch: str
     start: str
 
+    # Termination reporting (addendum §6.6) — written ONLY when a guard stops the
+    # run early (impact, escape, re-entry, or a reasonable user-limit crossing), so a
+    # normal completed run's metadata (and its export_csv header) are byte-identical
+    # to today. NOT added to _REQUIRED_METADATA_KEYS — these stay optional.
+    terminated: bool
+    termination_reason: str  # "reentry" | "impact" | "escape" | "user_min" | "user_max"
+    termination_epoch: str  # ISO 8601 UTC of the crossing
+
 
 # Required metadata keys, enforced at runtime in Trajectory.__post_init__ (see the
 # TrajectoryMetadata runtime caveat for why __required_keys__ isn't used).

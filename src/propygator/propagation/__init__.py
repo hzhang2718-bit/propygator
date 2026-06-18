@@ -18,6 +18,7 @@ from .attitude import (
     SunPointing,
 )
 from .force_models import ForceModelConfig
+from .guards import AltitudeLimits
 from .integrators import IntegratorConfig
 from .numerical import propagate_numerical
 from .spacecraft import (
@@ -35,6 +36,7 @@ __all__ = [
     "SpacecraftGeometry",
     "VariableCd",
     "IncidenceVariableCd",
+    "AltitudeLimits",
     "AttitudeConfig",
     "LofAligned",
     "LofOffset",

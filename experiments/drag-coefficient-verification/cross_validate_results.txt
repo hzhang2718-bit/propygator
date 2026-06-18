@@ -1,0 +1,64 @@
+======================================================================
+PHASE-2 DERIVED VALIDITY BAND (addendum sec. 4)
+======================================================================
+1. LOWER table boundary: ~150 km (retained; current radius_min =
+   6,528,000 m). Not extended downward -- density volatile/unvalidated
+   below, and the Knudsen floor (item 3) governs low-altitude validity.
+2. UPPER table boundary (collapse cut): NONE within the swept 130-1400 km
+   (Chunk 1: collapse RMS stays <= 5% green throughout, overall 0.490%,
+   storm 0.672%). The high cut is a soft confidence label and NON-BINDING
+   (drag ~ rho -> 0 up there). SIGNED-OFF grid extent: ~1400 km (radius
+   7,778,000 m) -- the full green-validated sweep, so high/elliptical LEO
+   above the old 1200 km ceiling no longer trips nuisance clamp warnings.
+3. KNUDSEN floor floor_altitude(L) (Chunk 2, conservative high-activity):
+      1U CubeSat  L=  0.10 m  ->   110.5 km
+      3U CubeSat  L=  0.34 m  ->   118.6 km
+        smallsat  L=  1.00 m  ->   128.4 km
+       small bus  L=  3.00 m  ->   145.4 km
+       large bus  L=  5.00 m  ->   156.9 km
+      ISS module  L= 10.00 m  ->   177.2 km
+         station  L= 30.00 m  ->   222.5 km
+
+======================================================================
+RECONCILE (i): accommodation anchor (alpha = 0.90) -> Langmuir K
+======================================================================
+  cd_core hardcoded anchor:  n_O = 2.640e+14   T = 1284.0 K
+  live NRLMSISE-00 anchor :  n_O = 2.640e+14   T = 1284.1 K
+  anchor n_O rel diff = 0.013%   T rel diff = 0.004%
+  K_exp (cd_core)   = 1.9230e+06 1/Pa
+  K_gen (generator) = 1.9227e+06 1/Pa
+  K rel diff = 0.017%   [PASS < 1%]
+
+======================================================================
+RECONCILE (ii): relative-speed formula
+======================================================================
+  cd_core.v_rel uses spherical r = R_earth + alt; the generator uses the
+  geocentric radius. Equal at the equator; the radius convention differs by
+  ~0.1-0.3% at high latitude -> a sub-1% speed difference (documented).
+   alt km   lat   v_exp m/s   v_gen m/s  rel diff
+      400     0     7174.29     7174.29   0.0000%
+      400    45     7319.06     7325.64   0.0898%
+      400    80     7582.73     7594.75   0.1583%
+     1200     0     6699.89     6699.89   0.0000%
+     1200    80     7156.54     7166.74   0.1424%
+  max speed rel diff = 0.1583%  (equator -> rotation-rate
+  constant only ~1e-5; latitude -> spherical-vs-geocentric radius)
+
+======================================================================
+SHARED ALGEBRA: per-species C_D + accommodation (expect ~machine eps)
+======================================================================
+  per-species closed form: max rel diff = 0.00e+00
+  accommodation isotherm : max rel diff = 0.00e+00
+
+======================================================================
+END-TO-END: both full C_D pipelines off identical NRLMSISE-00 rows
+======================================================================
+  150 shared (condition x altitude) points, 130-1450 km, lat -60..70
+  equator subset (shared K, pure physics): max rel diff = 1.17e-07  (radius conventions coincide)
+  shared K (physics + speed)             : max rel diff = 0.0191%  mean 0.0059%
+  physics+speed at K_exp (both models)   : max rel diff = 0.0191%  mean 0.0059%
+
+======================================================================
+VERDICT: the two C_D models' physics+speed agree to 0.0191% at a shared K; their independently-calibrated K agrees to 0.0170% -> full independent agreement is bounded by the product, << 1%  [PASS]
+======================================================================
+All sec. 5 reconciliations and the end-to-end agreement check PASS.

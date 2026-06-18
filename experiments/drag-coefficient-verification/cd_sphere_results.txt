@@ -1,21 +1,66 @@
-Generated 605 points across 55 epochs x 11 altitudes
-C_D range 2.255..3.106   alpha range 0.000..0.958
+Generated 5360 points across 67 epochs (12 storm) x 80 altitudes (130-1400 km)
+radius range 6490..7778 km   C_D range 2.091..3.294   alpha range 0.000..1.000
 
-(A) Scatter about per-altitude C_D(rho) curve (true thickness at matched alt,rho):
-    300 km : RMS 0.45 %   max 1.93 %
-    350 km : RMS 0.32 %   max 1.40 %
-    400 km : RMS 0.22 %   max 0.66 %
-    450 km : RMS 0.18 %   max 0.43 %
-    500 km : RMS 0.16 %   max 0.34 %
-    550 km : RMS 0.16 %   max 0.34 %
-    600 km : RMS 0.20 %   max 0.51 %
-    650 km : RMS 0.28 %   max 0.81 %
-    700 km : RMS 0.38 %   max 1.06 %
-    750 km : RMS 0.49 %   max 1.03 %
-    800 km : RMS 0.57 %   max 1.28 %
-   OVERALL: RMS 0.339 %   95th pct 0.71 %   worst 1.93 %
+Collapse thickness vs geocentric radius - sphere
+  thresholds: green <= 5% (negligible), red >= 30% (model breakdown / stop line)
+     radius  alt~km     n    RMS%    max%  storm%  verdict
+    6503.0   124.8    97   0.148    0.74    0.25  [PASS]
+    6528.0   149.8   111   0.169    0.95    0.26  [PASS]
+    6553.0   174.8    95   0.261    1.16    0.38  [PASS]
+    6578.0   199.8   115   0.275    1.28    0.36  [PASS]
+    6603.0   224.8    92   0.335    1.47    0.51  [PASS]
+    6628.0   249.8   114   0.344    1.58    0.46  [PASS]
+    6653.0   274.8    90   0.387    1.77    0.64  [PASS]
+    6678.0   299.8   117   0.405    1.90    0.66  [PASS]
+    6703.0   324.8    94   0.348    2.12    0.61  [PASS]
+    6728.0   349.8   110   0.423    2.05    0.71  [PASS]
+    6753.0   374.8   111   0.355    2.30    0.57  [PASS]
+    6778.0   399.8    94   0.451    2.15    0.80  [PASS]
+    6803.0   424.8   116   0.392    2.38    0.61  [PASS]
+    6828.0   449.8    92   0.457    2.18    0.77  [PASS]
+    6853.0   474.8   113   0.358    2.11    0.55  [PASS]
+    6878.0   499.8    90   0.399    1.78    0.65  [PASS]
+    6903.0   524.8   116   0.335    1.37    0.49  [PASS]
+    6928.0   549.8    96   0.376    0.89    0.52  [PASS]
+    6953.0   574.8   110   0.355    1.02    0.49  [PASS]
+    6978.0   599.8   111   0.388    0.98    0.57  [PASS]
+    7003.0   624.8    92   0.402    0.94    0.59  [PASS]
+    7028.0   649.8   118   0.404    1.02    0.60  [PASS]
+    7053.0   674.8    92   0.436    0.92    0.58  [PASS]
+    7078.0   699.8   113   0.426    1.06    0.57  [PASS]
+    7103.0   724.8    90   0.481    0.99    0.53  [PASS]
+    7128.0   749.8   116   0.505    1.25    0.58  [PASS]
+    7153.0   774.8    95   0.536    1.13    0.53  [PASS]
+    7178.0   799.8   111   0.594    1.21    0.60  [PASS]
+    7203.0   824.8   110   0.573    1.39    0.63  [PASS]
+    7228.0   849.8    92   0.662    1.43    0.56  [PASS]
+    7253.0   874.8   118   0.616    1.61    0.63  [PASS]
+    7278.0   899.8    93   0.638    1.70    0.58  [PASS]
+    7303.0   924.8   113   0.625    1.78    0.65  [PASS]
+    7328.0   949.8    90   0.638    1.74    0.62  [PASS]
+    7353.0   974.8   116   0.612    1.79    0.64  [PASS]
+    7378.0   999.8    94   0.578    1.74    0.69  [PASS]
+    7403.0  1024.8   112   0.595    1.70    0.64  [PASS]
+    7428.0  1049.8   108   0.548    1.59    0.73  [PASS]
+    7453.0  1074.8    94   0.579    1.49    0.72  [PASS]
+    7478.0  1099.8   118   0.549    1.34    0.78  [PASS]
+    7503.0  1124.8    93   0.583    1.27    0.84  [PASS]
+    7528.0  1149.8   113   0.534    1.34    0.82  [PASS]
+    7553.0  1174.8    90   0.582    1.63    0.91  [PASS]
+    7578.0  1199.8   116   0.560    1.54    0.87  [PASS]
+    7603.0  1224.8    93   0.551    2.12    0.93  [PASS]
+    7628.0  1249.8   113   0.571    1.75    0.89  [PASS]
+    7653.0  1274.8   107   0.538    2.45    0.88  [PASS]
+    7678.0  1299.8    95   0.596    1.91    0.95  [PASS]
+    7703.0  1324.8   118   0.543    2.50    0.86  [PASS]
+    7728.0  1349.8    93   0.614    2.40    0.99  [PASS]
+    7753.0  1374.8   113   0.544    2.48    0.79  [PASS]
+    7778.0  1399.8    47   0.590    2.60    0.95  [PASS]
+  OVERALL collapse RMS 0.490%  [PASS]
+  STORM-cohort collapse RMS 0.672%  [PASS]
+  HIGH-ALTITUDE CUT: none within swept range (collapse stays <= green 5% throughout; high limit non-binding here)
 
-(B) Table built on 27 epochs, applied to 28 held-out epochs:
-   residual: mean +0.022%  RMS 0.589%  95th |.| 1.28%  max|.| 3.163%  (n=295)
+(B) Table built on 33 epochs, applied to 34 held-out epochs:
+   residual: mean +0.364%  RMS 2.061%  95th |.| 3.95%  max|.| 13.805%  (n=2565)
 
 Saved figure.

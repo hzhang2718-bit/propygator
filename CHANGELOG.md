@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-06-13
+## [0.1.0] - 2026-06-17
 
 ### Added
 
@@ -30,4 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structured exports interface, involving CSV, matplotlib graphs, and plotly graphs
   exports. These are used extensively by the numerical propagator and are good for future
   use by other features as well.
+- Altitude guards based upon the Cd table, Knudsen number floor (supported by and
+  cross-checked against justification in experiments folder), Earth-Moon gravity
+  parity, ground impact, and user-tuned altitude limits.
 - Created Jupyter notebooks folder for casual users to interact with propygator.

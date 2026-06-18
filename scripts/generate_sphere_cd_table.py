@@ -58,14 +58,37 @@ WGS84_F = 1.0 / 298.257223563  # flattening
 EARTH_ROTATION_RATE = 7.2921159e-5  # rad/s
 WALL_TEMPERATURE = 300.0  # K, assumed spacecraft surface temperature
 
-# --- default grid extents (approved): geocentric radius 6,528-7,578 km
-#     (~150-1,200 km altitude), total density 1e-15 .. 3e-9 kg/m^3 log-spaced ---
-DEFAULT_RADIUS_MIN_M = 6_528_000.0
-DEFAULT_RADIUS_MAX_M = 7_578_000.0
-DEFAULT_RADIUS_POINTS = 22
+# --- default grid extents (drag-validity addendum, signed off 2026-06-15):
+#     geocentric radius 6,528-7,778 km (~150-1,400 km altitude), total density
+#     1e-15 .. 3e-9 kg/m^3 log-spaced. The GRID AXES are exactly the validated band
+#     (addendum sec. 4/5.3): lower edge ~150 km retained; upper edge extended from
+#     the old 1,200 km to the full green-validated ~1,400 km sweep so high /
+#     elliptical LEO no longer trips nuisance clamp warnings. ---
+DEFAULT_RADIUS_MIN_M = 6_528_000.0  # ~150 km altitude (lower edge, retained)
+DEFAULT_RADIUS_MAX_M = 7_778_000.0  # ~1,400 km altitude (validated upper edge)
+DEFAULT_RADIUS_POINTS = 26  # ~50 km radius spacing across the wider band
 DEFAULT_DENSITY_MIN = 1e-15
 DEFAULT_DENSITY_MAX = 3e-9
 DEFAULT_DENSITY_POINTS = 25
+
+# Internal MSIS altitude sampling: spans a margin WIDER than the grid so the regrid
+# interpolant covers the mesh corners rather than nearest-filling them (addendum
+# sec. 5.3 -- the internal sampling is NOT a coverage claim, only the grid axes are).
+# This is the full range the two C_D models were cross-validated over (addendum
+# sec. 5, Chunk 3: experiment vs generator agree to 0.0191% across 130-1450 km).
+DEFAULT_INTERNAL_ALT_MIN_KM = 130.0
+DEFAULT_INTERNAL_ALT_MAX_KM = 1450.0
+DEFAULT_INTERNAL_ALT_POINTS = 56  # ~24 km spacing (matches the prior sampling density)
+
+# Storm cohort: a fraction of the sampled conditions reach the validated storm tails
+# (addendum sec. 3.3) so the regridded cloud spans the same certified extremes the
+# experiment validated, rather than interpolating Cd over a narrower cloud than was
+# certified (addendum sec. 5 "same condition coverage").
+DEFAULT_STORM_FRACTION = 0.18  # ~ the experiment's 12/67 storm epochs
+QUIET_F107_RANGE = (65.0, 250.0)
+QUIET_AP_RANGE = (2.0, 80.0)
+STORM_F107_RANGE = (200.0, 320.0)
+STORM_AP_RANGE = (100.0, 400.0)
 
 # Accommodation anchor: energy accommodation at 400 km / solar maximum.
 # 0.90 is a commonly-accepted value there: Pilinski, Argrow & Palo (2010,
@@ -75,6 +98,14 @@ DEFAULT_DENSITY_POINTS = 25
 # to 0.90 per the Feature 1.1 drag-validity addendum, section 5). The *collapse*
 # onto (radius, density) is a property of the mechanism, not this value.
 ANCHOR_ALPHA = 0.90
+
+# Experiment-vs-generator C_D model cross-validation agreement (addendum sec. 5,
+# Chunk 3), measured by cross_validate_models.py over the full generation range.
+# Recorded in the table metadata for provenance only (the generator does not run the
+# cross-validation). UPDATE whenever the C_D model (physics, anchor ANCHOR_ALPHA, or
+# the relative-speed formula) changes and the cross-validation is re-run, so the
+# shipped table never claims a stale agreement.
+CROSS_VALIDATION_MAX_REL_PCT = 0.0191
 
 #: pymsis NRLMSISE-00 output column order (Variable enum): total density, the
 #: species number densities, then temperature. Reconstructed here, not imported.
@@ -215,9 +246,19 @@ def _accommodation(
 
 
 def _sample_conditions(
-    n_conditions: int, rng: np.random.Generator
+    n_conditions: int,
+    rng: np.random.Generator,
+    storm_fraction: float = DEFAULT_STORM_FRACTION,
 ) -> list[dict[str, object]]:
-    """Draw genuinely different thermospheric conditions across a solar cycle."""
+    """Draw genuinely different thermospheric conditions across a solar cycle.
+
+    A ``storm_fraction`` of the conditions are drawn from the validated storm tails
+    (F10.7 / Ap reaching the experiment's certified extremes; addendum sec. 3.3) so
+    the regridded cloud spans the same range the experiment validated -- otherwise
+    the table would interpolate Cd over a narrower cloud than was certified
+    (addendum sec. 5 "same condition coverage"). Each condition carries a ``storm``
+    flag for the metadata coverage record.
+    """
     epochs = [
         "2002-07-01T12:00",
         "2003-01-15T03:00",
@@ -228,16 +269,21 @@ def _sample_conditions(
         "2017-03-20T06:00",
         "2019-12-30T00:00",
     ]
+    n_storm = int(round(n_conditions * storm_fraction))
     conditions: list[dict[str, object]] = []
-    for _ in range(n_conditions):
+    for i in range(n_conditions):
+        storm = i < n_storm
+        f107_lo, f107_hi = STORM_F107_RANGE if storm else QUIET_F107_RANGE
+        ap_lo, ap_hi = STORM_AP_RANGE if storm else QUIET_AP_RANGE
         conditions.append(
             {
                 "date": np.datetime64(str(rng.choice(epochs))),
                 "lon": float(rng.uniform(0.0, 360.0)),  # varies local solar time
                 "lat": float(rng.uniform(-80.0, 80.0)),  # varies latitude
-                "f107": float(rng.uniform(65.0, 250.0)),  # solar-cycle position
-                "f107a": float(rng.uniform(65.0, 250.0)),
-                "ap": float(rng.uniform(2.0, 80.0)),  # geomagnetic activity
+                "f107": float(rng.uniform(f107_lo, f107_hi)),  # solar-cycle / storm
+                "f107a": float(rng.uniform(f107_lo, f107_hi)),
+                "ap": float(rng.uniform(ap_lo, ap_hi)),  # geomagnetic activity
+                "storm": storm,
             }
         )
     return conditions
@@ -249,6 +295,10 @@ def generate(
     density_axis: NDArray[np.float64],
     n_conditions: int,
     seed: int,
+    internal_alt_min_km: float = DEFAULT_INTERNAL_ALT_MIN_KM,
+    internal_alt_max_km: float = DEFAULT_INTERNAL_ALT_MAX_KM,
+    internal_alt_points: int = DEFAULT_INTERNAL_ALT_POINTS,
+    storm_fraction: float = DEFAULT_STORM_FRACTION,
 ) -> tuple[NDArray[np.float64], dict[str, object]]:
     """Build the ``(radius, density) -> Cd`` grid; return it plus provenance metadata.
 
@@ -259,7 +309,7 @@ def generate(
     from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 
     rng = np.random.default_rng(seed)
-    conditions = _sample_conditions(n_conditions, rng)
+    conditions = _sample_conditions(n_conditions, rng, storm_fraction)
     langmuir_K = _calibrate_accommodation_K(msis.run, ANCHOR_ALPHA)
     logger.info(
         "Calibrated Langmuir K = %.3e 1/Pa (anchor alpha=%.2f)",
@@ -269,7 +319,9 @@ def generate(
 
     # Sample geodetic altitudes spanning the radius grid with edge margin, so the
     # regrid interpolant covers the mesh corners rather than relying on nearest-fill.
-    altitudes_km = np.linspace(130.0, 1250.0, 48)
+    altitudes_km = np.linspace(
+        internal_alt_min_km, internal_alt_max_km, internal_alt_points
+    )
 
     radii: list[NDArray[np.float64]] = []
     densities: list[NDArray[np.float64]] = []
@@ -326,13 +378,66 @@ def generate(
         n_outside,
     )
 
+    n_storm = sum(bool(c["storm"]) for c in conditions)
     metadata: dict[str, object] = {
         "model": "Sentman/DRIA sphere Cd, mass-flux weighted over NRLMSISE-00 species",
         "accommodation": "SESAM Langmuir on atomic-O coverage",
         "anchor_alpha": ANCHOR_ALPHA,
         "atmosphere": "NRLMSISE-00 (pymsis)",
         "axes": "radius_axis [m] (geocentric), density_axis [kg/m^3] (total)",
-        "n_conditions": n_conditions,
+        # The GRID AXES are the validated-band coverage claim (addendum sec. 4/5.3):
+        # what the table asserts. The INTERNAL SAMPLING is deliberately wider (a
+        # margin so the regrid interpolates the mesh corners) and is NOT a claim --
+        # both are recorded so the distinction is auditable.
+        "grid_band": {
+            "radius_m": [float(radius_axis[0]), float(radius_axis[-1])],
+            "altitude_km_equatorial": [
+                float(radius_axis[0] - WGS84_A) / 1e3,
+                float(radius_axis[-1] - WGS84_A) / 1e3,
+            ],
+            "density_kgm3": [float(density_axis[0]), float(density_axis[-1])],
+        },
+        "internal_sampling_band": {
+            "altitude_km": [float(altitudes_km[0]), float(altitudes_km[-1])],
+            "n_points": int(altitudes_km.size),
+            "note": "wider-than-grid margin for regrid corner coverage; not a claim",
+        },
+        # The actual extent of the sampled (radius, density) cloud, plus how many mesh
+        # cells fell OUTSIDE it and were filled by nearest-neighbour rather than
+        # interpolated. Lets a reader audit whether a grid corner the axes CLAIM was
+        # genuinely interpolated or edge-extrapolated (addendum sec. 5.3: nearest-fill
+        # regions are recorded, not silently presented as validated).
+        "sampled_cloud": {
+            "radius_m": [float(radius_cloud.min()), float(radius_cloud.max())],
+            "density_kgm3": [float(density_cloud.min()), float(density_cloud.max())],
+            "n_mesh_cells_nearest_filled": n_outside,
+            "n_mesh_cells_total": int(grid.size),
+        },
+        "condition_coverage": {
+            "n_conditions": n_conditions,
+            "n_storm": n_storm,
+            "quiet_f107": list(QUIET_F107_RANGE),
+            "quiet_ap": list(QUIET_AP_RANGE),
+            "storm_f107": list(STORM_F107_RANGE),
+            "storm_ap": list(STORM_AP_RANGE),
+        },
+        "confidence": {
+            "green_rms_pct": 5.0,
+            # Derived from the grid upper edge (not hardcoded) so it tracks the band
+            # on regeneration; the whole grid is green-validated.
+            "green_validated_through_km": float(radius_axis[-1] - WGS84_A) / 1e3,
+            "reduced_confidence_above_km": None,
+            "cross_validation_max_rel_pct": CROSS_VALIDATION_MAX_REL_PCT,
+            "note": (
+                "Collapse RMS stays <= 5% (green) across the full validated sweep "
+                "(overall 0.490%, storm 0.672%; addendum Chunk 1), so there is no "
+                "reduced-confidence region within the grid. The high-altitude end is "
+                "non-binding (drag ~ rho -> 0). Experiment-vs-generator model cross-"
+                "validation (addendum sec. 5, Chunk 3): the two C_D models' physics "
+                f"agree to {CROSS_VALIDATION_MAX_REL_PCT}% over the generation range "
+                "(see grid_band / internal_sampling_band for the exact extents)."
+            ),
+        },
         "seed": seed,
         "n_samples": int(cd_cloud.size),
         "cd_range": [float(cd_cloud.min()), float(cd_cloud.max())],
@@ -389,6 +494,33 @@ def main(argv: list[str] | None = None) -> None:
         help="Number of thermospheric conditions sampled for the cloud.",
     )
     parser.add_argument(
+        "--storm-fraction",
+        type=float,
+        default=DEFAULT_STORM_FRACTION,
+        dest="storm_fraction",
+        help="Fraction of conditions drawn from the validated storm tails.",
+    )
+    parser.add_argument(
+        "--internal-alt-min",
+        type=float,
+        default=DEFAULT_INTERNAL_ALT_MIN_KM,
+        dest="internal_alt_min_km",
+        help="Internal MSIS altitude sampling floor [km] (wider than the grid).",
+    )
+    parser.add_argument(
+        "--internal-alt-max",
+        type=float,
+        default=DEFAULT_INTERNAL_ALT_MAX_KM,
+        dest="internal_alt_max_km",
+        help="Internal MSIS altitude sampling ceiling [km] (wider than the grid).",
+    )
+    parser.add_argument(
+        "--internal-alt-points",
+        type=int,
+        default=DEFAULT_INTERNAL_ALT_POINTS,
+        dest="internal_alt_points",
+    )
+    parser.add_argument(
         "--seed", type=int, default=20260611, help="RNG seed (reproducible output)."
     )
     parser.add_argument(
@@ -415,6 +547,10 @@ def main(argv: list[str] | None = None) -> None:
         density_axis=density_axis,
         n_conditions=args.n_conditions,
         seed=args.seed,
+        internal_alt_min_km=args.internal_alt_min_km,
+        internal_alt_max_km=args.internal_alt_max_km,
+        internal_alt_points=args.internal_alt_points,
+        storm_fraction=args.storm_fraction,
     )
 
     output.parent.mkdir(parents=True, exist_ok=True)

@@ -256,17 +256,27 @@ def test_variable_cd_bilinear_midpoint():
     assert t(1.0, 5.0) == pytest.approx((0.0 + 2.0 + 4.0 + 10.0) / 4.0)
 
 
-def test_variable_cd_clamps_and_warns_once():
-    t = _toy_table()
+def test_variable_cd_clamps_and_warns_per_edge():
+    # Edge-aware clamp warnings (addendum §6.2): each boundary warns once, with a
+    # tailored message — the low radius edge is loud (model invalid), the high edge is
+    # soft (drag negligible), the density edge is neutral.
+    t = _toy_table()  # radius_axis [1,2,3], density_axis [10,20]
     with warnings.catch_warnings(record=True) as records:
         warnings.simplefilter("always")
-        below = t(-100.0, 5.0)  # both axes below their minimum
-        above = t(1000.0, 1000.0)  # both axes above their maximum
-    # Clamped to the corners of the grid.
+        below = t(-100.0, 5.0)  # radius below min (low edge) + density below min
+        above = t(1000.0, 1000.0)  # radius above max (high edge) + density above max
+        t(-100.0, 5.0)  # repeat: must not re-warn any already-warned boundary
+    # Clamped to the corners of the grid (unchanged clamp behavior).
     assert below == pytest.approx(2.0)
     assert above == pytest.approx(3.0)
-    # Out-of-grid warns exactly once across multiple calls.
-    assert sum(issubclass(r.category, UserWarning) for r in records) == 1
+    msgs = [str(r.message) for r in records if issubclass(r.category, UserWarning)]
+    # Three distinct boundaries, each warned exactly once and edge-tailored.
+    assert sum("below the drag-table grid" in m for m in msgs) == 1  # low edge, loud
+    assert sum("above the drag-table grid" in m for m in msgs) == 1  # high edge, soft
+    assert (
+        sum("total density outside the table grid" in m for m in msgs) == 1
+    )  # density
+    assert len(msgs) == 3
 
 
 def test_variable_cd_in_range_does_not_warn():
@@ -341,10 +351,11 @@ def test_sphere_default_loads_committed_asset():
     t = VariableCd.sphere_default()
     assert t._metadata_id() == "sphere_default"
     assert t._grid is not None and t._grid.ndim == 2
-    # The shipped table spans the approved geocentric-radius extents.
+    # The shipped table spans the validated geocentric-radius band (drag-validity
+    # addendum: ~150 km lower edge retained, upper edge extended to ~1,400 km).
     assert t._radius_axis is not None
     assert t._radius_axis[0] == pytest.approx(6_528_000.0)
-    assert t._radius_axis[-1] == pytest.approx(7_578_000.0)
+    assert t._radius_axis[-1] == pytest.approx(7_778_000.0)
     # A physically realized LEO point returns a free-molecular Cd.
     assert 2.0 < t(6_828_000.0, 1e-12) < 3.5
 

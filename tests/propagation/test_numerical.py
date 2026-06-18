@@ -84,6 +84,30 @@ def _point_mass_mu() -> float:
     return float(GravityFieldFactory.getNormalizedProvider(0, 0).getMu())
 
 
+def _drag_eval_setup(mass_kg: float = 200.0):
+    """A ~400 km EME2000 ``SpacecraftState`` + a Harris-Priester atmosphere.
+
+    For acceleration-level drag comparisons: a shared atmosphere + state means the only
+    thing that can differ between two drag ``ForceModel``s is the drag formula itself.
+    """
+    from org.orekit.orbits import CartesianOrbit
+    from org.orekit.propagation import SpacecraftState
+
+    from propygator.core.bodies import _earth, _sun
+    from propygator.propagation.numerical import _resolve_atmosphere
+
+    initial = _state_from_elements(a_m=6778e3)  # ~400 km, well within the drag regime
+    orbit = CartesianOrbit(
+        initial.to_orekit().getPVCoordinates(),
+        Frame.EME2000.to_orekit(),
+        _EPOCH.to_orekit(),
+        _point_mass_mu(),
+    )
+    state = SpacecraftState(orbit, mass_kg)
+    atmosphere = _resolve_atmosphere("Harris-Priester", _sun(), _earth())
+    return state, atmosphere
+
+
 # --- sample counting --------------------------------------------------------
 
 
@@ -523,12 +547,14 @@ _DRAG_ONLY = ForceModelConfig(
 
 
 def test_variable_cd_constant_matches_fixed_drag():
-    """A constant ``VariableCd`` reproduces stock ``IsotropicDrag`` to sub-mm.
+    """A constant ``VariableCd`` and a fixed scalar Cd give the same trajectory.
 
-    Pins the custom ``DragSensitive``: same area / mass / atmosphere, Cd held at 2.2
-    either as a fixed scalar (Orekit ``IsotropicDrag``) or via a ``VariableCd``
-    callable. Catches a wrong drag *sign* or scale — the two paths must agree to
-    machine-level over the run (the sign caveat in the features.md drag note).
+    Since chunk 9 both feed the *same* custom ``DragSensitive`` (a fixed Cd through
+    ``_constant_cd``, a ``VariableCd`` through its callable), so this is an end-to-end
+    consistency check of the two ``cd_lookup`` paths — **not** a stock-Orekit
+    comparison. That independent pin now lives in
+    ``test_fixed_cd_sphere_matches_stock_isotropic_drag`` (acceleration level), since
+    routing fixed Cd through the proxy means this propagation can no longer witness it.
     """
     initial = _state_from_elements(a_m=6778e3)
     common = dict(duration=3600.0, output_step=600.0, force_models=_DRAG_ONLY)
@@ -553,6 +579,30 @@ def test_variable_cd_constant_matches_fixed_drag():
     )
     diff = np.linalg.norm(fixed.positions - variable.positions, axis=1)
     assert np.max(diff) < 1e-3  # sub-mm: identical physics, identical sign
+
+
+def test_fixed_cd_sphere_matches_stock_isotropic_drag():
+    """The custom sphere drag formula reproduces Orekit's stock ``IsotropicDrag``.
+
+    Chunk 9 routes *all* drag — fixed Cd included — through propygator's own
+    ``_sphere_accel`` formula rather than stock ``IsotropicDrag``, which made
+    ``test_variable_cd_constant_matches_fixed_drag`` tautological (both sides became
+    the custom proxy). This restores the independent pin at the acceleration level:
+    same atmosphere + state, so only the drag formula differs, catching a sign / scale
+    / mass regression the propagation test can no longer see.
+    """
+    from org.orekit.forces.drag import DragForce, IsotropicDrag
+
+    from propygator.propagation.numerical import _build_drag_force
+
+    area, cd = 5.0, 2.2
+    state, atmosphere = _drag_eval_setup()
+    geom = SpacecraftGeometry.sphere(area_m2=area, drag_coefficient=cd)
+    custom = _build_drag_force(geom, atmosphere, None)
+    stock = DragForce(atmosphere, IsotropicDrag(area, cd))
+    a_custom = custom.acceleration(state, custom.getParameters())
+    a_stock = stock.acceleration(state, stock.getParameters())
+    assert a_custom.subtract(a_stock).getNorm() < 1e-15  # machine-level identical
 
 
 def test_drag_lowers_semi_major_axis():
@@ -625,10 +675,13 @@ def test_variable_cd_differs_from_fixed_and_clamps_once():
             **common,
         )
     # The clamp triggers on every substep of the integration loop, but the table must
-    # emit the out-of-grid warning *exactly once* (features.md §1.1) — assert the count,
-    # not merely "at least one" (which pytest.warns would accept).
-    clamp_warnings = [w for w in caught if "outside the table grid" in str(w.message)]
-    assert len(clamp_warnings) == 1
+    # emit the edge warning *exactly once* per boundary (features.md §1.1; addendum §6)
+    # — assert the count, not merely "at least one". The toy table's radii sit below the
+    # orbit, so every lookup clamps to the high (upper-altitude) edge → the soft note.
+    regime_warnings = [
+        w for w in caught if "above the drag-table grid" in str(w.message)
+    ]
+    assert len(regime_warnings) == 1
     diff = np.linalg.norm(fixed.positions - variable.positions, axis=1)
     assert np.max(diff) > 1e-3  # clamped Cd 3.0 != fixed 2.2 -> visibly different
 
@@ -876,11 +929,13 @@ def test_box_incidence_variable_cd_ignored_when_drag_off():
 
 
 def test_box_variable_cd_matches_fixed_drag():
-    """A constant box ``VariableCd`` reproduces the fixed-Cd box to sub-mm.
+    """A constant box ``VariableCd`` and a fixed box Cd give the same trajectory.
 
-    Pins the box variable-Cd routing: the custom box ``DragSensitive`` (base Cd 1.0 +
-    the table value as the box's global drag factor) must equal the box built directly
-    with that fixed Cd — same projected-area bookkeeping, same scalar Cd.
+    Since chunk 9 both route through the *same* custom box ``DragSensitive`` (base Cd
+    1.0 + the scalar Cd as the box's global drag factor), so this is an end-to-end
+    consistency check of the two ``cd_lookup`` paths — **not** a stock-box comparison.
+    The independent pin against a stock box built with the native Cd now lives in
+    ``test_box_drag_matches_stock_box_with_native_cd`` (acceleration level).
     """
     initial = _state_from_elements(a_m=6778e3)
     common = dict(duration=3600.0, output_step=600.0, force_models=_DRAG_ONLY)
@@ -911,6 +966,52 @@ def test_box_variable_cd_matches_fixed_drag():
     )
     diff = np.linalg.norm(fixed.positions - variable.positions, axis=1)
     assert np.max(diff) < 1e-3  # sub-mm: identical box drag physics
+
+
+def test_box_drag_matches_stock_box_with_native_cd():
+    """Custom box drag (base dragCoeff 1.0 + Cd as global factor) == a native-Cd box.
+
+    Chunk 9 makes every box build at base dragCoeff 1.0 and apply the scalar Cd through
+    the custom ``DragSensitive``, replacing the pre-chunk-9 fixed-Cd path that fed the
+    Cd to the box constructor and used a stock ``DragForce``. This pins the "drag is
+    exactly linear in the global drag factor" premise against a stock box carrying the
+    native Cd — identical geometry fields, shared atmosphere + state, so only the Cd
+    routing differs.
+    """
+    from org.hipparchus.geometry.euclidean.threed import Vector3D
+    from org.orekit.forces import BoxAndSolarArraySpacecraft
+    from org.orekit.forces.drag import DragForce
+
+    from propygator.core.bodies import _sun
+    from propygator.propagation.numerical import (
+        _build_box_spacecraft,
+        _build_drag_force,
+    )
+
+    cd = 2.2
+    state, atmosphere = _drag_eval_setup()
+    geom = SpacecraftGeometry.box_and_panels(
+        x_length_m=2.0, y_length_m=1.0, z_length_m=1.5, drag_coefficient=cd
+    )
+    box_custom = _build_box_spacecraft(geom, _sun())  # base dragCoeff 1.0
+    custom = _build_drag_force(geom, atmosphere, box_custom)
+    # Stock reference: same geometry fields, native dragCoeff = cd (pre-chunk-9 path).
+    box_stock = BoxAndSolarArraySpacecraft(
+        geom.x_length_m,
+        geom.y_length_m,
+        geom.z_length_m,
+        _sun(),
+        geom.solar_array_area_m2,
+        Vector3D(*geom.solar_array_axis),
+        cd,
+        0.0,
+        geom.absorption_coefficient,
+        geom.specular_reflection_coefficient,
+    )
+    stock = DragForce(atmosphere, box_stock)
+    a_custom = custom.acceleration(state, custom.getParameters())
+    a_stock = stock.acceleration(state, stock.getParameters())
+    assert a_custom.subtract(a_stock).getNorm() < 1e-15  # machine-level identical
 
 
 def test_features_box_bus_example_runs():

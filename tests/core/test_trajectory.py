@@ -195,6 +195,32 @@ def test_from_arrays_copies_metadata():
     assert traj.metadata["propagator"] == "test"  # trajectory record unaffected
 
 
+def test_termination_metadata_keys_are_optional_and_round_trip():
+    # The addendum §6.6 termination keys are additive/optional: they are not in
+    # the required set (so a normal run with none of them constructs fine), and a
+    # terminated run carries them through unchanged.
+    from propygator.core.states import _REQUIRED_METADATA_KEYS
+
+    for key in ("terminated", "termination_reason", "termination_epoch"):
+        assert key not in _REQUIRED_METADATA_KEYS
+
+    n = 2
+    meta = _meta()
+    meta["terminated"] = True
+    meta["termination_reason"] = "user_min"
+    meta["termination_epoch"] = "2026-06-14T09:12:44Z"
+    traj = Trajectory.from_arrays(
+        [_epoch(i) for i in range(n)],
+        _positions(n),
+        _velocities(n),
+        Frame.EME2000,
+        metadata=meta,
+    )
+    assert traj.metadata["terminated"] is True
+    assert traj.metadata["termination_reason"] == "user_min"
+    assert traj.metadata["termination_epoch"] == "2026-06-14T09:12:44Z"
+
+
 # --- array validation ------------------------------------------------------
 
 

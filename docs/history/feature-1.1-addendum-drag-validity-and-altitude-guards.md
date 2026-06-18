@@ -1,16 +1,16 @@
 # propygator — Feature 1.1 Addendum: Drag-Model Validity Domain & Altitude Guards
 
-> **Status: DESIGN / SOURCE OF TRUTH.** This is an add-on design for the
+> **Status: RETIRED, treat as a record ONLY.** This is an add-on design for the
 > already-feature-complete numerical propagator (Feature 1.1). It is the binding
 > reference for the *next* build plan (the chunked plan will be derived from this,
 > the way `docs/history/build-plan-feature-1.1.md` was derived from `features.md`
 > §1.1). It is **not** itself a build plan.
 >
-> **It supersedes specific, enumerated sections of `architecture.md` and
+> **It superseded specific, enumerated sections of `architecture.md` and
 > `features.md` for the time being** (see §1, the supersession map). Where this
-> document and those two conflict, *this* document wins until a future
-> reconciliation folds it back in. It supersedes **only** what it must; everything
-> not listed in §1 is untouched and those docs remain authoritative.
+> document and those two conflict, *this* document won until a future
+> reconciliation (completed). It superseded **only** what it must; everything
+> not listed in §1 was untouched and those docs remain authoritative.
 
 > **Naming convention.** This is one of several planned add-ons to Feature 1.1.
 > Each lives in its own file named `feature-1.1-addendum-<topic>.md` so they can be
@@ -39,19 +39,19 @@ The work is staged: **expand the experiment → analyze → derive constants →
 
 | Source section | Relationship | What changes |
 |---|---|---|
-| `features.md` §1.1 → **"Escape and re-entry"** (lines 361–364) | **SUPERSEDED** | The "Planned (deferred)" design is replaced wholesale by §6 here: the ~120 km hardcoded terminal re-entry floor is replaced by *regime warnings (Kn floor) + a graceful classified re-entry catch + an impact backstop at the Earth radius + optional user limits*; the ~1,000,000 km Sun-Earth SOI ceiling is replaced by the **lunar-gravity-parity** ceiling (~346,000 km, §6.3); the previously-open reporting contract is **resolved** (§6.6). The "*Today*" paragraph (current behavior) remains accurate and is retained. |
+| `features.md` §1.1 → **"Escape and re-entry"** (lines 361–364) | **SUPERSEDED** | The "Planned (deferred)" design is replaced wholesale by §6 here: the ~120 km hardcoded terminal re-entry floor is replaced by *regime warnings (Kn floor) + a graceful classified re-entry catch + an impact backstop at the Earth radius + optional user limits*; the ~1,000,000 km Sun-Earth SOI ceiling is replaced by the **lunar-gravity-parity** ceiling (~327,000 km, §6.3); the previously-open reporting contract is **resolved** (§6.6). The "*Today*" paragraph (current behavior) remains accurate and is retained. |
 | `architecture.md` §13 → **"Escape / re-entry guards"** (line 1044) | **SUPERSEDED (resolved)** | This deferral is closed; the guard design is now specified (§6). |
 | `architecture.md` §13 → **"Coefficient of drag modeling"** (line 1042) | **EXTENDED** | Unchanged in design; this add-on adds the empirical *validity domain* (altitude band, Kn floor) and strengthens the table-generation-vs-experiment invariant (§5). |
 | `features.md` §1.1 → **"Drag-coefficient modeling"** (lines 368–409) | **EXTENDED** | The Tier A/B design is unchanged. Line 374's "the shipped table must be generated on the same geocentric-radius convention" is **strengthened** to the full invariant in §5. The "Out-of-grid → clamp + one-time warning" rule (line 403) is **refined** into the regime-warning tier (§6.2), including the low/high-altitude severity asymmetry. |
 | `features.md` §1.1 → **"Public signature"** (lines 13–25) | **EXTENDED** | One keyword-only parameter is added: `limits: AltitudeLimits | None = None` (§6.4). No existing parameter changes. |
-| `features.md` §1.1 → **"`propagate_numerical` behavior" → Failure modes table** (lines 343–359) & **Metadata** (lines 289–308) | **EXTENDED** | New rows/keys for altitude-limit termination and graceful stop-and-report (§6.6). |
+| `features.md` §1.1 → **"`propagate_numerical` behavior" → Failure modes table** (lines 343–359) & **Metadata** (lines 289–308) | **EXTENDED** | New failure-modes row for the unreasonable-`AltitudeLimits` `ValueError` (raised at construction); new `Metadata` keys for graceful stop-and-report termination — including reasonable user-limit crossings (`user_min`/`user_max`) (§6.6). |
 | `features.md` §1.1 → **"Model limitations (docstring)"** (lines 411–423) | **EXTENDED** | Gains a line stating the drag-model altitude validity band (§6.7). |
 | `architecture.md` §6 → **`TrajectoryMetadata`** (lines 491–518) | **EXTENDED** | Gains optional `terminated`, `termination_reason`, `termination_epoch` keys (§6.6). Additive only. |
 | `architecture.md` §6 → **`KeplerianElements`** (lines 340–356) & eccentricity validation in `core/elements.py` | **UNCHANGED (explicitly retained)** | The eccentricity gates (`e<0`, parabolic `e==1`, a/e sign coherence, hyperbolic ν-asymptote) stay exactly as-is. Hyperbolic orbits already propagate; this add-on only adds the runaway backstop. See §6.5. |
 
 Anything not in this table is **not** superseded.
 
-**New additions (not supersessions).** §6 introduces two brand-new public names that are *additions* — not edits to existing text — so they are deliberately absent from the map above: the `AltitudeLimits` config dataclass (§6.4) and the `AltitudeLimitError` exception (a `PropagationError` subclass, §6.6). The eventual reconciliation must register them where every other public type lives: `architecture.md` §6 (data model) and §7 (the `__init__.py` re-export list), `core/exceptions.py` (the exception), and a `CHANGELOG.md` `[Unreleased]` entry — all at build time.
+**New additions (not supersessions).** §6 introduces one brand-new public name that is an *addition* — not an edit to existing text — so it is deliberately absent from the map above: the `AltitudeLimits` config dataclass (§6.4). (No new exception type: an unreasonable `AltitudeLimits` raises the builtin `ValueError`, like every other config dataclass — §6.4/§6.6.) The eventual reconciliation must register `AltitudeLimits` where every other public type lives: `architecture.md` §6 (data model) and §7 (the `__init__.py` re-export list), and a `CHANGELOG.md` `[Unreleased]` entry — all at build time.
 
 ---
 
@@ -160,10 +160,10 @@ All guards operate on **geocentric radius** `r = |position|` in the propagation 
 | 3 | Table lower edge (~150 km) | **WARNING** | drag enabled **and** a `VariableCd`/`IncidenceVariableCd` table is in use |
 | — | *(validated band — silent, all good)* | — | — |
 | 4 | Table upper edge (§4, empirical) | **WARNING (soft)** | drag enabled and a table is in use |
-| 5 | User min/max altitude limits (§6.4) | **TERMINAL — raise** | when `limits` supplied |
-| 6 | Escape: `r > r_lunar_parity` (~346,000 km, §6.3) | **TERMINAL — stop & report** | always |
+| 5 | User min/max altitude limits (§6.4) | **TERMINAL — stop & report** | when `limits` supplied |
+| 6 | Escape: `r > r_lunar_parity` (~327,000 km, §6.3) | **TERMINAL — stop & report** | always |
 
-The **effective** terminal bounds are the *tightest* of the system backstops (1, 6) and the user limits (5): user limits can only tighten termination, never loosen it. System backstops (1, 6) are non-negotiable and always active. A drag-driven re-entry is terminal too, but caught reactively (off the integrator failure) rather than by a radius — see §6.6.
+The **effective** terminal bounds are the *tightest* of the system backstops (1, 6) and the user limits (5): user limits can only tighten termination, never loosen it (a user limit that falls *outside* the backstops can never bind, so it is rejected at construction — §6.4 — rather than appearing here). System backstops (1, 6) are non-negotiable and always active. A drag-driven re-entry is terminal too, but caught reactively (off the integrator failure) rather than by a radius — see §6.6.
 
 ### 6.2 Two-tier behavior
 
@@ -180,10 +180,11 @@ This refines the existing clamp-to-edge + one-time-warning behavior (`features.m
 
 - **Terminal stops → custom radius-based Orekit event detectors**, not the integrator step size, and **not** the stock `AltitudeDetector` (which computes *geodetic* altitude against a body shape every step, reintroducing the conversion we avoid). Each is a thin `g(state) = r − r_threshold` with `Action.STOP`. A *terminal* detector is cheap: the root-finding fires once (at the single crossing); the per-step `g` is a norm. **Build notes (this is a new integration surface — there is no event-detector usage anywhere in the codebase today):** implement each detector as a `@JImplements(EventDetector)` proxy on the `attitude.py` `AttitudeProvider` template, and **override every interface method the propagator invokes, including JPype `default` methods** (Python proxies do not inherit them — the lesson already recorded for `CustomAttitude`); verify inside a *real* `propagate()` call, not in isolation. And note the success path currently samples the ephemeris at a fixed count of offsets up to the *planned* end — a terminal `Action.STOP` shortens the realized span, so the sampling loop must be **clamped to `ephemeris.getMaxDate()`** or it raises when it samples past the crossing. That one clamp serves impact, escape, and the re-entry catch alike.
   - **Impact:** `r_threshold = R⊕ = 6,378,137 m`. The exact value is non-critical — by `R⊕` the orbit is long destroyed and the §6.2 low warnings have fired.
-  - **Escape:** `r_threshold = r_lunar_parity ≈ 346,000 km` — the Earth-Moon **equigravisphere** along the Earth-Moon line, where lunar gravity equals Earth's: with `μ⊕/μ☾ ≈ 81.3`, `r ≈ D · √81.3/(1+√81.3) ≈ 0.90 D ≈ 346,000 km` (≈ 8× GEO radius, ≈ 0.9× lunar distance). It is the edge of the *modeled* regime — propygator carries lunar third-body gravity as a *perturbation*; beyond parity the Moon dominates and the Earth-centered formulation breaks down. **This intentionally terminates Earth-bound trajectories whose apogee exceeds lunar parity (e.g. cislunar transfers, weak-stability-boundary orbits) — which is correct, because they are both out of the *modeled* regime (Moon-as-perturbation fails there) and out of *scope* (§0: no deep-space/cislunar dynamics).** It is a moving surface approximated as a static radius (adequate for a backstop). *(This is a deliberate, more-conservative choice than the previously-planned ~1,000,000 km ceiling — which is roughly the **Sun-Earth sphere of influence** (~924,000 km), not the ~1.5 M km Earth Hill sphere; both the prior design and this one prefer a clean radius backstop over an input eccentricity rejection.)*
+  - **Escape:** `r_threshold = r_lunar_parity ≈ 327,000 km` — the Earth-Moon **equigravisphere** along the Earth-Moon line, where lunar gravity equals Earth's: with `μ⊕/μ☾ ≈ 81.3`, `r ≈ D · √81.3/(1+√81.3) ≈ 0.90 D`. The Earth-Moon distance `D` is itself a ±5% moving target (perigee ≈ 363,300 km, apogee ≈ 405,500 km), so parity is a moving surface; the backstop uses the **perigee** (minimum) value, `D ≈ 363,300 km → r ≈ 0.90 · 363,300 ≈ 327,000 km` (≈ 7.8× GEO radius, ≈ 0.9× the lunar *perigee* distance). Taking the *minimum* parity radius is the conservative choice for a backstop: it guarantees termination *before* parity regardless of where the Moon actually is, and the only orbits it stops "early" (apogee in the ~327,000–365,000 km band) are cislunar-edge and out of scope anyway. It is the edge of the *modeled* regime — propygator carries lunar third-body gravity as a *perturbation*; beyond parity the Moon dominates and the Earth-centered formulation breaks down. **This intentionally terminates Earth-bound trajectories whose apogee exceeds lunar-perigee parity (e.g. cislunar transfers, weak-stability-boundary orbits) — which is correct, because they are both out of the *modeled* regime (Moon-as-perturbation fails there) and out of *scope* (§0: no deep-space/cislunar dynamics).** It is implemented as a **fixed, hard-coded policy constant — *not* derived from Orekit `Constants`**: nothing in the dynamics consumes it (it is a deliberately fuzzy fence, in the same category as the integrator step/tolerance literals), the Earth-Moon distance is not an Orekit `Constants` member anyway, and a single documented constant (formula + chosen perigee `D` in a code comment) is one clean source of truth for both the radius detector here and the §6.4 reasonableness check. *(This is a deliberate, more-conservative choice than the previously-planned ~1,000,000 km ceiling — which is roughly the **Sun-Earth sphere of influence** (~924,000 km), not the ~1.5 M km Earth Hill sphere; both the prior design and this one prefer a clean radius backstop over an input eccentricity rejection.)*
 - **Warnings → checks on the drag-evaluation path** (warn-once boxes, mirroring the existing `VariableCd` clamp warning). No event detector is needed for warnings (they do not stop the run and need no precise crossing).
 - **Re-entry → a classified catch of the integrator's min-step failure** (§6.6), not a radius detector or a fixed floor.
 - **Kn floor as a static constant.** `floor_altitude(L)` is computed **once at propagation setup** from the spacecraft's characteristic length `L` (sphere → diameter `2√(A/π)`; box → **max edge length**, conservative) and the configured atmosphere model, by scanning altitude for the `Kn = 10` crossing (the experiment's §3.4 method **re-implemented** at runtime — a third independent reconstruction, subject to the §5 equivalence check — over a few dozen atmosphere queries, one-time, not per-substep). The run then checks `r` against the resulting static floor radius. *(This needs a small internal per-species density helper that does not exist yet — the drag force only queries scalar density internally — so budget it as new setup-time code.)* *(Open sub-choice for the build plan: evaluate λ at the initial epoch's space weather — simplest, adapts to conditions — or at a conservative high-activity profile — stabler, slightly safer. Recommend the conservative profile.)*
+  - **Implementation note (Chunk 9, as built — supersedes the "configured atmosphere model / a few dozen atmosphere queries" wording above).** Orekit's public atmosphere API exposes only *total* density, not the per-species number densities λ needs, and `pymsis` is deliberately not a runtime dependency — so a live per-species query of the configured atmosphere is not possible. Instead the conservative high-activity composition (the recommended profile) is captured **once, offline** by `scripts/generate_kn_floor_composition.py` and embedded as a constant in `propagation/guards.py`; the runtime λ/Kn scan runs against that fixed embedded composition and does **not** read the run's configured atmosphere model or epoch/space weather at all. This is consistent with the "conservative, deterministic" intent (the floor is a worst-case fence, not a per-run quantity) but means a run configured with a different atmosphere model still gets the same fixed floor. The §5 equivalence obligation is met by `test_runtime_floor_matches_experiment_curve` (runtime floor vs the committed experiment curve). **Chunk 11 must fold this into `features.md` §1.1 / `architecture.md` §13** so the per-species-helper / atmosphere-query phrasing is reconciled with what shipped.
 
 ### 6.4 User-settable altitude limits
 
@@ -199,12 +200,19 @@ class AltitudeLimits:
     documented, slightly conservative approximation consistent with the no-
     per-substep-geodetic-conversion rule; the ~21 km latitude spread is within a
     guard's tolerance). None = no user limit on that side (system backstops still
-    apply). Crossing a user limit RAISES (it is a user-requested assertion).
+    apply). Crossing a *reasonable* user limit at runtime **stops & reports**: it
+    returns the partial `Trajectory` with `termination_reason="user_min"`/
+    `"user_max"`, exactly like the system backstops it nests inside (§6.6). An
+    *unreasonable* limit (outside the backstops) is rejected at construction.
     """
     min_altitude_km: float | None = None
     max_altitude_km: float | None = None
-    # __post_init__: finite if given; min < max; warn if a limit lies outside the
-    # system backstops (it would be superseded by impact/escape).
+    # __post_init__ raises ValueError (like every other config dataclass) on an
+    # *unreasonable* limit — one outside the system backstops, which could never
+    # bind: min_altitude_km < 0 (below the surface -> impact fires first) or
+    # max_altitude_km above the escape-parity altitude (~320,000 km -> escape fires
+    # first). Plus the usual: each finite if given, min < max. All are pure altitude
+    # comparisons against fixed policy bounds -- no JVM, safe before init.
 
 # signature gains, keyword-only:
 #   limits: AltitudeLimits | None = None      # None -> system backstops only
@@ -225,7 +233,7 @@ So this add-on does **not** "roll back a check." It adds the **escape backstop**
 
 This pins what `features.md` §1.1 line 364 left open ("partial `Trajectory` + a `terminated` flag vs a dedicated `PropagationError` subclass"):
 
-- **System backstops (impact, escape) and other physical terminations → stop & report.** Return a **partial `Trajectory`** (samples up to the crossing) with metadata:
+- **System backstops (impact, escape), reasonable user limits, and other physical terminations → stop & report.** Return a **partial `Trajectory`** (samples up to the crossing) with metadata:
 
   ```python
   # additive optional keys on TrajectoryMetadata (architecture §6 EXTENDED)
@@ -233,9 +241,9 @@ This pins what `features.md` §1.1 line 364 left open ("partial `Trajectory` + a
   termination_reason: str          # "reentry" | "impact" | "escape" | "user_min" | "user_max"
   termination_epoch: str           # ISO 8601 UTC of the crossing
   ```
-  Re-entry/escape are legitimate physical *outcomes*, not errors — the user wants to know *when/where*.
+  Re-entry/escape are legitimate physical *outcomes*, not errors, and a *reasonable* user limit is a soft boundary the user asked to stop at — in all of these the user wants the trajectory up to the crossing and to know *when/where*, so none of them raise.
 
-- **User-set terminal limits (§6.4) → raise.** A user limit is an explicit assertion ("abort if it leaves my band"), so crossing it raises a clear exception (a `PropagationError` subclass, e.g. `AltitudeLimitError`, carrying the boundary and the crossing epoch). Failure-modes table (`features.md` §1.1) EXTENDED with this row.
+- **Unreasonable user limits → raise `ValueError` at construction (not at a crossing).** A user limit is "reasonable" iff it falls *inside* the system backstops (`min_altitude_km ≥ 0` and `max_altitude_km` at or below the escape-parity altitude). A *reasonable* limit is a soft boundary, so crossing it **stops & reports** (the bullet above; `termination_reason="user_min"`/`"user_max"`). An *unreasonable* limit can never bind — the impact/escape backstop fires first — so it is almost always a mistake (a sign slip, a metre/km mix-up); it is rejected at **construction** with a plain `ValueError` (like every other config dataclass; §6.4), failing fast before anything propagates. There is **no** crossing-time user-limit exception and no dedicated exception type. Failure-modes table (`features.md` §1.1) EXTENDED with this construction-time `ValueError` row.
 
 - **Re-entry via a classified min-step catch → stop & report (the graceful default).** A decaying orbit with drag on stiffens until the adaptive integrator saturates `min_step_s` and the underlying Hipparchus integrator fails. This failure is **caught and classified**, not always re-raised:
   - If it occurred with **drag enabled**, with the orbit **descending** and its **osculating perigee already irrecoverably below the floor** (perigee radius below the table lower edge / ~120–150 km — *not* merely the instantaneous altitude, since a healthy low-perigee pass is descending half of every orbit and would otherwise be mislabeled), it is treated as physical re-entry → return a partial `Trajectory` with `terminated=True`, `termination_reason="reentry"`. The §6.2 low warnings will already have fired on the way down.
@@ -303,15 +311,25 @@ traj.metadata["termination_epoch"]   # "2026-07-02T14:08:31Z"
 # traj holds the samples up to re-entry
 ```
 
-**User-bounded run that leaves the band (raises):**
+**User-bounded run, reasonable limits, leaves the band (stop & report):**
 
 ```python
 traj = pgr.propagate_numerical(
     state, duration=86400.0, output_step=60.0,
     limits=pgr.AltitudeLimits(min_altitude_km=200.0, max_altitude_km=2000.0),
 )
-# -> AltitudeLimitError: propagation crossed user min altitude 200.0 km
-#    at 2026-06-14T09:12:44Z
+traj.metadata["terminated"]          # True
+traj.metadata["termination_reason"]  # "user_min" — dropped below 200 km
+traj.metadata["termination_epoch"]   # "2026-06-14T09:12:44Z"
+# traj holds the samples up to the crossing (like impact/escape)
+```
+
+**Unreasonable limits are rejected at construction (raises `ValueError`):**
+
+```python
+pgr.AltitudeLimits(min_altitude_km=-50.0)   # below the surface
+# -> ValueError: min_altitude_km must be >= 0 (a limit below the surface can
+#    never bind — the impact backstop fires first)
 ```
 
 **Hyperbolic / escape trajectory (already valid input; now safely bounded):**
@@ -319,7 +337,7 @@ traj = pgr.propagate_numerical(
 ```python
 traj = pgr.propagate_numerical(hyperbolic_state, duration=10*86400.0, output_step=3600.0)
 traj.metadata["terminated"]          # True
-traj.metadata["termination_reason"]  # "escape"   (crossed ~346,000 km)
+traj.metadata["termination_reason"]  # "escape"   (crossed ~327,000 km)
 ```
 
 ---
@@ -329,18 +347,43 @@ traj.metadata["termination_reason"]  # "escape"   (crossed ~346,000 km)
 ### Resolved by this add-on
 
 - **Low-altitude guard** = a body-size-dependent **Kn ≥ 10 warning floor** (never terminal) + a **graceful classified re-entry catch** on the integrator's min-step failure (stop & report, `reentry`; non-re-entry failures still raise) + an **impact backstop at `R⊕`** (stop & report). Replaces the hardcoded ~120 km terminal re-entry floor.
-- **Escape guard** = terminal stop & report at the **lunar-gravity-parity radius (~346,000 km)**, replacing the ~1,000,000 km Sun-Earth SOI ceiling.
+- **Escape guard** = terminal stop & report at the **lunar-gravity-parity radius (~327,000 km, perigee parity)**, a fixed hard-coded policy constant (not Orekit-derived), replacing the ~1,000,000 km Sun-Earth SOI ceiling.
 - **Guard axis** = geocentric radius throughout; custom radius event detectors for terminal stops (not step size, not stock `AltitudeDetector`).
-- **User altitude limits** = new `AltitudeLimits` config + `limits=` parameter; nests inside the system backstops; **raises** on crossing.
-- **Reporting contract** = stop-and-report (partial `Trajectory` + `terminated`/`termination_reason`/`termination_epoch`) for system/physical terminations; **raise** for user limits.
+- **User altitude limits** = new `AltitudeLimits` config + `limits=` parameter; nests inside the system backstops; a *reasonable* limit **stops & reports** on crossing (like the backstops, `user_min`/`user_max`); an *unreasonable* limit (outside the backstops) is rejected at construction with a plain `ValueError` (no dedicated exception type).
+- **Reporting contract** = stop-and-report (partial `Trajectory` + `terminated`/`termination_reason`/`termination_epoch`) for all runtime terminations — system backstops, re-entry, *and* reasonable user-limit crossings; the only `raise` is the construction-time `ValueError` for an unreasonable `AltitudeLimits` (plus the existing re-entry re-raise of non-re-entry min-step failures).
 - **Unbound orbits** = already supported; eccentricity gates **retained**; only the escape backstop is added.
 - **Table generation invariant** = §5 (model equivalence + matched axis/conditions/range/extents).
 - **Acceptance thresholds** = ~5% green / ~30% red for the collapse-limit; Kn = 10 for the model-validity floor.
 
+### Resolved at build time (Chunks 1–3, signed off 2026-06-15)
+
+The Phase 1–2 outputs, measured in `experiments/drag-coefficient-verification/`
+(committed figures + captured stdout) and cross-validated against the shipped
+generator (§5):
+
+- **Validated band.** Table grid **~150 km → ~1400 km** geocentric altitude (radius
+  **6,528,000 m → ~7,778,000 m**): lower edge **retained at ~150 km** (density
+  volatile/unvalidated below; size-independent — the large-body case is covered by
+  the per-body Kn floor, not by raising this edge); upper edge **extended to
+  ~1400 km**, the full green-validated sweep, so high/elliptical LEO no longer trips
+  nuisance clamp warnings. The collapse RMS stays **≤ 5 % green through the whole
+  130–1400 km sweep** (overall 0.490 %, storm 0.672 %), so the high "cut" is a soft
+  confidence label and **non-binding**.
+- **`floor_altitude(L)`** (Kn = 10, conservative high-activity): **~110.5 km** at
+  L = 0.1 m (CubeSat) rising monotonically to **~222.5 km** at L = 30 m (station).
+- **Model equivalence (§5): PASS.** The experiment and generator C_D models agree to
+  **0.0191 %** (≪ 1 %) at 150 shared points spanning the full **130–1450 km**
+  generation range (the signed-off 150–1400 km grid *plus* the internal-sampling
+  margin), so the extended grid claim is certified across exactly what is shipped;
+  shared algebra bit-identical; Langmuir K matched to 0.017 %; relative-speed formula
+  exact at the equator (≤ 0.16 % at high latitude from a documented
+  spherical-vs-geocentric radius convention).
+
 ### Still open (for the build plan to resolve)
 
-- Exact **upper table boundary** and **`floor_altitude(L)` numbers** — outputs of Phase 1–2, not guessed here.
-- Kn-floor atmosphere choice: **initial-epoch vs conservative high-activity** (§6.3). Recommend conservative.
+- Kn-floor atmosphere choice: **initial-epoch vs conservative high-activity** (§6.3).
+  Chunk 2 used **conservative high-activity** (the recommended default); the binding
+  runtime choice is confirmed at Chunk 9.
 
 ---
 
@@ -349,7 +392,7 @@ traj.metadata["termination_reason"]  # "escape"   (crossed ~346,000 km)
 1. Expanded experiment (§3) run in the venv; figures + captured stdout committed as evidence; validity domain (high cut, Kn floor curve) reported against the §3.1 thresholds.
 2. Model cross-validation (§5) passed and recorded — Cd (experiment vs generator) **and** the runtime Kn-scan vs the experiment curve, with the accommodation anchor (α = 0.90) and the relative-speed formula reconciled first.
 3. Table regenerated (§7) to the validated extents/conditions, with confidence labels.
-4. Guard system (§6) implemented: warnings (two-tier, edge-tailored), terminal radius detectors (impact, escape) via `@JImplements` with every default method overridden and the ephemeris sampling clamped to the achieved span, classified min-step re-entry catch (stop & report) with partial-trajectory recovery (incl. the empty-ephemeris and sub-`R⊕` edges) on re-raise, `AltitudeLimits` + `limits=` param, reporting contract + metadata keys (written only when terminated), docstring note.
+4. Guard system (§6) implemented: warnings (two-tier, edge-tailored), terminal radius detectors (impact, escape) via `@JImplements` with every default method overridden and the ephemeris sampling clamped to the achieved span, classified min-step re-entry catch (stop & report) with partial-trajectory recovery (incl. the empty-ephemeris and sub-`R⊕` edges) on re-raise, `AltitudeLimits` + `limits=` param (reasonable crossing → stop & report; unreasonable → `ValueError` at construction), reporting contract + metadata keys (written only when terminated), docstring note.
 5. Hyperbolic round-trip + escape-catch verified (§6.5).
-6. Tests: warning emission at each edge; clean stop-and-report at impact/escape; **classified re-entry catch returns a partial `Trajectory` on a drag-driven decay, while a non-re-entry min-step failure (e.g. an over-tight tolerance) still raises**; raise at user limits; hyperbolic propagation terminating at escape; Kn-floor computed from geometry. JVM-touching tests acquire the `orekit` fixture (architecture §11).
+6. Tests: warning emission at each edge; clean stop-and-report at impact/escape; **classified re-entry catch returns a partial `Trajectory` on a drag-driven decay, while a non-re-entry min-step failure (e.g. an over-tight tolerance) still raises**; reasonable user-limit crossing stops & reports (`user_min`/`user_max`); unreasonable `AltitudeLimits` raises `ValueError` at construction; hyperbolic propagation terminating at escape; Kn-floor computed from geometry. JVM-touching tests acquire the `orekit` fixture (architecture §11).
 7. Supersession map (§1) carried into the eventual `features.md`/`architecture.md` reconciliation.

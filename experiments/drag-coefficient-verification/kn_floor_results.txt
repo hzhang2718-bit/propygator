@@ -1,0 +1,62 @@
+(1) Mean free path hand-check (mid-activity ~ US Std Atm conditions):
+     alt km    lambda m   US-Std-Atm ballpark
+        100      0.1470   (~0.14 m)
+        120      4.5085   (~3.5 m)
+        150     47.4128   (~30 m)
+        200    327.1938   (~240 m)
+    (same order of magnitude at every check -> lambda model is sane)
+
+(2) Free-molecular floor altitude vs L  (Kn = 10)
+    atmosphere: conservative high-activity (F10.7=250, Ap=45)
+    floor_altitude(L) is finite and monotonically increasing in L   [PASS]
+         L m  floor km
+       0.100     110.5
+       0.122     111.8
+       0.148     113.0
+       0.180     114.3
+       0.220     115.6
+       0.267     116.9
+       0.325     118.3
+       0.396     119.8
+       0.482     121.3
+       0.587     123.0
+       0.715     124.8
+       0.870     126.9
+       1.059     129.1
+       1.290     131.6
+       1.570     134.3
+       1.911     137.3
+       2.326     140.6
+       2.832     144.3
+       3.448     148.3
+       4.197     152.6
+       5.109     157.4
+       6.220     162.7
+       7.572     168.4
+       9.218     174.5
+      11.221     181.2
+      13.660     188.4
+      16.629     196.1
+      20.243     204.4
+      24.644     213.2
+      30.000     222.5
+
+           body    L m  floor km
+     1U CubeSat   0.10     110.5
+     3U CubeSat   0.34     118.6
+       smallsat   1.00     128.4
+      small bus   3.00     145.4
+      large bus   5.00     156.9
+     ISS module  10.00     177.2
+        station  30.00     222.5
+
+(3) Conservative high-activity floor must EXCEED mid-activity
+    (denser atmosphere -> shorter lambda -> higher, safer floor):
+       L m  high km   mid km   delta
+      0.10    110.5    110.4    +0.2
+      1.00    128.4    127.3    +1.2
+     10.00    177.2    166.1   +11.1
+     30.00    222.5    197.2   +25.3
+    conservative floor exceeds mid-activity at every checked L   [PASS]
+
+Saved figure: kn_floor.png

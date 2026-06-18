@@ -1,6 +1,6 @@
 # Build plan: Feature 1.1 Addendum — Drag-model validity domain & altitude guards
 
-> **Status: BUILD PLAN (not started).** Derived from
+> **Status: BUILD PLAN (started).** Derived from
 > `docs/feature-1.1-addendum-drag-validity-and-altitude-guards.md`, which is the
 > **binding contract** for this work (the way `features.md` §1.1 was for the
 > original 1.1 build plan). Every threshold, signature, metadata key, and
@@ -30,12 +30,13 @@ workstreams (addendum §0):
    guard family: terminal impact + escape backstops (custom Orekit event
    detectors), edge-aware drag-regime warnings (Kn floor + table edges), a
    classified min-step re-entry catch, optional user `AltitudeLimits`, and a
-   stop-and-report vs raise reporting contract with new `Trajectory` metadata.
+   stop-and-report reporting contract (raising only a construction-time `ValueError`
+   for an unreasonable limit) with new `Trajectory` metadata.
 
 The end state matches addendum §8 "What the end product looks like" and §10
 "Definition of done": a normal LEO run is unchanged; a decaying run stops and
 reports `terminated`/`termination_reason`/`termination_epoch`; impact/escape
-terminate cleanly; user limits raise; and the shipped Cd table only claims the
+terminate cleanly; reasonable user limits stop & report (unreasonable ones rejected at construction); and the shipped Cd table only claims the
 altitude band the experiment validated.
 
 **Source-of-truth docs (do not silently diverge):**
@@ -57,14 +58,16 @@ altitude band the experiment validated.
   `cd_core.calibrate_K` and the generator's `ANCHOR_ALPHA` (already reconciled in
   the working tree; addendum §5, with citations). Chunk 3 only has to *prove* the
   two models now agree.
-- **Escape ceiling = lunar-gravity-parity radius ≈ 346,000 km** (addendum §6.3),
-  not the old ~1,000,000 km Sun-Earth SOI ceiling.
+- **Escape ceiling = lunar-gravity-parity radius ≈ 327,000 km** (perigee parity; a
+  fixed hard-coded policy constant, *not* Orekit-derived — addendum §6.3), not the
+  old ~1,000,000 km Sun-Earth SOI ceiling.
 - **High-altitude sweep ceiling ≈ 1400 km** (addendum §3.2 — modestly above the
   ~1200 km table ceiling; the high limit is non-binding).
 - **Guard axis = geocentric radius**, terminal stops via custom radius event
   detectors (never the stock `AltitudeDetector`, never step size; addendum §6.3).
-- **Reporting contract** = stop-and-report for system/physical terminations,
-  **raise** for user limits (addendum §6.6).
+- **Reporting contract** = stop-and-report for all runtime terminations (system
+  backstops, re-entry, *and* reasonable user-limit crossings); the only `raise` is a
+  construction-time `ValueError` for an unreasonable `AltitudeLimits` (addendum §6.6).
 - **Eccentricity gates retained** as-is (addendum §6.5) — this work *adds* the
   escape backstop, it does not remove validation.
 
@@ -119,7 +122,7 @@ frames explicit; `pathlib.Path`; `logging`, never `print`; frozen dataclasses wi
 
 ---
 
-## Git: branch strategy (read once, before Chunk 1)
+## Git: branch strategy (read once, before Chunk 1) - Done
 
 You've now done one feature branch (`feature/numerical-propagator`); the full
 end-to-end walkthrough is in `docs/history/build-plan-feature-1.1.md` ("Git: the
@@ -154,7 +157,7 @@ authenticated before Chunk 11.
 
 ---
 
-## Chunk 1 — Experiment expansion: continuous sweep + geocentric-radius rekey + storm cohort + thresholds
+## Chunk 1 — Experiment expansion: continuous sweep + geocentric-radius rekey + storm cohort + thresholds - Done
 
 **Goal:** turn the interior-only collapse study into a *boundary-finding* one — a
 dense altitude sweep on the **production axis** (geocentric radius), with a storm
@@ -202,7 +205,7 @@ against §3.1. Bare `pytest` is unaffected (experiment is outside `testpaths`).
 
 ---
 
-## Chunk 2 — Knudsen low-altitude diagnostic + body-size floor curve
+## Chunk 2 — Knudsen low-altitude diagnostic + body-size floor curve - Done
 
 **Goal:** the **model-validity instrument** the collapse experiment is blind to
 (addendum §2). A separate Knudsen-number diagnostic that finds the
@@ -243,7 +246,7 @@ direction).
 
 ---
 
-## Chunk 3 — Phase-2 analysis + model cross-validation (the §5 invariant)
+## Chunk 3 — Phase-2 analysis + model cross-validation (the §5 invariant) - Done
 
 **Goal:** turn the Chunk 1–2 runs into the **committed constants** the rest of the
 work consumes, and discharge the addendum's single most important correctness
@@ -286,7 +289,7 @@ band numbers (in the experiment README and/or addendum §9).
 before proceeding — a divergence here invalidates the regenerated table); the
 three Phase-2 quantities are recorded with evidence.
 
-> ### ✅ Checkpoint A — validity domain established
+> ### ✅ Checkpoint A — validity domain established - Done
 > 1. The validity domain (high cut, `floor_altitude(L)` curve, ~150 km floor) is
 >    measured against the §3.1 thresholds and the two Cd models are proven equal
 >    (addendum §10 items 1–2).
@@ -295,7 +298,7 @@ three Phase-2 quantities are recorded with evidence.
 
 ---
 
-## Chunk 4 — Cd table regeneration to the validated band
+## Chunk 4 — Cd table regeneration to the validated band - Done
 
 **Goal:** ship a table that claims **only** what was validated (addendum §5/§7) —
 the table generator's edits + the regenerated `data/sphere_cd_default.npz` +
@@ -338,7 +341,7 @@ runs in the bare env.
 
 ---
 
-## Chunk 5 — Runtime foundations: `AltitudeLimits` + `AltitudeLimitError` + metadata keys
+## Chunk 5 — Runtime foundations: `AltitudeLimits` + escape policy constant + metadata keys - Done
 
 **Goal:** the pure-Python, safe-before-init surface of the guard system —
 unit-testable with **no JVM**. Establishes the home module (`propagation/guards.py`)
@@ -348,29 +351,38 @@ the JVM-touching guard code lands in next.
 - `src/propygator/propagation/guards.py` (new) — `AltitudeLimits` frozen dataclass
   exactly per addendum §6.4: `min_altitude_km: float | None = None`,
   `max_altitude_km: float | None = None`; `__post_init__` validates each finite
-  if given, `min < max`, and **warns** (not raises) if a limit lies outside the
-  system backstops (it would be superseded by impact/escape). Docstring records
-  the "geodetic km → geocentric-radius via equatorial radius, converted once at
-  setup" approximation (the ~21 km latitude spread is within a guard's tolerance).
-- `src/propygator/core/exceptions.py` — `AltitudeLimitError(PropagationError)`
-  carrying the crossed boundary + the crossing epoch (mirrors the existing
-  `PropagationError` "message string, no raw Java trace" principle).
+  if given, `min < max`, and **raises `ValueError`** (like every other config
+  dataclass) on an *unreasonable* limit — one outside the system backstops that
+  could never bind: `min_altitude_km < 0` (below the surface) or `max_altitude_km`
+  above the escape-parity altitude. Both are pure altitude comparisons against
+  fixed policy bounds, so the validator stays **JVM-free / safe-before-init**.
+  Also define the module-level **escape-parity policy constant** here (perigee
+  lunar parity; `0.90 · D_perigee`, formula + chosen `D` in a comment; *not*
+  Orekit-derived). Store it as an **altitude** bound (≈ 320,650 km = the ≈ 327,000 km
+  perigee-parity *radius* minus the WGS84 equatorial radius) so this `max` check
+  needs no `R⊕` and stays JVM-free; the Chunk 6 escape detector lowers the *same*
+  constant to a geocentric radius (adding the Orekit `R⊕`, identical to how user
+  limits are lowered) — one source of truth for both. Docstring records the
+  "geodetic km → geocentric-radius via equatorial radius, converted once at setup"
+  approximation (the ~21 km latitude spread is within a guard's tolerance).
+- *(No new exception type.)* An unreasonable `AltitudeLimits` raises the builtin
+  `ValueError` from `__post_init__` (above); a reasonable limit never raises — it
+  stops & reports at runtime (Chunk 7). So `core/exceptions.py` is **unchanged**.
 - `src/propygator/core/states.py` — extend the `TrajectoryMetadata` `TypedDict`
   (`total=False`) with the three **optional, additive** keys (addendum §6.6):
   `terminated: bool`, `termination_reason: str`, `termination_epoch: str`. Do
   **not** add them to `_REQUIRED_METADATA_KEYS`. (Allowed values for
   `termination_reason`: `"reentry" | "impact" | "escape" | "user_min" |
   "user_max"`.)
-- `src/propygator/__init__.py` — re-export `AltitudeLimits` and
-  `AltitudeLimitError`; keep `import propygator` JVM-free.
-- **Tests** (`tests/propagation/test_guards.py`, pure-Python; + the exception in
-  `tests/core/`): every `AltitudeLimits.__post_init__` branch (finite, min<max,
-  the outside-backstops warning); the exception subclasses `PropagationError` and
-  carries its fields; constructing `AltitudeLimits` does **not** start the JVM.
+- `src/propygator/__init__.py` — re-export `AltitudeLimits`; keep `import propygator`
+  JVM-free.
+- **Tests** (`tests/propagation/test_guards.py`, pure-Python): every
+  `AltitudeLimits.__post_init__` branch — finite, `min < max`, and the
+  unreasonable-limit `ValueError` (negative `min`; `max` above the escape-parity
+  altitude); constructing `AltitudeLimits` does **not** start the JVM.
 
-**Reuse:** the frozen-dataclass + `__post_init__` idiom from `IntegratorConfig` /
-`SpacecraftGeometry`; the soft-limit `warnings.warn` pattern in `spacecraft.py`
-(~lines 589–594); the `PropagationError` base in `core/exceptions.py`.
+**Reuse:** the frozen-dataclass + `__post_init__` **`ValueError`** idiom from
+`IntegratorConfig` (`integrators.py:44–66`) / `SpacecraftGeometry`.
 
 **You provide:** nothing (the dataclass is fully specified in §6.4).
 
@@ -382,7 +394,7 @@ JVM-free; `python -c "import propygator, jpype; print(jpype.isJVMStarted())"` �
 
 ---
 
-## Chunk 6 — Terminal radius detectors (impact + escape) + sampling clamp + stop-and-report
+## Chunk 6 — Terminal radius detectors (impact + escape) + sampling clamp + stop-and-report - Done
 
 **Goal:** the core new Orekit integration surface — custom geocentric-radius event
 detectors that stop the run cleanly at impact and escape, the ephemeris-sampling
@@ -399,9 +411,13 @@ fix they require, and the partial-`Trajectory` + termination-metadata assembly
   Thresholds:
   - **Impact** `r = R⊕` — use `Constants.WGS84_EARTH_EQUATORIAL_RADIUS`
     (= 6,378,137 m; already used in `core/bodies.py`), not a literal.
-  - **Escape** `r = r_lunar_parity` — compute once from constants:
-    `D · √(μ⊕/μ☾) / (1 + √(μ⊕/μ☾))` (≈ 346,000 km), with the formula in a comment
-    (addendum §6.3). Deriving it from `Constants` is cleaner than hardcoding.
+  - **Escape** `r = r_lunar_parity` — lower the **escape-parity policy constant
+    from Chunk 5** (perigee lunar parity, stored as the ≈ 320,650 km altitude bound)
+    to a geocentric radius by adding the Orekit equatorial radius (→ ≈ 327,000 km),
+    the *same* altitude→radius lowering used for user limits. It is a **fixed,
+    hard-coded policy constant — *not* derived from Orekit `Constants`** (the
+    Earth-Moon distance is not a `Constants` member; the value is a deliberately
+    fuzzy fence — addendum §6.3).
 - `src/propygator/propagation/numerical.py` —
   - Register the impact + escape detectors on the propagator (both always active;
     addendum §6.1).
@@ -436,44 +452,51 @@ output) passes.
 
 ---
 
-## Chunk 7 — User altitude limits (`limits=` param + tightest-of nesting + raise)
+## Chunk 7 — User altitude limits (`limits=` param + tightest-of nesting + stop & report) - Done
 
-**Goal:** wire `AltitudeLimits` into the public signature and make a user-limit
-crossing **raise** (addendum §6.1 threshold 5, §6.4, §6.6).
+**Goal:** wire `AltitudeLimits` into the public signature and make a *reasonable*
+user-limit crossing **stop & report** like the system backstops (addendum §6.1
+threshold 5, §6.4, §6.6). Unreasonable limits are already rejected at construction
+by Chunk 5's `__post_init__` `ValueError`, so there is nothing to do for them here.
 
 **Create / edit:**
 - `src/propygator/propagation/numerical.py` — add the keyword-only parameter
   `limits: AltitudeLimits | None = None` (the **only** signature change; addendum
   §6.4). Lower each supplied limit **once at setup** to a geocentric-radius
-  threshold (equatorial-radius reference) and register a radius detector for it.
+  threshold (equatorial-radius reference) and register a radius detector for it,
+  reusing the Chunk 6 detector + stop-and-report machinery.
   Enforce the **tightest-of rule**: user limits can only *tighten* termination,
   never loosen the always-on system backstops (1, 6). On a user-limit crossing,
-  **raise `AltitudeLimitError`** (carrying the boundary + crossing epoch) — not
-  stop-and-report. The raised error **may carry the partial `Trajectory`** as an
-  attribute (advanced recovery), while still failing loudly.
-- Mirror the §8 message form: `propagation crossed user min altitude 200.0 km at
-  <ISO epoch>`.
-- `docs/features.md` §1.1 failure-modes table gets the new `AltitudeLimitError`
-  row in the Chunk-11 reconciliation (note it here so it isn't forgotten).
-- **Tests** (`orekit` fixture): a run that dips below `min_altitude_km` raises
-  `AltitudeLimitError` with the right boundary/epoch; a run that stays in-band does
-  not; a user limit *looser* than a system backstop is superseded by the backstop
-  (and warned at construction, per Chunk 5).
+  **stop & report** — return the partial `Trajectory` with `terminated=True`,
+  `termination_reason="user_min"`/`"user_max"`, and `termination_epoch`, exactly
+  like impact/escape (addendum §6.6). **No exception is raised on a crossing**; the
+  only user-limit error is Chunk 5's construction-time `ValueError`.
+- The crossing epoch goes into `termination_epoch` (ISO-8601 UTC), per the §8
+  stop-and-report example — there is no user-facing exception message to format.
+- `docs/features.md` §1.1 failure-modes table gets the new construction-time
+  `ValueError` row (unreasonable `AltitudeLimits`) in the Chunk-11 reconciliation
+  (note it here so it isn't forgotten).
+- **Tests** (`orekit` fixture): a run that dips below a reasonable `min_altitude_km`
+  **stops & reports** with `termination_reason="user_min"` and the right
+  `termination_epoch`; a run that stays in-band has no `terminated` key; a user limit
+  *tighter* than the system backstops fires before them. (The unreasonable-limit
+  `ValueError` is already covered by Chunk 5's pure-Python test.)
 
-**Reuse:** Chunk 5 `AltitudeLimits`/`AltitudeLimitError`; Chunk 6 detector
-mechanism + threshold lowering.
+**Reuse:** Chunk 5 `AltitudeLimits` + the escape-parity constant; Chunk 6 detector
+mechanism + threshold lowering + stop-and-report assembly.
 
 **You provide:** nothing.
 
-**Verify:** `pytest tests/propagation -v` green; the §8 "user-bounded run that
-leaves the band" example raises as shown.
+**Verify:** `pytest tests/propagation -v` green; the §8 "user-bounded run, reasonable
+limits, leaves the band" example **stops & reports** as shown, and the
+unreasonable-limits example raises `ValueError` at construction.
 
 *(Mergeable into Chunk 6 if that session has capacity — it reuses the same
 detector machinery.)*
 
 ---
 
-## Chunk 8 — Min-step re-entry classifier + partial-trajectory recovery
+## Chunk 8 — Min-step re-entry classifier + partial-trajectory recovery - Done
 
 **Goal:** the graceful default for a drag-driven decay — catch the integrator's
 min-step failure, classify it, and **stop-and-report** a genuine re-entry while
@@ -521,9 +544,10 @@ picks one — confirm at review.
 re-entry" example returns a partial trajectory with the three metadata keys; the
 over-tight-tolerance control case still raises.
 
-> ### ✅ Checkpoint B — terminal guards + reporting contract complete
+> ### ✅ Checkpoint B — terminal guards + reporting contract complete - Done
 > 1. Impact, escape, user-limit, and re-entry paths all behave per §6.6
->    (stop-and-report vs raise), with partial trajectories where specified.
+>    (stop-and-report for all crossings; the only `raise` is the construction-time
+>    `ValueError` for an unreasonable limit), with partial trajectories where specified.
 > 2. **Refresh `CLAUDE.md`** "Project state": the guard system is partway in
 >    (`propagation/guards.py` exists; `propagate_numerical` gained `limits=` and
 >    terminal detectors). Note the addendum is the active build plan.
@@ -532,7 +556,7 @@ over-tight-tolerance control case still raises.
 
 ---
 
-## Chunk 9 — Kn-floor + table-edge regime warnings (the warning tier)
+## Chunk 9 — Kn-floor + table-edge regime warnings (the warning tier) - Done
 
 **Goal:** the two-tier warning system (addendum §6.2) — edge-aware, warn-once
 drag-regime warnings at the **Kn floor**, the **table lower edge**, and the **table
@@ -585,7 +609,7 @@ the floor" warning appears once with the right body-specific `~N km`.
 
 ---
 
-## Chunk 10 — Unbound-orbit end-to-end verification + docstring limitation note
+## Chunk 10 — Unbound-orbit end-to-end verification + docstring limitation note - Done
 
 **Goal:** prove the escape backstop makes already-supported unbound orbits *safe*,
 and add the user-facing limitation note (addendum §6.5, §6.7).
@@ -597,7 +621,7 @@ and add the user-facing limitation note (addendum §6.5, §6.7).
   models — the `CartesianOrbit` path has no bound check) and that the **escape
   detector catches the climb-out**, terminating with
   `termination_reason="escape"`. Confirm the detector resolves the single crossing
-  cleanly at ~54× the LEO radius (check `maxCheck`/threshold scaling).
+  cleanly at ~51× the LEO radius (check `maxCheck`/threshold scaling).
 - `src/propygator/propagation/numerical.py` docstring — add the §6.7 limitation
   bullet to the "Spacecraft-model limitations (v1)" block:
   *"Drag modeling is valid only within an altitude band (free-molecular flow above
@@ -621,7 +645,7 @@ escape rather than running to absurd distances.
 
 ---
 
-## Chunk 11 — Wrap-up: full sweep, review, docs reconciliation, PR
+## Chunk 11 — Wrap-up: full sweep, review, docs reconciliation, PR - Done
 
 **Goal:** land the addendum — clean diff, the supersession map folded back into the
 governing docs, and the PR.
@@ -633,14 +657,14 @@ governing docs, and the PR.
 - **Reconcile the docs (addendum §1 map + §10 item 7).** Fold the superseded/
   extended sections back into the source-of-truth docs and register the new names:
   - `features.md` §1.1 — supersede "Escape and re-entry"; extend the signature
-    (`limits=`), the failure-modes table (`AltitudeLimitError`), the metadata block
-    (the three keys), the drag-coefficient-modeling §5 invariant, and the
-    model-limitations docstring line.
+    (`limits=`), the failure-modes table (construction-time `ValueError` for an
+    unreasonable `AltitudeLimits`), the metadata block (the three keys), the
+    drag-coefficient-modeling §5 invariant, and the model-limitations docstring line.
   - `architecture.md` — close the §13 "Escape / re-entry guards" deferral; extend
     §13 "Coefficient of drag modeling" (validity domain); extend §6
     `TrajectoryMetadata` (the three keys) and register `AltitudeLimits` in the §6
-    data model + §7 re-export list; add `AltitudeLimitError` to the exceptions
-    narrative.
+    data model + §7 re-export list. (No new exception type — an unreasonable
+    `AltitudeLimits` raises the builtin `ValueError`.)
   - `CHANGELOG.md` `[Unreleased]` — the guard system, `AltitudeLimits`, the
     metadata keys, the regenerated table.
   - **Refresh `CLAUDE.md`** "Project state": the addendum is built; remove its
@@ -654,16 +678,16 @@ PR; final go-ahead to merge (an outward action — Claude won't push/merge witho
 it).
 
 **Verify:** `pytest -v` full suite green; `pre-commit run --all-files` clean;
-`import propygator as pgr` exposes `AltitudeLimits`/`AltitudeLimitError` and stays
-JVM-free; the addendum §1 map is fully carried into `features.md`/`architecture.md`.
+`import propygator as pgr` exposes `AltitudeLimits` and stays JVM-free; the addendum
+§1 map is fully carried into `features.md`/`architecture.md`.
 
-> ### ✅ Final checkpoint — addendum done
+> ### ✅ Final checkpoint — addendum done - Done
 > CLAUDE.md, CHANGELOG, features.md, and architecture.md all reflect the validity
 > domain + guard system as built; the supersession map is discharged.
 
 ---
 
-## End-state verification (addendum complete → guards live)
+## End-state verification (addendum complete → guards live) - Done
 
 Mirrors addendum §10 "Definition of done." From repo root, `conda activate
 propygator`, on the merged branch:
@@ -681,9 +705,11 @@ propygator`, on the merged branch:
 4. **Unbound** (§10.5): a hyperbolic state round-trips and terminates at escape.
 5. **Tests** (§10.6): warning emission at each edge; clean stop-and-report at
    impact/escape; the re-entry catch returns a partial `Trajectory` on a
-   drag-driven decay while a non-re-entry min-step failure still raises; user
-   limits raise; hyperbolic propagation terminates at escape; the Kn floor is
-   computed from geometry. JVM-touching tests use the `orekit` fixture.
+   drag-driven decay while a non-re-entry min-step failure still raises; a reasonable
+   user-limit crossing stops & reports (`user_min`/`user_max`) while an unreasonable
+   `AltitudeLimits` raises `ValueError` at construction; hyperbolic propagation
+   terminates at escape; the Kn floor is computed from geometry. JVM-touching tests
+   use the `orekit` fixture.
 6. **Docs** (§10.7): the §1 supersession map is carried into
    `features.md`/`architecture.md`; CHANGELOG + CLAUDE.md updated.
 7. `python -c "import propygator, jpype; print(jpype.isJVMStarted())"` → `False`.

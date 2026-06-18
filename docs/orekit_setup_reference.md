@@ -54,6 +54,28 @@ What matters is that the `propygator` environment is active when Python runs —
 - **Jupyter** — install into the env (`conda install -c conda-forge jupyterlab`), launch from the activated env. Notebooks keep the JVM warm across cells, which is much faster than rerunning scripts.
 - **Double-click a .py file in Explorer** — does **not** work. Uses the system Python, not the conda one.
 
+## orekit-data: how propygator finds it
+
+When you use propygator you do **not** call `setup_orekit_curdir()` yourself — propygator
+resolves the orekit-data bundle automatically the first time you propagate (the JVM
+starts lazily). It searches, in order:
+
+1. the `OREKIT_DATA_PATH` environment variable (authoritative if set),
+2. `~/.propygator/orekit-data/` — the canonical per-user location (an absolute path), then
+3. `./orekit-data/` — relative to the current working directory.
+
+**Most reliable: keep one copy at `~/.propygator/orekit-data/`.** Because it is an
+absolute path it resolves identically from a script, JupyterLab, or VS Code, with no
+environment variable to set and nothing baked into your code. The cwd-relative
+`./orekit-data/` is a trap for notebooks: VS Code and JupyterLab start the kernel in the
+*notebook's* folder (e.g. `notebooks/`), so a copy sitting at the repo root is not found.
+
+You only need **one** copy. A repo-root `./orekit-data/` (it is gitignored) is redundant
+once the canonical one exists and can be deleted later to reclaim ~500 MB —
+`Remove-Item -Recurse -Force .\orekit-data` — without breaking anything, since everything
+resolves to the canonical copy. Fetch a fresh bundle any time with
+`python scripts/download_orekit_data.py`.
+
 ## Required Boilerplate
 
 Every Orekit script starts with these lines, in this exact order:

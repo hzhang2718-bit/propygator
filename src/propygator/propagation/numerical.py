@@ -52,6 +52,7 @@ from ..core.frames import Frame
 from ..core.states import Trajectory, _propygator_version
 from .attitude import LofAligned, _serialize_attitude, _to_provider
 from .force_models import ForceModelConfig, _serialize_force_models
+from .guards import _DETECTOR_THRESHOLD_S
 from .integrators import IntegratorConfig
 from .spacecraft import (
     IncidenceVariableCd,
@@ -77,6 +78,7 @@ if TYPE_CHECKING:
 
     from ..core.states import State, TrajectoryMetadata
     from .attitude import AttitudeConfig
+    from .guards import AltitudeLimits
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +119,18 @@ _SAMPLE_COUNT_TOL = 1e-9
 # raise and tell the caller to coarsen output_step.
 _MAX_OUTPUT_SAMPLES = 10_000_000
 
+# A run "terminated early" (a guard's Action.STOP fired) iff the planned end is more
+# than this many seconds past the achieved ephemeris span. A normal propagate(end)
+# lands getMaxDate() == end (durationFrom == 0), so this is the common-path test for
+# "did a backstop stop the run"; comfortably above any sub-ns float noise and below
+# any meaningful early stop (addendum §6.6). Must stay >= guards._DETECTOR_THRESHOLD_S
+# (the detector root-finds each crossing only to within that time tolerance) so this
+# early-stop test never mistakes the root-finder's own slack for a full-span run — the
+# assert enforces that cross-module invariant at import rather than trusting this
+# comment, so loosening the detector tolerance later fails fast here.
+_TERMINATION_TIME_TOL_S = 1.0e-3
+assert _TERMINATION_TIME_TOL_S >= _DETECTOR_THRESHOLD_S
+
 
 def _sample_count(duration: float, output_step: float) -> int:
     """Number of output samples: ``floor(duration/output_step + tol) + 1``.
@@ -127,6 +141,65 @@ def _sample_count(duration: float, output_step: float) -> int:
     ``n >= 2``.
     """
     return int(math.floor(duration / output_step + _SAMPLE_COUNT_TOL)) + 1
+
+
+def _realized_sample_count(
+    max_offset: float, output_step: float, planned_count: int
+) -> int:
+    """Output-sample count clamped to the achieved ephemeris span (addendum §6.3).
+
+    A terminal guard (impact, escape, or — Chunk 8 — a re-entry min-step catch) stops
+    the propagation early, so the generated ephemeris spans only ``max_offset``
+    seconds from the start rather than the planned ``(planned_count - 1) *
+    output_step``. Return the number of on-grid samples at or before ``max_offset`` —
+    ``floor(max_offset / output_step) + 1`` with **no** round-off slack, so the last
+    offset never overshoots ``getMaxDate()`` and the ephemeris query cannot raise —
+    capped at ``planned_count`` and floored at 1. A full run returns ``planned_count``
+    unchanged. One clamp serves impact, escape, and the re-entry catch alike.
+    """
+    if max_offset >= (planned_count - 1) * output_step:
+        return planned_count
+    count = int(math.floor(max_offset / output_step)) + 1
+    return max(1, min(count, planned_count))
+
+
+def _recover_ephemeris(
+    generator: "org.orekit.propagation.EphemerisGenerator",
+) -> "org.orekit.propagation.BoundedPropagator | None":
+    """Return the ephemeris generated up to a propagation failure, or ``None``.
+
+    After a ``JException`` from ``propagate()``, the generator usually still holds the
+    good steps recorded before the failure — a usable partial ephemeris (addendum §6.6,
+    verified on a real drag decay). But on a failure with *no* good steps (an integrator
+    config so unmeetable the very first step is rejected), ``getGeneratedEphemeris()``
+    *itself* raises; that edge returns ``None`` so the caller re-raises cleanly with no
+    partial attached.
+    """
+    import jpype
+
+    try:
+        return generator.getGeneratedEphemeris()
+    except jpype.JException:  # type: ignore[attr-defined]
+        return None
+
+
+def _radial_velocity_m_s(state: "org.orekit.propagation.SpacecraftState") -> float:
+    """Radial velocity of ``state`` in m/s (``r·v / |r|``); < 0 while descending."""
+    pv = state.getPVCoordinates()
+    p = pv.getPosition()
+    return float(p.dotProduct(pv.getVelocity())) / float(p.getNorm())
+
+
+def _osculating_perigee_radius_m(
+    state: "org.orekit.propagation.SpacecraftState",
+) -> float:
+    """Osculating perigee radius of ``state`` in m — ``a(1 - e)`` from its orbit.
+
+    Uses the orbit's own ``getA()`` / ``getE()`` (which carry the propagation mu), so it
+    is correct for any orbit type; for a bound orbit ``a(1 - e)`` is the perigee radius.
+    """
+    orbit = state.getOrbit()
+    return float(orbit.getA()) * (1.0 - float(orbit.getE()))
 
 
 def _validate_inputs(
@@ -310,39 +383,66 @@ def _resolve_atmosphere(
         ) from None
 
 
-def _build_variable_cd_drag_sensitive(
-    variable_cd: VariableCd,
+def _constant_cd(value: float) -> "Callable[[float, float], float]":
+    """A fixed-Cd lookup matching the ``VariableCd(radius_m, density) -> Cd`` shape.
+
+    Lets a plain float Cd flow through the same proxy as a :class:`VariableCd`, so every
+    drag path shares the per-substep Kn-floor hook (addendum §6.2).
+    """
+    return lambda radius_m, density: value
+
+
+def _build_drag_sensitive(
+    cd_lookup: "Callable[[float, float], float]",
     accel: "Callable[..., object]",
+    kn_floor: "tuple[float, str] | None",
 ) -> "org.orekit.forces.drag.DragSensitive":
-    """A custom ``DragSensitive`` applying a :class:`VariableCd` scalar Cd (Tier A).
+    """A custom ``DragSensitive`` carrying the scalar-Cd lookup + the Kn-floor warning.
 
     Implements the ``DragSensitive`` interface from Python via ``@JImplements`` (Java
-    classes can't be subclassed; CLAUDE.md) — **one** proxy serving both the sphere
-    and box paths, which differ only in how the per-substep scalar Cd becomes an
-    acceleration. ``accel(state, density, relative_velocity, cd)`` supplies that step:
-    the **sphere** assembles the ``IsotropicDrag`` formula directly; the **box**
+    classes can't be subclassed; CLAUDE.md) — **one** proxy serving every drag path
+    (sphere and box, fixed Cd and :class:`VariableCd`), which differ only in how the
+    per-substep scalar Cd becomes an acceleration. ``cd_lookup(radius_m, density) ->
+    Cd`` is a :class:`VariableCd` (its call does the table lookup **and** the
+    edge-aware clamp warning) or a fixed-Cd constant (:func:`_constant_cd`);
+    ``accel(state, density, relative_velocity, cd)`` turns that scalar into an
+    acceleration — the **sphere** assembles the ``IsotropicDrag`` formula, the **box**
     delegates to ``BoxAndSolarArraySpacecraft.dragAcceleration`` (attitude-driven
-    projected area) with the table value as the box's single "global drag factor".
-    Keeping the interface boilerplate (drivers, attitude-rate flag, the radius +
-    table-lookup preamble) in one place means a future Java default method JPype needs
-    is added once, not twice.
+    projected area) with the value as the box's single "global drag factor".
+
+    ``kn_floor`` is ``(floor_radius_m, message)`` or ``None``: when the geocentric
+    radius first drops below ``floor_radius_m`` the loud free-molecular-floor warning
+    is emitted **once** (addendum §6.2/§6.3).
+
+    **Deliberate trade (chunk 9).** Routing *every* drag path through this one proxy —
+    including a fixed-Cd sphere, which previously used Orekit's native ``IsotropicDrag``
+    — buys a single shared warn-once hook and one code path, at the cost of crossing the
+    Java->Python boundary for the whole drag formula on every integration substep
+    instead of staying in Java for the fixed-Cd case. That per-substep cost is marginal
+    next to the per-substep atmosphere-density query under the default ``NRLMSISE-00``,
+    but is a larger share under a cheaper atmosphere (e.g. ``Harris-Priester``); the
+    uniformity was judged worth it for v1. If a profile later shows it matters, restore
+    native ``IsotropicDrag`` for the fixed-Cd sphere and move the floor check off the
+    per-substep path (a setup-time perigee check or a non-terminal radius detector).
+    See architecture §13 ("Coefficient of drag modeling") for the contract-level note.
 
     Only the double-precision ``dragAcceleration`` is implemented — the Field overload
     is never invoked by a double-precision ``NumericalPropagator``;
-    ``getDragParametersDrivers`` returns no tunable parameters (the Cd comes from the
-    table, not a driver). Geocentric radius is ``|position|`` in the propagation frame
-    (no transform); calling ``variable_cd`` does the table lookup and the one-time
-    out-of-grid clamp warning.
+    ``getDragParametersDrivers`` returns no tunable parameters (the Cd comes from
+    ``cd_lookup``, not a driver). Geocentric radius is ``|position|`` in the propagation
+    frame (no transform).
     """
     import jpype
     from java.util import ArrayList
     from org.orekit.forces.drag import DragSensitive
 
+    kn_floor_warned = [False]  # one-element mutable box: floor warn-once state
+
     @jpype.JImplements(DragSensitive)  # type: ignore[attr-defined]
-    class _VariableCdDragSensitive:
+    class _DragSensitive:
         @jpype.JOverride  # type: ignore[attr-defined]
         def getDragParametersDrivers(self):  # noqa: ANN001, ANN202 - Java signature
-            return ArrayList()  # no tunable parameters: Cd is table-driven
+            return ArrayList()  # no tunable parameters: Cd comes from cd_lookup
 
         @jpype.JOverride  # type: ignore[attr-defined]
         def dependsOnAttitudeRate(self):  # noqa: ANN001, ANN202
@@ -350,11 +450,19 @@ def _build_variable_cd_drag_sensitive(
 
         @jpype.JOverride  # type: ignore[attr-defined]
         def dragAcceleration(self, state, density, relative_velocity, parameters):  # noqa: ANN001, ANN202
-            cd = variable_cd(float(state.getPosition().getNorm()), float(density))
+            radius_m = float(state.getPosition().getNorm())
+            if (
+                kn_floor is not None
+                and radius_m < kn_floor[0]
+                and not kn_floor_warned[0]
+            ):
+                kn_floor_warned[0] = True
+                warnings.warn(kn_floor[1], stacklevel=2)
+            cd = cd_lookup(radius_m, float(density))
             return accel(state, density, relative_velocity, float(cd))
 
     # Implements DragSensitive only at the JPype runtime level (mypy can't see it).
-    return _VariableCdDragSensitive()  # type: ignore[return-value]
+    return _DragSensitive()  # type: ignore[return-value]
 
 
 def _build_box_spacecraft(
@@ -367,17 +475,18 @@ def _build_box_spacecraft(
     ``RadiationSensitive``), so the caller builds it once and shares it. The 10-arg
     ctor is ``(x, y, z, sun, arrayArea, arrayAxis, dragCoeff, liftRatio, absorption,
     specular)``; lift ratio is ``0.0`` (v1 models no aerodynamic lift). The base drag
-    coefficient is the fixed Cd for a plain float; for a Cd *table* (:class:`VariableCd`
-    / :class:`IncidenceVariableCd`) it is ``1.0`` and the per-substep scalar Cd is
-    applied as the box's single "global drag factor" by the custom box ``DragSensitive``
-    (drag is exactly linear in that factor — verified). The array axis is already a
-    validated unit vector. Box field invariants hold (validated at construction).
+    coefficient is **always ``1.0``**: every drag path (fixed Cd or a
+    :class:`VariableCd` / :class:`IncidenceVariableCd` table) routes through the custom
+    box ``DragSensitive``, which applies the per-substep scalar Cd as the box's single
+    "global drag factor" (drag is exactly linear in that factor — verified), so the
+    Kn-floor warn-once hook is shared by all of them (addendum §6.2). The array axis is
+    already a validated unit vector. Box field invariants hold (validated at
+    construction).
     """
     from org.hipparchus.geometry.euclidean.threed import Vector3D
     from org.orekit.forces import BoxAndSolarArraySpacecraft
 
-    cd = geometry.drag_coefficient
-    base_cd = 1.0 if isinstance(cd, (VariableCd, IncidenceVariableCd)) else float(cd)
+    base_cd = 1.0
     assert geometry.x_length_m is not None
     assert geometry.y_length_m is not None
     assert geometry.z_length_m is not None
@@ -404,67 +513,83 @@ def _build_drag_force(
     atmosphere: "org.orekit.models.earth.atmosphere.Atmosphere",
     box: "org.orekit.forces.BoxAndSolarArraySpacecraft | None",
 ) -> "org.orekit.forces.ForceModel":
-    """Build the drag ``ForceModel`` (chunk 8 sphere; chunk 9 box).
+    """Build the drag ``ForceModel`` (chunk 8 sphere; chunk 9 box + Kn floor).
 
-    **Sphere:** a fixed Cd uses the stock ``IsotropicDrag(area, Cd)``; a
-    :class:`VariableCd` uses :func:`_build_variable_cd_drag_sensitive` with the
-    isotropic-acceleration strategy. **Box:** a fixed Cd uses ``box`` directly (it
-    implements ``DragSensitive`` and was built with that Cd); a :class:`VariableCd`
-    uses the same shared proxy with a strategy that delegates the projected-area
-    bookkeeping to ``box``; an :class:`IncidenceVariableCd` (Tier B) raises
-    ``NotImplementedError`` — its runtime lookup is deferred (architecture §13).
-    ``box`` is the shared object also used by SRP (``None`` for a sphere).
+    Every drag path routes through :func:`_build_drag_sensitive` (the shared custom
+    ``DragSensitive``), so they share both the scalar-Cd lookup shape and the §6.2
+    free-molecular-floor warn-once hook. ``cd_lookup`` is the :class:`VariableCd` (its
+    call does the lookup + the edge-aware clamp warning) or a fixed-Cd constant
+    (:func:`_constant_cd`); ``accel`` is the **sphere** ``IsotropicDrag`` formula or the
+    **box** delegation to ``BoxAndSolarArraySpacecraft.dragAcceleration`` (the box is
+    built at base dragCoeff=1.0 and the Cd is applied as its global drag factor). A box
+    :class:`IncidenceVariableCd` (Tier B) raises ``NotImplementedError`` — its runtime
+    lookup is deferred (architecture §13). ``box`` is the shared object also used by SRP
+    (``None`` for a sphere). The Kn floor for this body (addendum §6.2/§6.3) is computed
+    once here.
     """
     import jpype
-    from org.orekit.forces.drag import DragForce, IsotropicDrag
+    from org.orekit.forces.drag import DragForce
+
+    from .guards import _kn_floor_setup
 
     cd = geometry.drag_coefficient
-    if geometry.kind == "sphere":
-        assert geometry.area_m2 is not None  # sphere always carries an area
-        area = float(geometry.area_m2)
-        if isinstance(cd, VariableCd):
-            # IsotropicDrag formula with the table Cd. Orekit hands the relative
-            # velocity as v_atmosphere - v_spacecraft, so the matching deceleration is
-            # the +1/2 (Cd*A/m) rho |relVel| relVel form (features.md §1.1 sign note;
-            # mass from the state, verified against IsotropicDrag to ~1e-21 m/s²).
-            def _sphere_accel(state, density, relative_velocity, table_cd):  # noqa: ANN001, ANN202
-                factor = (
-                    0.5
-                    * table_cd
-                    * area
-                    / state.getMass()
-                    * density
-                    * relative_velocity.getNorm()
-                )
-                return relative_velocity.scalarMultiply(float(factor))
-
-            sensitive = _build_variable_cd_drag_sensitive(cd, _sphere_accel)
-        else:
-            sensitive = IsotropicDrag(area, float(cd))  # type: ignore[arg-type]
-        return DragForce(atmosphere, sensitive)
-
-    assert box is not None  # built by the caller whenever geometry is a box
     if isinstance(cd, IncidenceVariableCd):
         raise NotImplementedError(
             "IncidenceVariableCd (Tier B, incidence-keyed box drag) is a validated "
             "skeleton in v1: its runtime Cd lookup is deferred (architecture §13). Use "
             "a fixed Cd or a VariableCd on box_and_panels for now."
         )
+    # The body's free-molecular validity floor: (floor_radius_m, warning) or None when
+    # it falls outside the captured band. Computed once at setup; checked per-substep
+    # inside the proxy so the loud regime warning fires once on the first dip below it.
+    kn_floor = _kn_floor_setup(geometry)
+    # A VariableCd does its own table lookup + edge-aware clamp warning; a fixed Cd is a
+    # constant. Both flow through the same proxy.
+    cd_lookup = cd if isinstance(cd, VariableCd) else _constant_cd(float(cd))
     if isinstance(cd, VariableCd):
-        # Delegate the attitude-driven projected-area bookkeeping to the box and
-        # override only the scalar Cd: the box was built with base dragCoeff=1.0, so
-        # forwarding the table value as its single "global drag factor" makes the
-        # effective Cd equal the table value (drag is exactly linear in it).
-        def _box_accel(state, density, relative_velocity, table_cd):  # noqa: ANN001, ANN202
-            return box.dragAcceleration(
-                state,
-                density,
-                relative_velocity,
-                jpype.JArray(jpype.JDouble)([float(table_cd)]),
-            )
+        # Give the table-edge warnings the same once-per-run scope as the Kn-floor hook
+        # below: clear the warn-once state now, so a VariableCd reused across several
+        # propagations re-warns each run instead of staying silent after the first.
+        cd._reset_edge_warnings()
 
-        return DragForce(atmosphere, _build_variable_cd_drag_sensitive(cd, _box_accel))
-    return DragForce(atmosphere, box)  # fixed Cd: box built with that Cd
+    if geometry.kind == "sphere":
+        assert geometry.area_m2 is not None  # sphere always carries an area
+        area = float(geometry.area_m2)
+
+        # IsotropicDrag formula with the looked-up Cd. Orekit hands the relative
+        # velocity as v_atmosphere - v_spacecraft, so the matching deceleration is the
+        # +1/2 (Cd*A/m) rho |relVel| relVel form (features.md §1.1 sign note; mass from
+        # the state, verified against the stock IsotropicDrag to ~1e-21 m/s²).
+        def _sphere_accel(state, density, relative_velocity, scalar_cd):  # noqa: ANN001, ANN202
+            factor = (
+                0.5
+                * scalar_cd
+                * area
+                / state.getMass()
+                * density
+                * relative_velocity.getNorm()
+            )
+            return relative_velocity.scalarMultiply(float(factor))
+
+        return DragForce(
+            atmosphere, _build_drag_sensitive(cd_lookup, _sphere_accel, kn_floor)
+        )
+
+    assert box is not None  # built by the caller whenever geometry is a box
+
+    # Delegate the attitude-driven projected-area bookkeeping to the box and apply the
+    # looked-up Cd as its single "global drag factor": the box was built at base
+    # dragCoeff=1.0, so the effective Cd equals the lookup value (drag is exactly
+    # linear).
+    def _box_accel(state, density, relative_velocity, scalar_cd):  # noqa: ANN001, ANN202
+        return box.dragAcceleration(
+            state,
+            density,
+            relative_velocity,
+            jpype.JArray(jpype.JDouble)([float(scalar_cd)]),
+        )
+
+    return DragForce(atmosphere, _build_drag_sensitive(cd_lookup, _box_accel, kn_floor))
 
 
 def _build_srp_force(
@@ -700,6 +825,7 @@ def propagate_numerical(
     spacecraft: SpacecraftConfig | None = None,
     attitude: AttitudeConfig | None = None,
     integrator: IntegratorConfig | None = None,
+    limits: AltitudeLimits | None = None,
     name: str | None = None,
 ) -> Trajectory:
     """Numerically propagate ``initial`` forward by ``duration`` seconds.
@@ -713,34 +839,78 @@ def propagate_numerical(
     **Force model.** Gravity is always wired (point-mass for the ``keplerian`` preset
     ``0 x 0``, a Holmes-Featherstone field otherwise); each enabled
     ``ForceModelConfig`` toggle adds its Orekit force — Sun/Moon third body, drag
-    (fixed Cd via ``IsotropicDrag`` / the box, or a :class:`VariableCd` via a custom
-    ``DragSensitive``), conical-shadow SRP, solid/ocean tides, relativity. The
+    (every path — sphere or box, fixed Cd or a :class:`VariableCd` table — routes
+    through one custom ``DragSensitive`` so the §6.2 free-molecular-floor warn-once
+    hook is shared), conical-shadow SRP, solid/ocean tides, relativity. The
     ``force_models`` metadata lists only the forces actually wired, and ``spacecraft``
-    is recorded only when drag or SRP (which consume it) is wired.
+    is recorded only when drag or SRP (which consume it) is wired. Because all drag
+    flows through that one proxy it exposes no drag ``ParameterDriver``: that is
+    invisible to forward/backward-in-time propagation and to TLE fitting (which reads
+    only the propagated *states* and estimates the TLE's own elements + B*), and would
+    matter only for numerical orbit determination — estimating the propagator's own Cd
+    — which is out of scope for v1.
 
-    **Geometry + attitude.** A ``sphere`` geometry uses ``IsotropicDrag`` /
-    ``IsotropicRadiationSingleCoefficient``; a ``box_and_panels`` geometry builds one
-    ``BoxAndSolarArraySpacecraft`` driving both drag and SRP (a box
-    :class:`VariableCd` is routed through a delegating custom ``DragSensitive``; a box
-    ``IncidenceVariableCd`` raises ``NotImplementedError`` when drag is wired). The
+    **Geometry + attitude.** A ``sphere`` geometry uses the custom drag
+    ``DragSensitive`` (an ``IsotropicDrag``-equivalent formula) and
+    ``IsotropicRadiationSingleCoefficient`` for SRP; a ``box_and_panels`` geometry
+    builds one ``BoxAndSolarArraySpacecraft`` driving both drag and SRP, with drag
+    routed through that same custom ``DragSensitive`` (a box ``IncidenceVariableCd``
+    raises ``NotImplementedError`` when drag is wired). The
     ``attitude`` argument is lowered to a native Orekit provider and wired into the
     propagator; a non-default attitude on a sphere has no dynamical effect, so it
     emits a one-time consistency warning and falls back to ``LofAligned``. The
     ``attitude`` metadata key is recorded only for a box with a wired surface force.
 
+    **Termination (addendum §6).** Two always-on geocentric-radius backstops stop the
+    run and report: Earth impact (``r < R⊕``) and lunar-gravity-parity escape
+    (``r > ~327,000 km``). An optional ``limits`` (:class:`AltitudeLimits`) adds user
+    terminal altitude bounds that **nest inside** those backstops — a supplied
+    ``min_altitude_km`` / ``max_altitude_km`` is lowered once to a geocentric-radius
+    threshold and can only *tighten* termination (a limit outside the backstops is
+    rejected at ``AltitudeLimits`` construction, so it never reaches here). A
+    **drag-driven decay** that stiffens into a propagation failure is caught and, when
+    its osculating perigee is already below the drag-table floor (~150 km) while
+    descending, also stops & reports (``"reentry"``) rather than raising. On any stop
+    the returned ``Trajectory`` holds the samples up to the crossing and its metadata
+    gains ``terminated=True``, ``termination_reason`` (``"impact"`` / ``"escape"`` /
+    ``"user_min"`` / ``"user_max"`` / ``"reentry"``), and ``termination_epoch``
+    (ISO-8601 UTC of the crossing — for ``"reentry"`` this is the last successfully
+    integrated step, just before the min-step failure, since nothing past it can be
+    sampled). A normal completed run carries none of these keys.
+
     Parameters mirror features.md §1.1 exactly. ``None`` config arguments are
     substituted with their defaults inside the body (``force_models`` ->
     ``leo_default()``, ``spacecraft`` -> ``SpacecraftConfig()``, ``attitude`` ->
-    ``LofAligned()``, ``integrator`` -> ``IntegratorConfig.default()``); ``name``, if
-    given, is recorded in the trajectory metadata.
+    ``LofAligned()``, ``integrator`` -> ``IntegratorConfig.default()``); ``limits``
+    left ``None`` means the system backstops only; ``name``, if given, is recorded in
+    the trajectory metadata.
 
     Raises ``ValueError`` for invalid inputs (non-inertial frame, non-positive or
     mis-ordered ``duration`` / ``output_step``, unknown ``integrator.type``,
     ``gravity_field``, or ``atmosphere_model``, ``ClassicalRK4`` without
     ``fixed_step_s``); ``NotImplementedError`` for a box ``IncidenceVariableCd`` under
     drag (Tier B deferred); and
-    :class:`~propygator.core.exceptions.PropagationError` if the integrator fails to
-    converge (carrying the Orekit message, no Java trace).
+    :class:`~propygator.core.exceptions.PropagationError` if the integrator fails and
+    the failure is **not** a drag-driven re-entry (a too-tight tolerance, a bad setup,
+    or any non-low-altitude stiffness) — carrying the Orekit message only (no Java
+    trace). Any recoverable partial trajectory is attached as
+    ``err.partial_trajectory`` (``None`` when no usable steps were generated).
+
+    Spacecraft-model limitations (v1):
+      * Solar radiation pressure uses uniform optical coefficients across the
+        whole spacecraft. Per-face optical properties are not modeled.
+      * Drag acts on the projected cross-section but produces no torque, and
+        aerodynamic lift is not modeled; attitude is not perturbed by drag.
+      * The drag coefficient is a fixed value, a (geocentric radius, density)
+        table value (``VariableCd``, sphere or box), or — for a faithful box —
+        an incidence-keyed table (``IncidenceVariableCd``). Per-facet gas-surface
+        physics (full Sentman) is not modeled.
+      * Drag modeling is valid only within an altitude band — free-molecular flow
+        above a body-size-dependent floor (~110 km for a small CubeSat rising to
+        ~220 km for a large bus/station) up to the Cd-table ceiling (~1400 km).
+        Below the floor the run continues with a warning but drag is unreliable;
+        a decaying orbit ends gracefully at re-entry, while impact and escape
+        terminate the run, and user altitude limits may tighten these bounds.
     """
     # Resolve None sentinels to default instances (features.md default-arg rule).
     force_models = (
@@ -779,6 +949,16 @@ def propagate_numerical(
     from org.orekit.propagation.numerical import NumericalPropagator
 
     from ..core.exceptions import PropagationError
+    from ..core.time import _epoch_from_orekit
+    from .guards import (
+        _altitude_km_to_radius_m,
+        _classify_termination,
+        _escape_radius_m,
+        _impact_radius_m,
+        _is_reentry_failure,
+        _make_radius_stop_detector,
+        _reentry_floor_radius_m,
+    )
 
     eme2000 = Frame.EME2000.to_orekit()
     start_date = initial.epoch.to_orekit()
@@ -807,28 +987,91 @@ def propagate_numerical(
     # Mass drives drag/SRP per-unit-mass acceleration (gravity is mass-independent).
     propagator.setInitialState(SpacecraftState(orbit, float(spacecraft.mass_kg)))
 
+    # Terminal radius backstops (addendum §6.1/§6.3): stop & report at Earth impact
+    # and at lunar-gravity-parity escape. Both always active, independent of the force
+    # config. `termination_specs` (radius -> reason) also drives reason classification
+    # after the run. The system backstops stay FIRST in the list so the
+    # nearest-threshold classifier resolves a degenerate exact tie with a user limit in
+    # favor of the system reason (min_altitude_km == 0 -> "impact"; max_altitude_km at
+    # the escape-parity altitude -> "escape").
+    termination_specs = [
+        (_impact_radius_m(), "impact"),
+        (_escape_radius_m(), "escape"),
+    ]
+    # Optional user altitude limits (addendum §6.4/§6.6): lower each supplied bound
+    # once to a geocentric radius via the *same* altitude->radius reference the escape
+    # backstop uses, and register it as another terminal stop. A reasonable limit is
+    # guaranteed (by AltitudeLimits.__post_init__) to nest inside the backstops, so it
+    # can only tighten termination — on a descent the inner user_min radius is reached
+    # before R⊕, on a climb the user_max radius before escape, so the first crossing
+    # wins with no explicit tightest-of arithmetic. An unreasonable limit raised a
+    # ValueError at construction, so none reaches here. (features.md §1.1 failure-modes
+    # table gains that construction-time ValueError row in the Chunk-11 reconciliation.)
+    if limits is not None:
+        if limits.min_altitude_km is not None:
+            termination_specs.append(
+                (_altitude_km_to_radius_m(limits.min_altitude_km), "user_min")
+            )
+        if limits.max_altitude_km is not None:
+            termination_specs.append(
+                (_altitude_km_to_radius_m(limits.max_altitude_km), "user_max")
+            )
+    for threshold_radius, _ in termination_specs:
+        propagator.addEventDetector(_make_radius_stop_detector(threshold_radius))
+
     last_offset = float((n_samples - 1) * output_step)
     end_date = start_date.shiftedBy(last_offset)
 
     t0 = time.perf_counter()
     generator = propagator.getEphemerisGenerator()
+    # A propagation failure (a JException) is no longer always fatal (addendum §6.6). A
+    # drag-driven decay stiffens until it fails — the adaptive step saturates min_step_s
+    # or, with looser tolerances, the atmosphere model rejects the sub-surface query
+    # ("point is inside ellipsoid"). Both surface as a JException; we catch it, recover
+    # the ephemeris built so far, and CLASSIFY by physical state (drag + descending +
+    # osculating perigee), not by the message. The impact detector registered above is
+    # the drag-OFF counterpart: with no atmosphere query it stops cleanly at R⊕ as
+    # "impact" (addendum §8), so a drag-on decay routes here as "reentry" instead.
+    failure_msg: str | None = None
     try:
         propagator.propagate(end_date)
     except jpype.JException as exc:  # type: ignore[attr-defined]
-        # Convergence / unknown Orekit failures surface as PropagationError with the
-        # Java message only (no raw stack trace), per the failure table (features.md).
-        raise PropagationError(
-            f"numerical propagation failed: {exc.getMessage()}"
-        ) from None
-    ephemeris = generator.getGeneratedEphemeris()
+        # Capture the Java *message* only (no raw stack trace; architecture §3) and
+        # leave the except block before recovering, so a recovery failure cannot chain.
+        failure_msg = str(exc.getMessage())
 
-    # Sample the generated ephemeris at exactly output_step. The Orekit lookup date
-    # and the propygator Epoch share the same offset, so they denote one instant.
-    positions = np.empty((n_samples, 3), dtype=np.float64)
-    velocities = np.empty((n_samples, 3), dtype=np.float64)
+    if failure_msg is not None:
+        ephemeris = _recover_ephemeris(generator)
+        if ephemeris is None:
+            # No usable steps recovered (edge a): fail loudly with no partial attached.
+            raise PropagationError(
+                f"numerical propagation failed: {failure_msg}"
+            ) from None
+    else:
+        ephemeris = generator.getGeneratedEphemeris()
+
+    # A terminal detector firing — or a recovered partial — shortens the realized span
+    # below the planned end, so clamp the sampling grid to the achieved span (addendum
+    # §6.3): sampling past getMaxDate() would raise. A normal run achieves the full span
+    # (realized == n_samples), so the common path is unchanged.
+    max_date = ephemeris.getMaxDate()
+    max_offset = float(max_date.durationFrom(start_date))
+    realized = _realized_sample_count(max_offset, output_step, n_samples)
+
+    # Sample the (possibly partial) ephemeris at exactly output_step. The Orekit lookup
+    # date and the propygator Epoch share the same offset, so they denote one instant.
+    offsets = [k * output_step for k in range(realized)]
+    # A terminal stop inside the first output_step clamps to one on-grid sample
+    # (the start). Append the achieved-span endpoint so the partial Trajectory keeps
+    # the >= 2 samples every downstream verb (at/plot/export) needs — the floor a
+    # normal run gets from output_step <= duration. The endpoint is exactly
+    # getMaxDate(), so the lookup stays inside the ephemeris.
+    if len(offsets) < 2 and max_offset > 0.0:
+        offsets.append(max_offset)
+    positions = np.empty((len(offsets), 3), dtype=np.float64)
+    velocities = np.empty((len(offsets), 3), dtype=np.float64)
     epochs = []
-    for k in range(n_samples):
-        offset = float(k * output_step)
+    for k, offset in enumerate(offsets):
         pv = ephemeris.propagate(start_date.shiftedBy(offset)).getPVCoordinates()
         p = pv.getPosition()
         v = pv.getVelocity()
@@ -840,8 +1083,60 @@ def propagate_numerical(
         )
         epochs.append(initial.epoch.shifted_by(offset))
 
+    # Termination decision (addendum §6.6). Three outcomes feed the single metadata +
+    # Trajectory build below:
+    #   * propagation failure -> classify: a drag-driven re-entry stops & reports
+    #     "reentry"; anything else is a genuine error to re-raise (with the partial).
+    #   * a terminal detector fired -> classify the reason by nearest threshold radius.
+    #   * normal completion -> no termination keys (byte-identical to a pre-guard run).
+    terminated = False
+    termination_reason: str | None = None
+    termination_epoch: str | None = None
+    reraise = False
+    if failure_msg is not None:
+        last_state = ephemeris.propagate(max_date)
+        if _is_reentry_failure(
+            drag_enabled=wired.drag,
+            radial_velocity_m_s=_radial_velocity_m_s(last_state),
+            perigee_radius_m=_osculating_perigee_radius_m(last_state),
+            floor_radius_m=_reentry_floor_radius_m(),
+        ):
+            terminated = True
+            termination_reason = "reentry"
+        else:
+            # Not a re-entry (drag off, climbing, or perigee still above the floor): a
+            # genuine numeric/config failure -> re-raise (invariant: prefer a false
+            # re-raise over a false reentry). The partial built below is attached to it.
+            reraise = True
+    else:
+        terminated = float(end_date.durationFrom(max_date)) > _TERMINATION_TIME_TOL_S
+        if terminated:
+            r_final = float(ephemeris.propagate(max_date).getPosition().getNorm())
+            termination_reason = _classify_termination(r_final, termination_specs)
+            # A clean impact-detector stop with drag ON is a drag-driven re-entry, not a
+            # geometric impact: the impact detector can fire at R⊕ before the atmosphere
+            # model throws (the usual "reentry" route via the min-step catch), and §8
+            # reserves "impact" for a drag-OFF sub-surface orbit. Relabel here so the
+            # reported reason is robust to that integrator-vs-atmosphere race.
+            if termination_reason == "impact" and wired.drag:
+                termination_reason = "reentry"
+    # The crossing instant is the same in either branch, so format the ISO-8601 UTC
+    # termination_epoch once here — keeping the "+ Z" UTC-suffix convention in a single
+    # place (Epoch.to_iso() deliberately emits no zone suffix).
+    if terminated:
+        termination_epoch = _epoch_from_orekit(max_date).to_iso() + "Z"
+
     metadata = _build_metadata(
-        force_models, wired, integrator, output_step, spacecraft, attitude_config, name
+        force_models,
+        wired,
+        integrator,
+        output_step,
+        spacecraft,
+        attitude_config,
+        name,
+        terminated=terminated,
+        termination_reason=termination_reason,
+        termination_epoch=termination_epoch,
     )
     traj = Trajectory.from_arrays(
         epochs,
@@ -850,10 +1145,17 @@ def propagate_numerical(
         Frame.EME2000,
         metadata=metadata,
     )
+    if reraise:
+        # Fail loudly, but carry the samples computed before the failure for advanced
+        # recovery (addendum §6.6) — a non-terminated partial (no termination keys).
+        err = PropagationError(f"numerical propagation failed: {failure_msg}")
+        err.partial_trajectory = traj
+        raise err from None
     logger.info(
-        "propagate_numerical: done — %d samples in %.3fs wall",
-        n_samples,
+        "propagate_numerical: done — %d samples in %.3fs wall%s",
+        len(epochs),
         time.perf_counter() - t0,
+        f" (terminated: {termination_reason})" if terminated else "",
     )
     return traj
 
@@ -866,6 +1168,10 @@ def _build_metadata(
     spacecraft: SpacecraftConfig,
     attitude: "AttitudeConfig",
     name: str | None,
+    *,
+    terminated: bool = False,
+    termination_reason: str | None = None,
+    termination_epoch: str | None = None,
 ) -> "TrajectoryMetadata":
     """Assemble the trajectory metadata for this run (features.md §1.1).
 
@@ -879,6 +1185,11 @@ def _build_metadata(
     affects the result only through a non-spherical cross-section under a surface
     force, so it is recorded exactly when geometry is a box *and* drag or SRP was wired
     (a sphere, or a force-free box, leaves it dynamically inert and omits the key).
+
+    The optional ``terminated`` / ``termination_reason`` / ``termination_epoch`` keys
+    (addendum §6.6) are written only when a guard stopped the run early; a normal
+    completed run omits all three, keeping its metadata byte-identical to before the
+    guard system landed.
     """
     force_tokens = _serialize_force_models(
         gravity_field=force_models.gravity_field,
@@ -928,4 +1239,13 @@ def _build_metadata(
         metadata["attitude"] = _serialize_attitude(attitude)
     if name is not None:
         metadata["name"] = name
+    # Termination reporting (addendum §6.6): written ONLY when a guard stopped the run
+    # early, so a normal completed run's metadata (and its export_csv header) are
+    # byte-identical to today.
+    if terminated:
+        assert termination_reason is not None  # set together by the caller
+        assert termination_epoch is not None
+        metadata["terminated"] = True
+        metadata["termination_reason"] = termination_reason
+        metadata["termination_epoch"] = termination_epoch
     return metadata

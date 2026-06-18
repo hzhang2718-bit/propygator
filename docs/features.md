@@ -6,7 +6,7 @@ Companion document to `architecture.md`. Where `architecture.md` locks in the cr
 
 ## 1.1 Numerical propagator
 
-> **Status: DRAFTED.** Force-model, spacecraft, attitude, integrator, output, and metadata sections are settled. `VariableCd` (a precomputed Cd table keyed on geocentric radius and live total density) is the v1 variable-drag path for **both** sphere and box geometry (a density-varying scalar Cd); a faithful incidence-keyed box table (`IncidenceVariableCd`) is designed as the documented extension. Full per-facet Sentman remains deferred (architecture §13). SRP uses a conical shadow. Attitude is a first-class input with seven modes, all but one backed by native Orekit providers. Remaining open items are cosmetic plot details.
+> **Status: DRAFTED.** Force-model, spacecraft, attitude, integrator, output, and metadata sections are settled. `VariableCd` (a precomputed Cd table keyed on geocentric radius and live total density) is the v1 variable-drag path for **both** sphere and box geometry (a density-varying scalar Cd); a faithful incidence-keyed box table (`IncidenceVariableCd`) is designed as the documented extension. Full per-facet Sentman remains deferred (architecture §13). SRP uses a conical shadow. Attitude is a first-class input with seven modes, all but one backed by native Orekit providers. Remaining open items are cosmetic plot details. The **drag-validity & altitude-guards addendum** (drag-model validity domain + the altitude/regime guard system) has been built and folded into the subsections below — the signature (`limits=`), the metadata block (termination keys), "Escape and re-entry" (rewritten to the as-built guards), "Drag-coefficient modeling" (the §5 invariant, two-tier regime warnings, Knudsen floor), and the limitations note.
 
 ### Public signature
 
@@ -20,11 +20,14 @@ def propagate_numerical(
     spacecraft: SpacecraftConfig | None = None,     # None -> SpacecraftConfig()
     attitude: AttitudeConfig | None = None,         # None -> LofAligned() (TNW)
     integrator: IntegratorConfig | None = None,     # None -> DOP853 default
+    limits: AltitudeLimits | None = None,           # None -> system backstops only
     name: str | None = None,                  # optional, recorded in metadata
 ) -> Trajectory:
 ```
 
 Inputs after `duration` are keyword-only so callers can't transpose `output_step` and `force_models`. Backward propagation is not supported in v1.
+
+`limits` (an optional `AltitudeLimits`) adds user terminal altitude bounds that **nest inside** the always-on system backstops (impact at `R⊕`, lunar-parity escape); see "Escape and re-entry" and "Drag-coefficient modeling" below. `None` means the system backstops only. (Added by the drag-validity & altitude-guards addendum, which superseded/extended several subsections below — folded back in here.)
 
 **Default-argument convention.** Configurable inputs use a `None` sentinel and are substituted with their default instances inside the body (consistent with `fit_tle`, architecture §8), so no config object is constructed in the signature.
 
@@ -304,10 +307,15 @@ class IntegratorConfig:
     "output_step_s": <float>,
     "created_at": <iso utc str>,
     "name": <str>,                      # only if supplied
+    "terminated": True,                 # only if a guard stopped the run early
+    "termination_reason": <str>,        # only if terminated; see below
+    "termination_epoch": <iso utc str>, # only if terminated; crossing instant
 }
 ```
 
 (The `spacecraft`, `attitude`, and `name` keys are optional fields on the `TrajectoryMetadata` TypedDict, architecture §6.)
+
+**Termination keys (drag-validity & altitude-guards addendum).** When a guard stops the run early (see "Escape and re-entry"), three additive optional keys are written: `terminated: True`, `termination_reason` (one of `"reentry" | "impact" | "escape" | "user_min" | "user_max"`), and `termination_epoch` (ISO-8601 UTC of the crossing). They are written **only when terminated**, so a normal completed run's metadata — and its `export_csv` header — is byte-identical to a pre-guard run (no churn on the common path). These are optional `TrajectoryMetadata` fields (architecture §6), not in the required set.
 
 The optional physics keys are emitted only when they actually shaped the trajectory ("reflect what's acting", not the config booleans): `spacecraft` appears when **drag or SRP** was wired (the only forces that consume mass/geometry/coefficients), so a `keplerian` run omits it; `attitude` appears only when geometry is a **box and** drag or SRP was wired (orientation affects the result solely through a non-spherical cross-section under a surface force) — a sphere, or a force-free box, omits it. `name` appears only when supplied.
 
@@ -351,17 +359,25 @@ The optional physics keys are emitted only when they actually shaped the traject
 | `Inertial.reference_frame` non-inertial | `ValueError` |
 | `SunPointing.pointing_axis` parallel to `phasing_axis` | `ValueError` |
 | `attitude.law` not callable (`CustomAttitude`) | `ValueError` |
+| `AltitudeLimits(...)` unreasonable — `min_altitude_km < 0`, `max_altitude_km` above the escape-parity altitude (≈ 320,621 km), or `min >= max` — raised at **construction**, not at a crossing | `ValueError` |
 | `NadirPointing(velocity_reference='ecef')` — deferred in v1 (architecture §13) | `NotImplementedError` |
 | `box_and_panels` `IncidenceVariableCd` under drag — Tier B deferred (architecture §13) | `NotImplementedError` |
-| Integrator fails to converge (usually `min_step_s` saturation) | `PropagationError` |
+| Integrator fails (usually `min_step_s` saturation) **and** the failure is a drag-driven re-entry (drag on, descending, osculating perigee already below the ~150 km drag-table floor) | *stop & report* — partial `Trajectory`, `termination_reason="reentry"` (**not** an error; addendum §6.6) |
+| Integrator fails for any **other** reason (over-tight tolerance, bad setup, non-low-altitude stiffness) | `PropagationError` (may carry a recovered `err.partial_trajectory`, or `None`) |
 | Unrecognized underlying Orekit failure | `PropagationError` wrapping the original |
 
-`PropagationError` lives in `propygator.exceptions` and carries the Java exception's message as a string — no raw Java stack trace surfaces (same principle as `OrekitDataMissingError`, architecture §3). String-valued config fields are validated at the top of `propagate_numerical`, before integration.
+`PropagationError` lives in `propygator.exceptions` and carries the Java exception's message as a string — no raw Java stack trace surfaces (same principle as `OrekitDataMissingError`, architecture §3). String-valued config fields are validated at the top of `propagate_numerical`, before integration. A drag-driven decay is **caught and classified** rather than always re-raised (addendum §6.6): a genuine re-entry stops and reports a partial `Trajectory` (`termination_reason="reentry"`), while any non-re-entry failure re-raises `PropagationError` — carrying a recoverable partial trajectory as `err.partial_trajectory` when usable steps were generated, else `None`. The invariant is **prefer a false re-raise over a false `reentry`**: when in doubt, raise.
 
-**Escape and re-entry.** v1 ships no purpose-built guard for either boundary; this records the current behavior and the planned guard so the gap is explicit.
+**Escape and re-entry (drag-validity & altitude-guards addendum).** The propagator carries a geocentric-radius guard family that bounds both ends of the validity domain. All guards operate on `r = |position|` in the EME2000 propagation frame (one `sqrt`, no per-substep geodetic conversion).
 
-- *Today.* The Cartesian orbit/integration (`OrbitType.CARTESIAN`) has no `e → 1` singularity, so an escape (hyperbolic) trajectory propagates faithfully rather than crashing — and there is no input bound-check, so a hyperbolic `State` already propagates today. The only orbit-class guard is the *parabolic* `e == 1` rejection in `KeplerianElements` (a classical-element representability limit, not an escape guard). Re-entry surfaces only *indirectly*: drag stiffens the dynamics, the adaptive step saturates `min_step_s`, and Hipparchus raises → `PropagationError`. The gap: with drag **off**, a sub-surface perigee is not caught — positions inside/below the Earth are returned with no warning, and an unbound orbit simply flies away.
-- *Planned (deferred — architecture §13).* A configurable **re-entry floor** (~120 km geodetic above the WGS84 ellipsoid — the conventional decay altitude, and roughly the lower validity bound of DTM-2000 / Harris-Priester) that stops cleanly, plus a permissive **upper-altitude ceiling** (~1,000,000 km, just past Earth's sphere of influence, where Earth-centric Sun+Moon propagation stops being physically meaningful) as the escape safety-net. The ceiling is chosen *over* an input eccentricity rejection, which would forbid whole valid cases (HEO / Molniya / GTO, hyperbolic flybys): it propagates any orbit up to a boundary and exists only to stop runaway integration (the parabolic `e == 1` rejection stays — orthogonal, representational). **Non-goal:** propygator *guards* these boundaries; it does not *model* atmospheric entry (aerothermodynamics, breakup, footprint) or deep-space / cislunar regimes — those are separate future feature lines, with the ceiling doubling as the clean boundary marker for the latter. Reporting contract (partial `Trajectory` + a `terminated` metadata flag vs. a dedicated `PropagationError` subclass) to be pinned when implemented.
+- **Terminal backstops (always on).** Two custom radius event detectors stop the run cleanly and **report**: **impact** at `r < R⊕` (WGS84 equatorial, 6,378,137 m) and **escape** at `r > r_lunar_parity` (≈ 327,000 km — the Earth-Moon gravity-parity radius at lunar perigee; a fixed hard-coded policy fence, not Orekit-derived). The escape backstop makes an already-supported unbound (hyperbolic) `State` *safe*: runaway integration terminates instead of running to absurd distances. The parabolic `e == 1` rejection in `KeplerianElements` stays (a representability limit, orthogonal to these guards).
+- **Re-entry (reactive).** A decaying orbit with drag on stiffens until the integrator saturates `min_step_s` (or the atmosphere model rejects the sub-surface query) and fails. That failure is **caught and classified**: drag on + descending + osculating perigee already below the ~150 km drag-table floor → a physical re-entry that **stops & reports** (`termination_reason="reentry"`, partial `Trajectory`); anything else re-raises `PropagationError` (invariant: prefer a false re-raise over a false `reentry`). See the Failure modes table.
+- **Drag-regime warnings (run continues).** Two-tier, edge-aware, warn-once — the free-molecular Knudsen floor and the table edges; see "Drag-coefficient modeling".
+- **User limits (optional).** An `AltitudeLimits` passed as `limits=` adds terminal altitude bounds that **nest inside** the system backstops (they can only *tighten* termination). A reasonable crossing stops & reports (`termination_reason="user_min"`/`"user_max"`); an unreasonable limit (outside the backstops) is rejected at `AltitudeLimits` construction with `ValueError` (it could never bind — the system backstop fires first).
+- **Reporting contract.** Every runtime termination — impact, escape, re-entry, reasonable user-limit — *stops and reports*: it returns the partial `Trajectory` (samples up to the crossing) with `terminated` / `termination_reason` / `termination_epoch` metadata, written only when terminated. The sole `raise` on the guard path is the construction-time `ValueError` for an unreasonable `AltitudeLimits`.
+- **Non-goal (unchanged).** propygator *guards* these boundaries; it does not *model* atmospheric entry (aerothermodynamics, breakup, footprint) or deep-space / cislunar dynamics. The escape backstop intentionally terminates Earth-bound trajectories whose apogee exceeds lunar-perigee parity (e.g. cislunar transfers, weak-stability-boundary orbits) — both out of the modeled regime (Moon-as-perturbation fails there) and out of scope.
+
+*(This subsection was **superseded** by the addendum: the old ~120 km hardcoded re-entry floor and ~1,000,000 km SOI ceiling are replaced by the guard family above, reconciled here. Full contract: `docs/feature-1.1-addendum-drag-validity-and-altitude-guards.md` §6; architecture §13.)*
 
 **Logging.** INFO: once at start (config summary), once at end (sample count, wall time). DEBUG: integrator step statistics if Orekit exposes them. No printing (architecture §10).
 
@@ -371,7 +387,7 @@ v1 supports a fixed user Cd (default) and an optional variable Cd that captures 
 
 **Fixed Cd (default).** A scalar `drag_coefficient` (default 2.2) mapping onto Orekit's `IsotropicDrag` (sphere) or the box drag model. Right for most v1 use.
 
-**Variable Cd — the plumbing constraint.** Orekit's `DragSensitive.dragAcceleration` is handed only *total density* and the relative velocity — no composition or temperature. So any model needing those at runtime must re-query the atmosphere per substep. Keying instead on quantities already in hand sidesteps this: **geocentric radius** (`|position|` in the propagation frame — no frame transform, no EOP) and the passed-in total density. Total density is a tight proxy for thermospheric state at a given radius — at fixed altitude it swings 5–10× over the solar cycle, driven by the same temperature/composition changes that move Cd — so a `(radius, density)` table collapses the higher-dimensional input space while retaining the dominant variation a fixed 2.2 ignores. Radius alone would miss the solar-cycle effect; density carries it. (Geocentric radius rather than geodetic altitude: the altitude axis is the weak secondary index, the up-to-~21 km geodetic/geocentric spread lands within a bin or two where Cd varies slowly at fixed density, and it avoids a per-substep frame transform. The shipped table must be *generated on the same geocentric-radius convention*.)
+**Variable Cd — the plumbing constraint.** Orekit's `DragSensitive.dragAcceleration` is handed only *total density* and the relative velocity — no composition or temperature. So any model needing those at runtime must re-query the atmosphere per substep. Keying instead on quantities already in hand sidesteps this: **geocentric radius** (`|position|` in the propagation frame — no frame transform, no EOP) and the passed-in total density. Total density is a tight proxy for thermospheric state at a given radius — at fixed altitude it swings 5–10× over the solar cycle, driven by the same temperature/composition changes that move Cd — so a `(radius, density)` table collapses the higher-dimensional input space while retaining the dominant variation a fixed 2.2 ignores. Radius alone would miss the solar-cycle effect; density carries it. (Geocentric radius rather than geodetic altitude: the altitude axis is the weak secondary index, the up-to-~21 km geodetic/geocentric spread lands within a bin or two where Cd varies slowly at fixed density, and it avoids a per-substep frame transform. The shipped table must be *generated by a Cd model proven equal to the validity experiment's, over the same axis, conditions, and altitude band* — the §5 model-equivalence invariant of the drag-validity addendum, which strengthens the bare same-convention requirement: a validity limit derived from the experiment transfers to the shipped table only if the two independent Sentman/DRIA reconstructions agree at the boundary (cross-validated to 0.0191 % across 130–1450 km before the table was regenerated).)
 
 ```python
 # Sphere or box (Tier A): a 2-D (geocentric radius, total density) table.
@@ -394,13 +410,20 @@ IncidenceVariableCd.from_table(
 
 **Runtime.** Each variable Cd maps to a thin custom `DragSensitive` whose `dragAcceleration` reads geocentric radius from the state, takes the passed-in total density (plus body-frame incidence for Tier B), interpolates Cd, and assembles `a = −½ (Cd·A/m) ρ |v_rel| v_rel` exactly as `IsotropicDrag` / the box model would. **The custom `DragSensitive` is instantiated inside `propagate_numerical`, never at geometry construction** — that keeps the geometry factory on the safe-before-init surface (architecture §10).
 
+As built (addendum Chunk 9), **every** drag path — sphere or box, *fixed Cd or a table* — routes through this one custom `DragSensitive`, so the free-molecular-floor warn-once hook (below) and the table-edge warnings share a single code path. The trade: a fixed-Cd sphere, which Orekit could otherwise drive natively via `IsotropicDrag`, now crosses the Java↔Python boundary for the drag formula on every substep — marginal next to the default `NRLMSISE-00` density query, a larger share under a cheaper atmosphere (`Harris-Priester`); the uniformity was judged worth it for v1. The shared proxy also exposes no drag `ParameterDriver`, which is invisible to forward/backward propagation and TLE fitting and matters only for numerical OD (out of scope for v1). See architecture §13.
+
 > **Implementation note (Orekit sign convention, verified at build).** The textbook `a = −½ … |v_rel| v_rel` above assumes `v_rel = v_spacecraft − v_atmosphere`. Orekit hands `DragSensitive.dragAcceleration` the **opposite-signed** relative velocity, `relativeVelocity = v_atmosphere − v_spacecraft`, and `IsotropicDrag` therefore applies a **positive** scalar: `a = +½ (Cd·A/m) ρ |relativeVelocity| relativeVelocity`. The custom `DragSensitive` must use the `+½` form with Orekit's argument to match `IsotropicDrag` (verified to ~1e-21 m/s²); the two expressions denote the same physical deceleration. A faithfulness test pins this against `IsotropicDrag` at constant Cd. The per-substep work is a low-dimensional interpolation plus a `|position|`; far cheaper than per-facet Sentman, but measurably slower than stock fixed-Cd drag — benchmark at implementation.
 
 **Where the table comes from.** `sphere_default()` is generated once by maintainers and committed to `data/`; end users load a small array and compute nothing. Generation sweeps a high-fidelity Cd model (closed-form Sentman for the sphere) over a grid of thermospheric conditions and regrids onto the `(radius, density)` mesh — order 10⁴–10⁵ vectorized evaluations, sub-minute. A box (Tier B) table is a deliberate user setup step (a generation script or an external tool such as ADBSat / DSMC); the output is the same kind of array.
 
 **Freshness.** The table encodes a *physics relationship* (given this density at this radius, what is Cd?), not the atmospheric *state*; the time-varying density is supplied live by the atmosphere model from orekit-data space-weather files. So the table tracks current conditions and never goes stale with time — it needs regenerating only when the geometry/material changes or a revised physics model ships. (Keying on a solar index instead of density would bake space-weather assumptions into the table and make it drift; this is why density is the key.)
 
-**Out-of-grid.** Clamp to the nearest edge per-axis with a one-time warning — raising would crash a long propagation mid-run, and extrapolating would fabricate Cd values.
+**Out-of-grid & drag-regime warnings (drag-validity addendum).** Out-of-grid inputs still clamp to the nearest edge per-axis (raising mid-run would crash a long propagation; extrapolating would fabricate Cd) — but the one-time warning is now **edge-aware and two-tier**, because the two altitude edges are physically asymmetric:
+
+- **Low edge** — below the table's lower altitude edge, or below the body-size-dependent free-molecular **Knudsen floor**: drag is large and the model is invalid → a **loud** warning.
+- **High edge** — above the table's upper altitude edge: Cd is uncertain but multiplies a near-zero force → a **soft** note.
+
+A density-axis clamp is a neutral data-range edge. Each boundary warns once per propagation; with drag **off**, no drag-regime warning fires (there is no drag model to be invalid — the only low guard is then the impact backstop). The **Knudsen floor** is computed once at setup from the body's characteristic length L (sphere → diameter `2√(A/π)`; box → max edge length, conservative) by re-implementing the validity experiment's `Kn = λ/L = 10` free-molecular scan. Because Orekit's atmosphere API exposes only *total* density — not the per-species number densities λ needs — and pymsis is deliberately not a runtime dependency, the conservative high-activity composition is captured **offline** (`scripts/generate_kn_floor_composition.py`) and embedded as a constant in `propagation/guards.py`; the runtime scan runs against that fixed composition (a deterministic worst-case fence, not the run's live space weather). This is the *third* reconstruction of the experiment's method, held to the §5 equivalence check (cross-checked against the committed experiment floor curve).
 
 **Metadata / reproducibility.** Fixed: `Cd=2.2`. Variable: `Cd=table:<name-or-hash>`. A `from_callable` table carries the "not byte-reproducible" gap noted for `CustomAttitude`.
 
@@ -420,6 +443,12 @@ Spacecraft-model limitations (v1):
     table value (VariableCd, sphere or box), or — for a faithful box — an
     incidence-keyed table (IncidenceVariableCd). Per-facet gas-surface
     physics (full Sentman) is not modeled.
+  * Drag modeling is valid only within an altitude band — free-molecular flow
+    above a body-size-dependent floor (~110 km for a small CubeSat rising to
+    ~220 km for a large bus/station) up to the Cd-table ceiling (~1400 km).
+    Below the floor the run continues with a warning but drag is unreliable;
+    a decaying orbit ends gracefully at re-entry, while impact and escape
+    terminate the run, and user altitude limits may tighten these bounds.
 ```
 
 ### Outputs

@@ -151,6 +151,30 @@ def _bilinear(
     )
 
 
+# Edge-aware clamp warnings (addendum §6.2). Out-of-grid inputs still clamp to the
+# nearest edge per axis (features.md §1.1); the message is tailored to the boundary,
+# because the two altitude edges are physically asymmetric — below the table's lower
+# edge the drag model is invalid and the force is large (loud), while above the upper
+# edge drag is negligible (soft). A density-only clamp is a data-range edge, not an
+# altitude regime (neutral). Keyed by the boundary names used in `_warn_edge_once`.
+_CLAMP_EDGE_MESSAGES = {
+    "radius_low": (
+        "VariableCd geocentric radius below the drag-table grid (lower altitude edge): "
+        "Cd is clamped to the edge value and is unreliable below the validated "
+        "drag-table floor. This warning is emitted once."
+    ),
+    "radius_high": (
+        "VariableCd geocentric radius above the drag-table grid (upper altitude edge): "
+        "drag is negligible at this altitude, so the clamped Cd has minimal effect. "
+        "This warning is emitted once."
+    ),
+    "density": (
+        "VariableCd total density outside the table grid: clamping to the nearest "
+        "edge. This warning is emitted once."
+    ),
+}
+
+
 # --- Tier A: VariableCd -----------------------------------------------------
 
 
@@ -181,7 +205,7 @@ class VariableCd:
         "_callable",
         "_name",
         "_content_hash",
-        "_clamp_warned",
+        "_clamp_warned_edges",
     )
 
     def __init__(
@@ -203,7 +227,7 @@ class VariableCd:
         self._callable = callable_
         self._name = name
         self._content_hash = content_hash
-        self._clamp_warned = [False]  # one-element mutable box: warn-once state
+        self._clamp_warned_edges: set[str] = set()  # warn-once-per-boundary state
 
     @classmethod
     def from_table(
@@ -295,9 +319,10 @@ class VariableCd:
         """Scalar Cd at a geocentric radius [m] and total density [kg/m^3].
 
         Table backing interpolates bilinearly and clamps out-of-grid inputs to the
-        nearest edge per axis, warning once. Callable backing forwards, then
-        validates the returned Cd. A non-finite ``radius_m`` / ``density_kgm3``
-        raises ``ValueError``: NaN slips past the clamp's ``<`` / ``>`` comparisons
+        nearest edge per axis, warning once *per boundary* with an edge-tailored
+        message (addendum §6.2). Callable backing forwards, then validates the
+        returned Cd. A non-finite ``radius_m`` / ``density_kgm3`` raises
+        ``ValueError``: NaN slips past the clamp's ``<`` / ``>`` comparisons
         unflagged and would otherwise poison the drag acceleration with a silent NaN.
         """
         r_in = float(radius_m)
@@ -319,24 +344,48 @@ class VariableCd:
         assert self._grid is not None  # narrow for type-checkers: table backing
         assert self._radius_axis is not None
         assert self._density_axis is not None
-        r, r_clamped = _clamp_to_axis(r_in, self._radius_axis)
+        r, _ = _clamp_to_axis(r_in, self._radius_axis)
         d, d_clamped = _clamp_to_axis(d_in, self._density_axis)
-        if r_clamped or d_clamped:
-            self._warn_clamped_once()
+        # Edge-aware drag-regime warnings (addendum §6.2): which boundary was crossed
+        # decides the message (radius low = loud invalid-floor; radius high = soft
+        # negligible-drag; density = neutral data-range edge). Warn once per boundary.
+        if r_in < self._radius_axis[0]:
+            self._warn_edge_once("radius_low")
+        elif r_in > self._radius_axis[-1]:
+            self._warn_edge_once("radius_high")
+        if d_clamped:
+            self._warn_edge_once("density")
         return _bilinear(self._grid, self._radius_axis, self._density_axis, r, d)
 
-    def _warn_clamped_once(self) -> None:
-        if not self._clamp_warned[0]:
-            self._clamp_warned[0] = True
-            warnings.warn(
-                "VariableCd input outside the table grid; clamping to the nearest "
-                "edge (this warning is emitted once per table).",
-                # stacklevel=2 points at the __call__ site (the Cd lookup). During a
-                # propagation __call__ is invoked from inside Orekit's integration loop
-                # via JPype, so there is no stable Python caller frame to surface; a
-                # higher stacklevel would just report an arbitrary internal location.
-                stacklevel=2,
-            )
+    def _reset_edge_warnings(self) -> None:
+        """Clear the warn-once-per-boundary state so the next propagation re-warns.
+
+        ``propagate_numerical`` calls this once when it wires the drag force, giving the
+        table-edge warnings the same **once-per-run** scope as the Kn-floor warn-once
+        hook (``numerical._build_drag_sensitive``). Without it, a ``VariableCd`` reused
+        across several propagations would stay silent after the first run, even though
+        each run re-enters the same out-of-grid regime.
+        """
+        self._clamp_warned_edges.clear()
+
+    def _warn_edge_once(self, edge: str) -> None:
+        """Emit the edge-tailored clamp warning for ``edge`` once per boundary per run.
+
+        ``propagate_numerical`` resets the per-boundary state each run via
+        :meth:`_reset_edge_warnings`, so "once" is once-per-propagation (matching the
+        Kn-floor warn-once hook), not once for the object's whole lifetime.
+        """
+        if edge in self._clamp_warned_edges:
+            return
+        self._clamp_warned_edges.add(edge)
+        warnings.warn(
+            _CLAMP_EDGE_MESSAGES[edge],
+            # stacklevel=2 points at the __call__ site (the Cd lookup). During a
+            # propagation __call__ is invoked from inside Orekit's integration loop
+            # via JPype, so there is no stable Python caller frame to surface; a
+            # higher stacklevel would just report an arbitrary internal location.
+            stacklevel=2,
+        )
 
     def _metadata_id(self) -> str:
         """The ``<name-or-hash>`` written as ``Cd=table:<...>`` in metadata."""

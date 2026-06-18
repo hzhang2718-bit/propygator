@@ -8,7 +8,8 @@ are pure-Python and JVM-free.
 The Feature 1.1 surface is re-exported here: the data-model types, the
 ``propagate_numerical`` verb with its config dataclasses (``ForceModelConfig``,
 ``SpacecraftConfig``/``SpacecraftGeometry``, ``VariableCd``, ``IntegratorConfig``,
-the attitude family), the ``plot_*`` functions, and ``export_csv`` / ``export_all``.
+``AltitudeLimits``, the attitude family), the ``plot_*`` functions, and
+``export_csv`` / ``export_all``.
 ``IncidenceVariableCd`` (the deferred Tier-B skeleton) stays reachable via
 ``propygator.propagation``. Later features (1.3 TLE propagation onward) add more
 verbs.
@@ -37,6 +38,7 @@ from .plotting import (
     plot_summary,
 )
 from .propagation import (
+    AltitudeLimits,
     AttitudeConfig,
     CustomAttitude,
     ForceModelConfig,
@@ -86,6 +88,7 @@ __all__ = [
     "SpacecraftConfig",
     "SpacecraftGeometry",
     "VariableCd",
+    "AltitudeLimits",
     "AttitudeConfig",
     "LofAligned",
     "LofOffset",

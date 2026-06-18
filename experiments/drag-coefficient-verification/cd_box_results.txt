@@ -1,9 +1,12 @@
-attitude                  mean C_D  thick RMS%    max%
-cube head-on (0deg)          3.536       0.714    4.08  (C_D 2.69..4.14)
-cube edge-on (45deg)         4.196       0.446    2.57  (C_D 3.37..4.70)
-cube corner-on               4.660       0.288    2.38  (C_D 3.85..5.06)
-plate face-on (0deg)         3.175       0.407    3.79  (C_D 2.37..3.53)
-plate 60deg                  1.301       0.269    2.09  (C_D 1.10..1.41)
-plate 80deg grazing          0.403       1.301    8.31  (C_D 0.37..0.48)
+Generated 50 epochs (10 storm) x 80 altitudes (130-1400 km) per attitude
+thresholds: green <= 5% / red >= 30% (collapse thickness on the geocentric-radius axis)
+
+attitude                  mean C_D     RMS%   storm%    max%   cut(km)  verdict
+cube head-on (0deg)          3.601    1.004    1.232    5.10    none    [PASS]
+cube edge-on (45deg)         4.217    0.622    0.816    3.06    none    [PASS]
+cube corner-on               4.638    0.374    0.560    2.59    none    [PASS]
+plate face-on (0deg)         3.134    0.488    0.784    4.12    none    [PASS]
+plate 60deg                  1.298    0.368    0.533    2.28    none    [PASS]
+plate 80deg grazing          0.432    1.977    2.311   12.95    none    [PASS]
 
 Saved figure.
