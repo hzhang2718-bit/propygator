@@ -399,6 +399,11 @@ class Trajectory:
         #    epoch arrays and (N, 3) for positions/velocities, consistent N.)
         ...
 
+        # 2b. Epochs strictly increasing in time. at() uses the first/last
+        #     samples as the span endpoints and the Ephemeris that backs it
+        #     assumes chronologically ordered, distinct samples, so an unsorted
+        #     or duplicate-epoch trajectory is rejected at construction.
+
         # 3. Freeze backing arrays. Users who need to mutate can call .copy()
         #    on the returned arrays.
         for arr in (self._epochs_int, self._epochs_frac,
@@ -426,8 +431,9 @@ class Trajectory:
         epoch_scale: TimeScale = TimeScale.UTC, # used only when epochs is ndarray
         metadata: "TrajectoryMetadata | None" = None,
     ) -> "Trajectory":
-        """Construct from raw arrays. Validates shapes, dtypes, and (for the
-        list-of-Epoch form) that all epochs share a single TimeScale.
+        """Construct from raw arrays. Validates shapes, dtypes, strictly
+        increasing epochs, and (for the list-of-Epoch form) that all epochs
+        share a single TimeScale.
 
         Epoch-input contract:
           * list[Epoch]   — preserves full femtosecond-class precision; the
@@ -686,6 +692,8 @@ src/propygator/
 ### Dependency rule
 
 Dependencies flow inward. `tracking/` can import from `propagation/` and `core/`; `propagation/` can import from `core/`; `tle/` can import from `core/`. `io/` is a pure I/O leaf — it depends on `core/` types and on nothing in `tracking/` or `propagation/`. **Nothing imports from `plotting/`** — it's a leaf. This keeps the core testable without a display.
+
+**Sanctioned exception — `io/exports.py::export_all`.** `export_all` bundles the plots with the CSV, so it calls `plotting.plot_summary` / `plot_3d`. It imports them **lazily, inside the function body**, so `io/`'s static module graph stays `core`-only and the headless suites never pull `plotting/` through `io/`; the sole `io → plotting` edge exists only at call time, when the user has explicitly asked `export_all` to render figures. This honors features.md's placement of `export_all` beside `export_csv` and this section's own "`savefig`-at-`exports.py`" framing (the `io/exports.py` entry above already anticipates writing image-file metadata via `savefig`), while preserving the rule's intent (core testable without a display). The lazy import is the same idiom the package uses for the JVM and for the Sun body inside `export_csv`. Note the top-level `__init__` *separately* re-exports `plot_*`, so `import propygator` does load matplotlib (≈0.6 s) — a public-namespace choice, independent of this rule.
 
 `core/catalogs.py` is reference data and may be imported by `tracking/`, `tle/sources.py`, and elsewhere. It does not import from any sibling subpackage.
 
@@ -976,7 +984,7 @@ Never commit. Use environment variables (`SPACETRACK_USERNAME`, `SPACETRACK_PASS
 A small dedicated test set guards against silent breakage when conda dependencies update (especially around the NumPy ↔ JPype ↔ Orekit boundary):
 
 - **(a) Smoke import** — `import propygator`, fetch a known TLE, materialize a `State` from `current_position`. Catches "imports but the JPype/NumPy boundary is broken" failures.
-- **(b) Numerical round-trip** — propagate a known Keplerian orbit forward, then backward; assert agreement with the initial state at machine-precision levels (10⁻⁸ relative or better). Catches "imports work but math is wrong" failures (e.g. silent dtype promotion changes in NumPy).
+- **(b) Numerical round-trip** — propagate a known *point-mass* (Keplerian) orbit over exactly one Keplerian period and assert it returns to the initial state at machine-precision levels (10⁻⁸ relative or better). A closed two-body orbit is exactly periodic, so this **one-period closure** is a genuine there-and-back round-trip that stays inside the v1 forward-only contract — backward propagation is unsupported (`duration > 0`; features §1.1), so the literal "forward then backward" of the original design is realized this way. Catches "imports work but math is wrong" failures (e.g. silent dtype promotion changes in NumPy).
 - **(c) Bulk-array round-trip** — construct a `Trajectory` with ~10⁵ samples, run `to_frame()`, run `to_dataframe()`, export to CSV, reload, compare. Catches dtype/promotion bugs in the vectorized paths. Explicitly assert `float64` for `positions`/`velocities` and `int64` for `_epochs_int` on the reloaded trajectory — NumPy 2.x changed some default-integer behaviour across point releases (e.g. earlier 2.x had platform-dependent int defaults on Windows; resolved by 2.1), and the test should be sensitive to dtype regressions even though Windows is not a supported platform.
 
 These three tests are also the basis for the verified-environment snapshot in `docs/verified_environments/`.
@@ -992,6 +1000,8 @@ Suggested implementation sequence:
 3. **1.4 Real-time tracker** — cheap once 1.3 works
 4. **1.5 Ground passes + brightness** — builds on 1.4 and visibility
 5. **1.2 TLE fitter** — hardest; lean on Orekit's built-in fitting machinery. Treated as a plus rather than a blocker.
+
+A preliminary build of **1.1 Numerical propagator** is complete.
 
 ---
 
@@ -1030,5 +1040,7 @@ Suggested implementation sequence:
 - **RTN/LVLH frames.** Dropped from v1's supported frame set because none of features 1.1–1.5 need satellite-local frames. Returns to the supported set when formation flying, rendezvous, or relative-motion features are added. Note: re-adding these is *not* a drop-in extension of the `Frame` enum — they are relative-motion frames parameterized by a reference state (and possibly a reference epoch), so they'll require a new type (e.g. `RelativeFrame(reference: State)`) rather than a new enum value. Plan for this when the feature lands; don't expect the deferral to be trivial to undo.
 - **`FitResult` return type for `fit_tle`** — backward-compatible to add later (introduce `fit_tle_detailed()` or extend the return). v1 returns a bare `TLE`.
 - **Coefficient of drag modeling.** The numerical integrator interpolates avariable Cd from a table keyed on geocentric radius and total density. v1 ships this for the sphere (VariableCd) and a box density-varying scalar Cd (Tier A): Orekit's box computes projected area from attitude, the table supplies the scalar Cd. An attitude/incidence-keyed box table (Tier B, IncidenceVariableCd, generated offline by a panel method or DSMC) is the documented faithful extension. Full per-facet free-molecular Sentman remains deferred for plumbing reasons (Orekit's DragSensitive is passed only total density). The table is keyed on geocentric radius, not geodetic altitude, to avoid a per-substep frame transform; the geodetic reconciliation is done once during offline table generation.
+- **`NadirPointing` ECEF-relative velocity yaw (`velocity_reference="ecef"`).** v1 wires `velocity_reference="inertial"` (ECI velocity) via Orekit's `PredefinedTarget.VELOCITY`. The `"ecef"` option — yaw-steering to the Earth-relative (ground) velocity, which differs from inertial by the Earth-rotation term ω⊕×r (up to a few degrees of yaw in LEO) — ships as a **validated skeleton**: the `NadirPointing(velocity_reference="ecef")` config constructs, validates, and serializes (`nadir_pointing:vel=ecef`), but lowering it to a provider raises `NotImplementedError`. Completing it needs a custom `@JImplements TargetProvider` that subtracts Earth rotation (Orekit has no built-in Earth-relative-velocity `PredefinedTarget`); swapping the raise for that provider is backward-compatible — no signature or metadata change. This mirrors the `IncidenceVariableCd` Tier-B skeleton pattern.
+- **Escape / re-entry guards.** `propagate_numerical` has no purpose-built boundary guard in v1: escape propagates faithfully (Cartesian orbit type, no `e → 1` singularity) and re-entry surfaces only indirectly as a `min_step_s`-saturation `PropagationError` — with drag off, a sub-surface perigee is returned uncaught. Planned: a configurable re-entry floor (~120 km geodetic, the atmosphere-model validity edge) and a permissive upper-altitude ceiling (~1,000,000 km ≈ Earth's sphere of influence) as the escape safety-net, chosen over an input eccentricity rejection so bound HEO and hyperbolic cases are not forbidden. propygator *guards* these boundaries but does not *model* atmospheric entry or deep-space regimes (the ceiling doubles as the boundary marker for a future deep-space feature line). See features.md §1.1.
 
 None of these block starting the build.

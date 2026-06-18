@@ -105,7 +105,9 @@ SpacecraftGeometry.sphere(
 ) -> SpacecraftGeometry
 ```
 
-One shape number: cross-sectional area (π·r²). Same area faces velocity and Sun regardless of orientation, so attitude is irrelevant. Maps to Orekit's `IsotropicDrag` / `IsotropicRadiationClassicalConvention`. Cd = 2.2 is the free-molecular convention (above ~200 km). Cr uses Orekit's classical convention — **1.0 = fully absorbing, 2.0 = perfectly specular** — pinned in the docstring so users coming from tools where Cr ∈ [0, 1] is a reflectivity *fraction* don't mistranslate.
+One shape number: cross-sectional area (π·r²). Same area faces velocity and Sun regardless of orientation, so attitude is irrelevant. Maps to Orekit's `IsotropicDrag` / `IsotropicRadiationSingleCoefficient`. Cd = 2.2 is the free-molecular convention (above ~200 km). Cr uses Orekit's single-coefficient convention — **1.0 = fully absorbing, 2.0 = perfectly specular** — pinned in the docstring so users coming from tools where Cr ∈ [0, 1] is a reflectivity *fraction* don't mistranslate.
+
+> **Implementation note (Orekit 13.1.x, verified at build).** Earlier drafts named the sphere's SRP model `IsotropicRadiationClassicalConvention`; that wording is misleading. `IsotropicRadiationClassicalConvention` takes **two** coefficients `(area, ca, cs)` (absorption + specular) and cannot represent a single `Cr`. The single-`Cr` sphere is `IsotropicRadiationSingleCoefficient(area, cr)` (its parameter driver is literally "reflection coefficient", default 1.5), which is the model that realizes the 1.0-absorbing / 2.0-specular convention above.
 
 **`box_and_panels` — a sketched satellite.**
 
@@ -203,7 +205,9 @@ class NadirPointing:
     vector. Earth-pointing with velocity yaw. Exact when the flight-path angle
     is zero (circular orbits, apsides); off-apsis on eccentric orbits, nadir is
     held exactly and velocity is best-effort."""
-    velocity_reference: str = "inertial"      # "inertial" (ECI) | "ecef"
+    velocity_reference: str = "inertial"      # "inertial" (ECI); "ecef" is a
+    # validated skeleton deferred in v1 — propagating with it raises
+    # NotImplementedError (architecture §13)
 
 @dataclass(frozen=True)
 class InPlaneTracking:
@@ -214,10 +218,10 @@ class InPlaneTracking:
 @dataclass(frozen=True)
 class CustomAttitude:
     """Fully user-defined law mapping a State to a body orientation. `law`
-    returns a propygator Rotation (a boundary value type — NOT an Orekit /
-    Hipparchus object), converted internally. Escape hatch for laws not
+    returns a propygator Orientation (a boundary value type — NOT an Orekit /
+    Hipparchus Rotation), converted internally. Escape hatch for laws not
     expressible above. `law` must be callable, else ValueError."""
-    law: Callable[[State], "Rotation"]
+    law: Callable[[State], "Orientation"]
 ```
 
 **Native-provider mapping:**
@@ -237,7 +241,7 @@ class CustomAttitude:
 
 **Geometry interaction.** `InPlaneTracking`, `NadirPointing`, and `SunPointing` specify body axes directly, so they need no geometry inspection — the box dimensions affect the drag/SRP cross-sections (handled by Orekit) but not the attitude definition. With a velocity-tracking mode, the +Y face is the ram face, so the drag cross-section (x × z face) stays roughly constant over the orbit. For a symmetric box with uniform optical coefficients, which of two opposite faces is sunlit is immaterial (mirror-symmetric), but which *pair* (x vs y vs z) the Sun and flow see is not — it sets the projected area and reflection direction — and is determined automatically by the attitude plus Sun geometry.
 
-**Performance caveat.** A `CustomAttitude` `law` is invoked from inside Orekit's integration loop via JPype on every substep and now also constructs/converts a propygator `Rotation` each call. Prefer the declarative modes; reserve `CustomAttitude` for laws that genuinely cannot be expressed as one of them.
+**Performance caveat.** A `CustomAttitude` `law` is invoked from inside Orekit's integration loop via JPype on every substep and now also constructs/converts a propygator `Orientation` each call. Prefer the declarative modes; reserve `CustomAttitude` for laws that genuinely cannot be expressed as one of them.
 
 **Deferred (post-v1).** Time-varying / programmed attitude (mid-propagation maneuvers) and additional local-orbital-frame choices beyond TNW. Adding them later is backward-compatible (new attitude types, or a `lof` parameter defaulting to TNW). See architecture §13.
 
@@ -269,8 +273,8 @@ class IntegratorConfig:
 
 - **DOP853** (eighth-order adaptive) is the default, matching Orekit's reference examples. **DormandPrince54** is the lower-order adaptive alternative for short propagations. **ClassicalRK4** is fixed-step (requires `fixed_step_s`), mainly for exercising `keplerian` at a known step in tests.
 - Tolerances are interpreted as meters of position via Orekit's `OrbitType.CARTESIAN` tolerance computation; the propagator builds the `[abs[7], rel[7]]` array from these two scalars.
-- `min_step_s` / `max_step_s` bound the adaptive controller; the wide defaults (1 ms–1000 s) mean a healthy propagation never bumps either bound. Saturation against `min_step_s` is surfaced as an end-of-run warning (usually an ill-posed problem).
-- **`high_precision` caveat:** `rel_tolerance = 1e-12` may trip the `min_step_s` saturation warning on representative LEO/GEO cases. Verify against the §11 round-trip tests at implementation; if it warns routinely, loosen to `1e-11` rather than shipping a preset that always warns.
+- `min_step_s` / `max_step_s` bound the adaptive controller; the wide defaults (1 ms–1000 s) mean a healthy propagation never bumps either bound. If the adaptive step is driven below `min_step_s` (usually an ill-posed problem), Hipparchus cannot meet tolerance and **stops** rather than silently continuing at an oversized step — the propagation raises `PropagationError` (see the failure table below). (Earlier drafts described this as an end-of-run *warning*; that assumed the integrator clamps at `min_step_s` and continues, which it does not — it raises.)
+- **`high_precision` caveat:** `rel_tolerance = 1e-12` is demanding; on a stiff or ill-posed case it can drive the step below `min_step_s` and raise `PropagationError`. Verify against the §11 round-trip tests at implementation; if it raises on representative LEO/GEO cases, loosen to `1e-11` rather than shipping a preset that fails.
 
 ### `propagate_numerical` behavior
 
@@ -295,6 +299,8 @@ class IntegratorConfig:
     "integrator": <str>,                # optional; e.g. "DOP853"
     "integrator_tolerances": {"abs_m": <float>, "rel": <float>,
                               "min_step_s": <float>, "max_step_s": <float>},
+    # ClassicalRK4 is fixed-step: integrator_tolerances is {"fixed_step_s": <float>}
+    # instead (the adaptive tolerances above never act on a fixed-step integrator).
     "output_step_s": <float>,
     "created_at": <iso utc str>,
     "name": <str>,                      # only if supplied
@@ -303,6 +309,8 @@ class IntegratorConfig:
 
 (The `spacecraft`, `attitude`, and `name` keys are optional fields on the `TrajectoryMetadata` TypedDict, architecture §6.)
 
+The optional physics keys are emitted only when they actually shaped the trajectory ("reflect what's acting", not the config booleans): `spacecraft` appears when **drag or SRP** was wired (the only forces that consume mass/geometry/coefficients), so a `keplerian` run omits it; `attitude` appears only when geometry is a **box and** drag or SRP was wired (orientation affects the result solely through a non-spherical cross-section under a surface force) — a sphere, or a force-free box, omits it. `name` appears only when supplied.
+
 **`force_models` grammar.** Deterministic, greppable strings in fixed token order — gravity, `third_body:sun`, `third_body:moon`, drag, srp, tides (`tides:solid` / `tides:ocean` emitted independently), relativity — so the same config yields byte-identical metadata. Example (LEO + solid tides):
 
 ```python
@@ -310,7 +318,7 @@ class IntegratorConfig:
  "drag:NRLMSISE-00", "srp", "tides:solid"]
 ```
 
-**`spacecraft` string.** Deterministic; numbers use `repr()` for exact round-tripping; semicolon separates geometry from mass/coefficients. A `VariableCd` / `IncidenceVariableCd` records `Cd=table:<name-or-hash>` (the hash includes the table's axis set, so a 2-D and an incidence table for the same geometry don't collide).
+**`spacecraft` string.** Deterministic; numbers are coerced to `float` and rendered with `repr()` (so an int- and a float-valued coefficient serialize identically — `Cd=2` and `Cd=2.0` both yield `2.0`); semicolon separates geometry from mass/coefficients. A `VariableCd` / `IncidenceVariableCd` records `Cd=table:<name-or-hash>` (the hash includes the table's axis set, so a 2-D and an incidence table for the same geometry don't collide).
 
 ```
 "sphere:A=1.0;m=1000.0,Cd=2.2,Cr=1.5"
@@ -343,10 +351,17 @@ class IntegratorConfig:
 | `Inertial.reference_frame` non-inertial | `ValueError` |
 | `SunPointing.pointing_axis` parallel to `phasing_axis` | `ValueError` |
 | `attitude.law` not callable (`CustomAttitude`) | `ValueError` |
+| `NadirPointing(velocity_reference='ecef')` — deferred in v1 (architecture §13) | `NotImplementedError` |
+| `box_and_panels` `IncidenceVariableCd` under drag — Tier B deferred (architecture §13) | `NotImplementedError` |
 | Integrator fails to converge (usually `min_step_s` saturation) | `PropagationError` |
 | Unrecognized underlying Orekit failure | `PropagationError` wrapping the original |
 
 `PropagationError` lives in `propygator.exceptions` and carries the Java exception's message as a string — no raw Java stack trace surfaces (same principle as `OrekitDataMissingError`, architecture §3). String-valued config fields are validated at the top of `propagate_numerical`, before integration.
+
+**Escape and re-entry.** v1 ships no purpose-built guard for either boundary; this records the current behavior and the planned guard so the gap is explicit.
+
+- *Today.* The Cartesian orbit/integration (`OrbitType.CARTESIAN`) has no `e → 1` singularity, so an escape (hyperbolic) trajectory propagates faithfully rather than crashing — and there is no input bound-check, so a hyperbolic `State` already propagates today. The only orbit-class guard is the *parabolic* `e == 1` rejection in `KeplerianElements` (a classical-element representability limit, not an escape guard). Re-entry surfaces only *indirectly*: drag stiffens the dynamics, the adaptive step saturates `min_step_s`, and Hipparchus raises → `PropagationError`. The gap: with drag **off**, a sub-surface perigee is not caught — positions inside/below the Earth are returned with no warning, and an unbound orbit simply flies away.
+- *Planned (deferred — architecture §13).* A configurable **re-entry floor** (~120 km geodetic above the WGS84 ellipsoid — the conventional decay altitude, and roughly the lower validity bound of DTM-2000 / Harris-Priester) that stops cleanly, plus a permissive **upper-altitude ceiling** (~1,000,000 km, just past Earth's sphere of influence, where Earth-centric Sun+Moon propagation stops being physically meaningful) as the escape safety-net. The ceiling is chosen *over* an input eccentricity rejection, which would forbid whole valid cases (HEO / Molniya / GTO, hyperbolic flybys): it propagates any orbit up to a boundary and exists only to stop runaway integration (the parabolic `e == 1` rejection stays — orthogonal, representational). **Non-goal:** propygator *guards* these boundaries; it does not *model* atmospheric entry (aerothermodynamics, breakup, footprint) or deep-space / cislunar regimes — those are separate future feature lines, with the ceiling doubling as the clean boundary marker for the latter. Reporting contract (partial `Trajectory` + a `terminated` metadata flag vs. a dedicated `PropagationError` subclass) to be pinned when implemented.
 
 **Logging.** INFO: once at start (config summary), once at end (sample count, wall time). DEBUG: integrator step statistics if Orekit exposes them. No printing (architecture §10).
 
@@ -377,7 +392,9 @@ IncidenceVariableCd.from_table(
 
 **Tier B — incidence-keyed box table.** A box's true Cd also depends on how each face meets the flow, so a faithful table adds body-frame incidence axes (azimuth, elevation; optional array-articulation axis), generated offline by a panel method (ADBSat) or DSMC. No shipped default — a box table is geometry/material-specific. At runtime the model computes the relative-velocity direction in the body frame from the attitude and looks up Cd on the multi-D grid.
 
-**Runtime.** Each variable Cd maps to a thin custom `DragSensitive` whose `dragAcceleration` reads geocentric radius from the state, takes the passed-in total density (plus body-frame incidence for Tier B), interpolates Cd, and assembles `a = −½ (Cd·A/m) ρ |v_rel| v_rel` exactly as `IsotropicDrag` / the box model would. **The custom `DragSensitive` is instantiated inside `propagate_numerical`, never at geometry construction** — that keeps the geometry factory on the safe-before-init surface (architecture §10). The per-substep work is a low-dimensional interpolation plus a `|position|`; far cheaper than per-facet Sentman, but measurably slower than stock fixed-Cd drag — benchmark at implementation.
+**Runtime.** Each variable Cd maps to a thin custom `DragSensitive` whose `dragAcceleration` reads geocentric radius from the state, takes the passed-in total density (plus body-frame incidence for Tier B), interpolates Cd, and assembles `a = −½ (Cd·A/m) ρ |v_rel| v_rel` exactly as `IsotropicDrag` / the box model would. **The custom `DragSensitive` is instantiated inside `propagate_numerical`, never at geometry construction** — that keeps the geometry factory on the safe-before-init surface (architecture §10).
+
+> **Implementation note (Orekit sign convention, verified at build).** The textbook `a = −½ … |v_rel| v_rel` above assumes `v_rel = v_spacecraft − v_atmosphere`. Orekit hands `DragSensitive.dragAcceleration` the **opposite-signed** relative velocity, `relativeVelocity = v_atmosphere − v_spacecraft`, and `IsotropicDrag` therefore applies a **positive** scalar: `a = +½ (Cd·A/m) ρ |relativeVelocity| relativeVelocity`. The custom `DragSensitive` must use the `+½` form with Orekit's argument to match `IsotropicDrag` (verified to ~1e-21 m/s²); the two expressions denote the same physical deceleration. A faithfulness test pins this against `IsotropicDrag` at constant Cd. The per-substep work is a low-dimensional interpolation plus a `|position|`; far cheaper than per-facet Sentman, but measurably slower than stock fixed-Cd drag — benchmark at implementation.
 
 **Where the table comes from.** `sphere_default()` is generated once by maintainers and committed to `data/`; end users load a small array and compute nothing. Generation sweeps a high-fidelity Cd model (closed-form Sentman for the sphere) over a grid of thermospheric conditions and regrids onto the `(radius, density)` mesh — order 10⁴–10⁵ vectorized evaluations, sub-minute. A box (Tier B) table is a deliberate user setup step (a generation script or an external tool such as ADBSat / DSMC); the output is the same kind of array.
 
@@ -433,7 +450,7 @@ def export_csv(traj, path, *, columns=None) -> None: ...
 
 **Styling.** A single shipped `plotting/propygator.mplstyle`, applied per-figure via a context manager *inside* each `plot_*` function (never by mutating global `rcParams` on import). Plotly figures get an analogous shared layout template. Ground track and 3D are colored *by time* (blue→red, via a `LineCollection` / color-mapped Plotly trace reading the same named colormap); all time-series use a fixed dark blue; continent outlines are black. Pinning the baseline early is a prerequisite for the §11 snapshot tests. Deferred to implementation: exact dark-blue hex, colormap endpoints, axis labels, figure sizes, legend placement.
 
-**CSV columns.** Default set (`columns=None`), 16 columns: `epoch_utc` (ISO), `epoch_mjd_utc`, `x/y/z_eme2000_m`, `vx/vy/vz_eme2000_mps`, `x/y/z_itrf_m`, `latitude_deg`/`longitude_deg`/`altitude_m` (geodetic, WGS84), `speed_inertial_mps`. Opt-in via `columns`:
+**CSV columns.** Default set (`columns=None`), 16 columns: `epoch_utc` (ISO), `epoch_mjd_utc`, `x/y/z_eme2000_m`, `vx/vy/vz_eme2000_mps`, `x/y/z_itrf_m`, `latitude_deg`/`longitude_deg`/`altitude_m` (geodetic, WGS84), `speed_inertial_mps` (EME2000-relative magnitude), `speed_itrf_mps` (ground-relative magnitude). `columns` is additive — a list of opt-in group tokens appended to the defaults:
 
 - Keplerian elements (a, e, i, Ω, ω, ν), computed **in EME2000** (the trajectory frame). Near-circular / near-equatorial orbits make ω, Ω, ν individually ill-conditioned (argument of latitude is the stable combination); see architecture §6.
 - Sun position / direction columns (Sun lives in `core/bodies.py`, reachable without violating the dependency rule).
@@ -511,7 +528,7 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 
 ### Resolved decisions for 1.1
 
-- **Attitude API** — seven-mode `AttitudeConfig` family (`LofAligned` / `LofOffset` / `Inertial` / `SunPointing` / `NadirPointing` / `InPlaneTracking` / `CustomAttitude`), TNW as the local orbital frame; all but `CustomAttitude` lower to native Orekit providers (`FrameAlignedProvider`, `CelestialBodyPointed` / `AlignedAndConstrained`, `LofOffset(TNW)`). `CustomAttitude.law` returns a propygator `Rotation`, not an Orekit/Hipparchus type.
+- **Attitude API** — seven-mode `AttitudeConfig` family (`LofAligned` / `LofOffset` / `Inertial` / `SunPointing` / `NadirPointing` / `InPlaneTracking` / `CustomAttitude`), TNW as the local orbital frame; all but `CustomAttitude` lower to native Orekit providers (`FrameAlignedProvider`, `CelestialBodyPointed` / `AlignedAndConstrained`, `LofOffset(TNW)`). `CustomAttitude.law` returns a propygator `Orientation`, not an Orekit/Hipparchus `Rotation`.
 - **Spacecraft optical coefficients** — on the geometry factories; sphere uses one Cr, box uses absorption + specular (each in [0, 1]).
 - **Variable drag coefficient** — `VariableCd`, a `(geocentric radius, total density)` table, for **sphere and box** (Tier A: density-varying scalar Cd); `IncidenceVariableCd` (Tier B: + body-frame incidence) is the faithful box extension, no shipped default; clamp-to-edge out-of-grid; the custom `DragSensitive` is built inside `propagate_numerical`. Full per-facet Sentman deferred.
 - **IntegratorConfig** — three presets locked; `high_precision` rel-tolerance flagged for verification.

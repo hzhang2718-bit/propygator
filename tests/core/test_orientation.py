@@ -140,10 +140,9 @@ def test_stored_quaternion_read_only():
         o._quaternion[0] = 5.0
 
 
-def test_to_orekit_deferred():
-    o = Orientation.from_quaternion(1.0, 0.0, 0.0, 0.0)
-    with pytest.raises(NotImplementedError):
-        o.to_orekit()
+# Note: Orientation.to_orekit is Orekit-crossing (it starts the JVM), so its test
+# lives in tests/test_conversions.py under the `orekit` fixture — it cannot run
+# here without violating the safe-before-init invariant.
 
 
 # --- equality / hashing ----------------------------------------------------

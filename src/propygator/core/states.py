@@ -2,9 +2,9 @@
 
 A :class:`State` is an immutable Cartesian position+velocity at an :class:`Epoch`
 in an explicit :class:`Frame`. Construction and validation are pure-Python and
-safe before JVM init (architecture §10); only the deferred conversion methods
+safe before JVM init (architecture §10); the conversion methods
 (:meth:`State.to_frame`, :meth:`State.to_keplerian`, :meth:`State.to_orekit`)
-touch Orekit, and they land with Feature 1.
+cross into Orekit and start the JVM lazily on first use (Feature 1.1).
 """
 
 from __future__ import annotations
@@ -18,24 +18,49 @@ from typing import TYPE_CHECKING, Required, TypedDict
 
 import numpy as np
 
-from .frames import Frame
-from .time import Epoch, TimeScale, _count_from_wallclock
+from .frames import Frame, _require_pseudo_inertial, to_geodetic
+from .time import Epoch, TimeScale, _abs_date, _count_from_wallclock
 
 if TYPE_CHECKING:
     # Type-only. The org.* namespaces are runtime JPype stubs; pandas is imported
     # lazily inside to_dataframe so importing the package stays cheap.
     import org.hipparchus.geometry.euclidean.threed  # noqa: F401
     import org.orekit.propagation  # noqa: F401
+    import org.orekit.propagation.analytical  # noqa: F401
+    import org.orekit.utils  # noqa: F401
     import pandas as pd  # noqa: F401
 
     from .elements import KeplerianElements  # noqa: F401
 
 
-_FEATURE1_NOTE = (
-    "{name} is deferred to Feature 1 (numerical propagator). It performs an "
-    "Orekit-backed conversion, so it is not part of the pure-Python, "
-    "safe-before-init surface (architecture §10)."
-)
+def _vector3d_to_array(
+    v: "org.hipparchus.geometry.euclidean.threed.Vector3D",
+) -> np.ndarray:
+    """Extract a Hipparchus/Orekit ``Vector3D`` into a fresh ``(3,) float64`` array.
+
+    The JVM-boundary idiom (architecture §10): pull the Java ``Vector3D`` getters
+    into NumPy. The returned array is owned by the caller; :class:`State` copies it
+    again on construction, so the read-only-array invariant is preserved.
+    """
+    return np.array([v.getX(), v.getY(), v.getZ()], dtype=np.float64)
+
+
+def _pv(position: np.ndarray, velocity: np.ndarray) -> "org.orekit.utils.PVCoordinates":
+    """Build Orekit ``PVCoordinates`` from a ``(3,)`` position and ``(3,)`` velocity.
+
+    The JVM-boundary idiom in one place: cast a NumPy ``(p, v)`` pair into the
+    Hipparchus ``Vector3D`` pair Orekit wants. The caller must have started the
+    JVM (each call site runs ``_ensure_started()`` first). Shared by
+    :meth:`State._orekit_pv` and the :meth:`Trajectory.to_frame` per-sample loop so
+    the float-cast convention lives in a single spot.
+    """
+    from org.hipparchus.geometry.euclidean.threed import Vector3D
+    from org.orekit.utils import PVCoordinates
+
+    return PVCoordinates(
+        Vector3D(float(position[0]), float(position[1]), float(position[2])),
+        Vector3D(float(velocity[0]), float(velocity[1]), float(velocity[2])),
+    )
 
 
 @dataclass(frozen=True)
@@ -118,12 +143,91 @@ class State:
         )
 
     def to_frame(self, target_frame: Frame) -> "State":
-        """Return this state expressed in ``target_frame`` (deferred to Feature 1)."""
-        raise NotImplementedError(_FEATURE1_NOTE.format(name="State.to_frame"))
+        """Return this state expressed in ``target_frame``.
+
+        Crosses into Orekit: resolves both frames via :meth:`Frame.to_orekit` and
+        applies the Orekit ``Transform`` between them at ``self.epoch`` to the
+        position+velocity. The transform carries the frames' relative rotation
+        rate, so the velocity gets the correct transport-theorem correction — e.g.
+        the Earth-rotation term on an ``EME2000`` → ``ITRF`` conversion. Returns a
+        new :class:`State` with freshly allocated, read-only arrays (no aliasing of
+        this state's memory). ``target_frame is self.frame`` short-circuits to a
+        fresh copy without starting the JVM.
+        """
+        if target_frame is self.frame:
+            return State(self.epoch, self.position, self.velocity, target_frame)
+
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+
+        transform = self.frame.to_orekit().getTransformTo(
+            target_frame.to_orekit(), self.epoch.to_orekit()
+        )
+        pv = transform.transformPVCoordinates(self._orekit_pv())
+        return State(
+            self.epoch,
+            _vector3d_to_array(pv.getPosition()),
+            _vector3d_to_array(pv.getVelocity()),
+            target_frame,
+        )
 
     def to_keplerian(self) -> "KeplerianElements":
-        """Return the osculating classical elements (deferred to Feature 1)."""
-        raise NotImplementedError(_FEATURE1_NOTE.format(name="State.to_keplerian"))
+        """Return the osculating classical elements in this state's own frame.
+
+        Builds an Orekit ``KeplerianOrbit`` from the position+velocity in
+        ``self.frame`` using Earth's WGS84 µ (:func:`core.bodies._earth_mu`) and
+        reads back the six classical elements with the **true anomaly** as the
+        canonical angle (architecture §6). No implicit frame conversion — the
+        elements are computed in ``self.frame``, which must be pseudo-inertial for
+        classical elements to be well-defined (a rotating frame such as ``ITRF``
+        raises ``ValueError``; convert with :meth:`to_frame` first). ω, Ω, and ν
+        are individually ill-conditioned as e→0 / i→0
+        (finite but erratic for the near-circular LEO orbits this library targets;
+        the argument of latitude is the stable combination — architecture §6).
+
+        Near-parabolic states (osculating e→1) are unsupported: classical elements
+        have no finite semi-major axis there, so :class:`KeplerianElements` rejects
+        e == 1 and the read-back surfaces that as a clean ``ValueError`` (not a Java
+        trace). Such orbits are outside this library's LEO target domain.
+        """
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+        from org.orekit.orbits import KeplerianOrbit
+
+        from .bodies import _earth_mu
+        from .elements import KeplerianElements
+
+        ok_frame = _require_pseudo_inertial(
+            self.frame,
+            "to_keplerian",
+            "Convert first with state.to_frame(Frame.EME2000).",
+        )
+
+        orbit = KeplerianOrbit(
+            self._orekit_pv(),
+            ok_frame,
+            self.epoch.to_orekit(),
+            _earth_mu(),
+        )
+        return KeplerianElements(
+            float(orbit.getA()),
+            float(orbit.getE()),
+            float(orbit.getI()),
+            float(orbit.getRightAscensionOfAscendingNode()),
+            float(orbit.getPerigeeArgument()),
+            float(orbit.getTrueAnomaly()),
+        )
+
+    def _orekit_pv(self) -> "org.orekit.utils.PVCoordinates":
+        """Orekit ``PVCoordinates`` for this state's position+velocity (JVM-crossing).
+
+        Shared by :meth:`to_orekit`, :meth:`to_frame`, and :meth:`to_keplerian`;
+        the caller must have started the JVM (each calls ``_ensure_started()``
+        first). Frame-agnostic — the frame/epoch are attached by the caller.
+        """
+        return _pv(self.position, self.velocity)
 
     if TYPE_CHECKING:
 
@@ -132,8 +236,34 @@ class State:
     else:
 
         def to_orekit(self):
-            """Build the Orekit ``SpacecraftState`` (deferred to Feature 1)."""
-            raise NotImplementedError(_FEATURE1_NOTE.format(name="State.to_orekit"))
+            """Build the Orekit ``SpacecraftState`` for this state.
+
+            The JVM-crossing conversion: starts the JVM on first call via
+            ``_ensure_started()`` (lazy-JVM contract, architecture §10). The
+            state is wrapped as ``AbsolutePVCoordinates`` -> ``SpacecraftState`` —
+            a frame-agnostic position+velocity snapshot at ``self.epoch`` in
+            ``self.frame``. Position/velocity round-trip exactly through the
+            Orekit getters regardless of frame (``isOrbitDefined()`` is ``False``).
+
+            No gravitational parameter (mu) is attached here, by design. A
+            numerical propagation's mu is the one carried by its configured
+            gravity field (the ``propagation`` layer, later in Feature 1.1), so
+            baking a fixed mu into this conversion would be redundant and could
+            silently disagree with the field actually integrated. ``to_keplerian``
+            supplies its own mu where osculating elements genuinely require one.
+            """
+            from .._orekit_init import _ensure_started
+
+            _ensure_started()
+            from org.orekit.propagation import SpacecraftState
+            from org.orekit.utils import AbsolutePVCoordinates
+
+            abs_pv = AbsolutePVCoordinates(
+                self.frame.to_orekit(),
+                self.epoch.to_orekit(),
+                self._orekit_pv(),
+            )
+            return SpacecraftState(abs_pv)
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +343,16 @@ def _default_metadata(propagator: str = "user") -> "TrajectoryMetadata":
 # ---------------------------------------------------------------------------
 # Trajectory
 # ---------------------------------------------------------------------------
+
+# Orekit Ephemeris interpolation order for Trajectory.at. Samples are stored as
+# raw Cartesian (p, v); the Ephemeris runs cubic Hermite on position AND velocity
+# (see _ephemeris for the USE_PV filter choice that makes this so): exact at the
+# sample nodes, and sub-meter between them at a 60 s LEO cadence, falling
+# ~quadratically as the step shrinks. Two points is deliberate and optimal here —
+# a higher order over Cartesian samples oscillates (Runge) and *worsens* accuracy,
+# the interpolated velocity worst of all (verified). Users who need finer
+# interpolation re-propagate with a smaller output_step.
+_AT_INTERPOLATION_POINTS = 2
 
 
 def _epoch_arrays_from_list(
@@ -362,7 +502,23 @@ class Trajectory:
             if not np.all(np.isfinite(named[name])):
                 raise ValueError(f"{name} must be finite (no NaN or inf)")
 
-        # 3. Freeze backing-array contents (architecture §6); the attribute
+        # 3. Epochs strictly increasing in time. Trajectory.at() takes the first
+        #    and last samples as the span endpoints, and the Orekit Ephemeris that
+        #    backs it assumes chronologically ordered, distinct samples — so an
+        #    unsorted or duplicate-epoch trajectory would silently mis-bound queries
+        #    or break interpolation. Enforce the invariant once here so every later
+        #    path can rely on it; the two-part TAI count compares lexicographically
+        #    since _epochs_frac ∈ [0, 1). n < 2 is trivially ordered.
+        if n >= 2:
+            d_int = np.diff(self._epochs_int)
+            d_frac = np.diff(self._epochs_frac)
+            if not np.all((d_int > 0) | ((d_int == 0) & (d_frac > 0))):
+                raise ValueError(
+                    "Trajectory epochs must be strictly increasing in time; got "
+                    "out-of-order or duplicate samples."
+                )
+
+        # 4. Freeze backing-array contents (architecture §6); the attribute
         #    bindings are not enforced-immutable (see the class docstring).
         for arr in (
             self._epochs_int,
@@ -485,15 +641,237 @@ class Trajectory:
         meta = _default_metadata() if metadata is None else metadata.copy()
         return cls(epochs_int, epochs_frac, scale, pos, vel, frame, meta)
 
-    # --- deferred to Feature 1 --------------------------------------------
+    # --- interpolation / conversion (Orekit-crossing) ---------------------
 
     def at(self, epoch: Epoch) -> State:
-        """Interpolated state lookup (deferred to Feature 1)."""
-        raise NotImplementedError(_FEATURE1_NOTE.format(name="Trajectory.at"))
+        """Return the interpolated state at ``epoch`` (in this trajectory's frame).
+
+        Builds an Orekit ``Ephemeris`` over the samples with Hermite interpolation
+        (which keeps position+velocity consistent by construction), **cached on the
+        trajectory on first call** and reused thereafter. The result is in this
+        trajectory's frame — call :meth:`State.to_frame` on it to convert.
+
+        Raises ``ValueError`` if ``epoch`` lies outside the trajectory's time span:
+        there is no extrapolation (architecture §13). A query that needs denser
+        coverage should re-propagate with a smaller ``output_step``. Needs at least
+        two samples to interpolate.
+        """
+        n = len(self)
+        if n < 2:
+            raise ValueError(
+                f"Trajectory.at needs at least 2 samples to interpolate, got {n}."
+            )
+
+        # Bounds check in Python on the two-part TAI count (scale-independent, so
+        # the query Epoch's scale need not match the trajectory's) so an out-of-span
+        # query raises a clean ValueError instead of an opaque Orekit
+        # TimeStampedCacheException. (int, frac) compares as the real instant since
+        # frac is in [0, 1). Samples run chronologically (a propagation output), so
+        # the span endpoints are the first and last samples.
+        query = (epoch._int_seconds, epoch._frac_seconds)
+        first = (int(self._epochs_int[0]), float(self._epochs_frac[0]))
+        last = (int(self._epochs_int[-1]), float(self._epochs_frac[-1]))
+        if query < first or query > last:
+            raise ValueError(
+                f"epoch {epoch.to_iso()} is outside the trajectory span "
+                f"[{self._epoch_at(0).to_iso()}, {self._epoch_at(-1).to_iso()}]; "
+                "Trajectory.at does not extrapolate (re-propagate with a smaller "
+                "output_step for denser coverage)."
+            )
+
+        ephemeris, interp_frame = self._ephemeris()
+        ss = ephemeris.propagate(epoch.to_orekit())
+        state = State(
+            epoch,
+            _vector3d_to_array(ss.getPosition()),
+            _vector3d_to_array(ss.getVelocity()),
+            interp_frame,
+        )
+        # The ephemeris is built in this trajectory's frame when that frame is
+        # pseudo-inertial, else in EME2000 (Orekit's SpacecraftStateInterpolator
+        # rejects a non-inertial output frame — see _ephemeris). Transform the
+        # sampled state back so at() always returns a State in self.frame.
+        if interp_frame is not self.frame:
+            state = state.to_frame(self.frame)
+        return state
+
+    def _ephemeris(
+        self,
+    ) -> "tuple[org.orekit.propagation.analytical.Ephemeris, Frame]":
+        """Lazily build + cache the Orekit ``Ephemeris`` backing :meth:`at`.
+
+        Returns the ephemeris together with the propygator :class:`Frame` it is
+        expressed in. The interpolation frame is this trajectory's own frame when
+        that frame is pseudo-inertial (``EME2000`` / ``TEME``), but **EME2000 when
+        it is not** (``ITRF``): Orekit's ``SpacecraftStateInterpolator`` requires a
+        pseudo-inertial output/attitude-reference frame and raises
+        ``OrekitIllegalArgumentException`` otherwise, so an Earth-fixed trajectory is
+        interpolated in EME2000 and :meth:`at` transforms each sampled state back to
+        ``self.frame``. A private cached Orekit reference is an allowed
+        implementation detail (architecture §10) — it never appears on a public
+        signature. Building it materializes one ``SpacecraftState`` per sample, so it
+        is deferred to the first :meth:`at` call and reused for every subsequent query.
+        """
+        cached = getattr(self, "_ephemeris_cache", None)
+        if cached is not None:
+            return cached
+
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+        from java.util import ArrayList
+        from org.orekit.propagation import SpacecraftState, SpacecraftStateInterpolator
+        from org.orekit.propagation.analytical import Ephemeris
+        from org.orekit.time import AbstractTimeInterpolator
+        from org.orekit.utils import (
+            AbsolutePVCoordinates,
+            AngularDerivativesFilter,
+            CartesianDerivativesFilter,
+        )
+
+        # SpacecraftStateInterpolator requires a pseudo-inertial output frame, so a
+        # non-inertial (Earth-fixed) trajectory is interpolated in EME2000 and at()
+        # transforms the result back. A pseudo-inertial frame (EME2000/TEME) is used
+        # as-is, so those paths are unchanged.
+        if self.frame.to_orekit().isPseudoInertial():
+            interp_frame = self.frame
+            source = self
+        else:
+            interp_frame = Frame.EME2000
+            source = self.to_frame(Frame.EME2000)
+        output_frame = interp_frame.to_orekit()
+        # ArrayList is generic in the Java stubs, so mypy wants an element type; the
+        # elements are untyped Orekit SpacecraftStates, so the annotation adds nothing.
+        states = ArrayList()  # type: ignore[var-annotated]
+        # Build each SpacecraftState straight from the backing arrays rather than via
+        # source[i].to_orekit(): the rows are already validated and read-only
+        # (__post_init__), so the State round-trip would only re-copy and re-validate
+        # them per sample. output_frame and _abs_date(...) supply the frame/epoch.
+        for i in range(len(source)):
+            abs_pv = AbsolutePVCoordinates(
+                output_frame,
+                _abs_date(int(source._epochs_int[i]), float(source._epochs_frac[i])),
+                _pv(source.positions[i], source.velocities[i]),
+            )
+            states.add(SpacecraftState(abs_pv))
+        # USE_PV, not the constructor default USE_PVA: the samples carry only
+        # position+velocity, while the AbsolutePVCoordinates behind each
+        # SpacecraftState default their acceleration to zero. USE_PVA would treat
+        # that fabricated a=0 as a real node constraint, forcing the interpolant flat
+        # in acceleration where the true orbit is ~-9 m/s² — a ~900 m midpoint error
+        # at a 60 s LEO cadence. USE_PV does cubic Hermite on the (p, v) actually
+        # present: exact at nodes, sub-meter between them. USE_R likewise ignores the
+        # absent attitude rates. The explicit extrapolation threshold and the
+        # output_frame reused as the attitude-reference frame reproduce the
+        # short-constructor defaults.
+        interpolator = SpacecraftStateInterpolator(
+            _AT_INTERPOLATION_POINTS,
+            AbstractTimeInterpolator.DEFAULT_EXTRAPOLATION_THRESHOLD_SEC,
+            output_frame,
+            output_frame,
+            CartesianDerivativesFilter.USE_PV,
+            AngularDerivativesFilter.USE_R,
+        )
+        ephemeris = Ephemeris(states, interpolator)
+        self._ephemeris_cache = (ephemeris, interp_frame)
+        return self._ephemeris_cache
 
     def to_frame(self, frame: Frame) -> "Trajectory":
-        """Return this trajectory expressed in ``frame`` (deferred to Feature 1)."""
-        raise NotImplementedError(_FEATURE1_NOTE.format(name="Trajectory.to_frame"))
+        """Return this trajectory expressed in ``frame``.
+
+        Applies a per-sample Orekit ``Transform`` — the EME2000↔ITRF relation is
+        epoch-dependent, so each sample is transformed at its own epoch and the
+        velocity picks up the transport-theorem correction (e.g. the Earth-rotation
+        term on EME2000 → ITRF). Returns a new :class:`Trajectory` with freshly
+        allocated, read-only ``positions``/``velocities`` arrays (no view aliasing
+        of this trajectory's memory); the read-only epoch arrays are shared and
+        ``metadata`` is shallow-copied, since neither is frame-dependent
+        (architecture §6 ``to_frame`` allocation contract). ``frame is self.frame``
+        short-circuits to a fresh copy without starting the JVM.
+        """
+        if frame is self.frame:
+            return Trajectory(
+                self._epochs_int,
+                self._epochs_frac,
+                self.epoch_scale,
+                self.positions.copy(),
+                self.velocities.copy(),
+                frame,
+                self.metadata.copy(),
+            )
+
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+
+        src = self.frame.to_orekit()
+        dst = frame.to_orekit()
+
+        n = len(self)
+        new_pos = np.empty((n, 3), dtype=np.float64)
+        new_vel = np.empty((n, 3), dtype=np.float64)
+        # Per-sample loop: the EME2000<->ITRF transform changes with epoch, so there
+        # is no single batch transform. This is the bulk-path hotspot at ~1e5 samples
+        # (stack-compat part (c)), so it avoids per-sample allocations: src/dst are
+        # hoisted, the date is built straight from the two-part count via _abs_date
+        # (no throwaway Epoch), and the transformed getters are written directly into
+        # the preallocated rows (no throwaway (3,) arrays). The rest is inherently
+        # per-sample.
+        for i in range(n):
+            transform = src.getTransformTo(
+                dst, _abs_date(int(self._epochs_int[i]), float(self._epochs_frac[i]))
+            )
+            pv = transform.transformPVCoordinates(
+                _pv(self.positions[i], self.velocities[i])
+            )
+            p = pv.getPosition()
+            v = pv.getVelocity()
+            new_pos[i, 0], new_pos[i, 1], new_pos[i, 2] = p.getX(), p.getY(), p.getZ()
+            new_vel[i, 0], new_vel[i, 1], new_vel[i, 2] = v.getX(), v.getY(), v.getZ()
+
+        return Trajectory(
+            self._epochs_int,
+            self._epochs_frac,
+            self.epoch_scale,
+            new_pos,
+            new_vel,
+            frame,
+            self.metadata.copy(),
+        )
+
+    def _geodetic_track(
+        self,
+    ) -> "tuple[Trajectory, np.ndarray, np.ndarray, np.ndarray]":
+        """Return this trajectory in ITRF plus per-sample geodetic lat/lon/alt.
+
+        Backs the module-level :func:`~propygator.core.frames.geodetic_track` that CSV
+        export and the ground-track / altitude plots share. Converts to ITRF once and
+        projects every sample (:func:`~propygator.core.frames.to_geodetic`), returning
+        ``(itrf, latitude_deg, longitude_deg, altitude_m)`` with the three lat/lon/alt
+        arrays read-only. The result is cached on the instance the same lazy
+        cache-on-first-call way as the :meth:`at` ephemeris (architecture §10; the
+        backing data is immutable, so the cache never goes stale). Repeated consumers
+        (``plot_summary`` panels, a full ``export_all``) reuse one ITRF conversion plus
+        projection instead of recomputing it 2-3x.
+        """
+        cached = getattr(self, "_geodetic_cache", None)
+        if cached is not None:
+            return cached
+
+        itrf = self.to_frame(Frame.ITRF)
+        n = len(itrf)
+        lat = np.empty(n, dtype=np.float64)
+        lon = np.empty(n, dtype=np.float64)
+        alt = np.empty(n, dtype=np.float64)
+        for i, state in enumerate(itrf):
+            geo = to_geodetic(state)
+            lat[i] = geo.latitude_deg
+            lon[i] = geo.longitude_deg
+            alt[i] = geo.altitude_m
+        for arr in (lat, lon, alt):
+            arr.setflags(write=False)  # shared cached arrays; guard against mutation
+        self._geodetic_cache = (itrf, lat, lon, alt)
+        return self._geodetic_cache
 
     # --- export ------------------------------------------------------------
 
@@ -584,7 +962,10 @@ class Orientation:
     out of scope for v1 — orientation only.
     """
 
-    _quaternion: np.ndarray  # (4,) float64, unit-norm, w >= 0; (w, x, y, z)
+    # (4,) float64, unit-norm, (w, x, y, z); sign-canonicalized so the first
+    # significantly-nonzero component is >= 0 (not simply w >= 0 — see the class
+    # docstring and _canonicalize_quaternion_sign).
+    _quaternion: np.ndarray
 
     def __post_init__(self) -> None:
         q = self._quaternion
@@ -622,7 +1003,8 @@ class Orientation:
 
     @classmethod
     def from_quaternion(cls, w: float, x: float, y: float, z: float) -> "Orientation":
-        """Build from quaternion components (normalized; sign-canonicalized to w>=0)."""
+        """Build from quaternion components (normalized; sign-canonicalized so the
+        first significantly-nonzero component of (w, x, y, z) is >= 0)."""
         q = np.array([w, x, y, z], dtype=np.float64)
         if not np.all(np.isfinite(q)):
             raise ValueError("quaternion components must be finite")
@@ -695,7 +1077,8 @@ class Orientation:
         return cls.from_quaternion(w, x, y, z)
 
     def as_quaternion(self) -> np.ndarray:
-        """Return a writable copy of the unit quaternion ``(w, x, y, z)`` (w >= 0)."""
+        """Return a writable copy of the unit quaternion ``(w, x, y, z)`` (sign-
+        canonicalized: first significantly-nonzero component >= 0)."""
         return self._quaternion.copy()
 
     if TYPE_CHECKING:
@@ -707,7 +1090,21 @@ class Orientation:
     else:
 
         def to_orekit(self):
-            """Build the Hipparchus ``Rotation`` (deferred to Feature 1)."""
-            raise NotImplementedError(
-                _FEATURE1_NOTE.format(name="Orientation.to_orekit")
-            )
+            """Build the Hipparchus ``Rotation`` for this orientation (JVM-crossing).
+
+            Starts the JVM on first call via ``_ensure_started()`` (lazy-JVM
+            contract, architecture §10), then constructs the rotation from the
+            stored unit quaternion ``(w, x, y, z)`` — Hipparchus'
+            ``Rotation(q0, q1, q2, q3, needsNormalization)`` takes ``q0`` as the
+            scalar part. The quaternion is already unit-norm and sign-canonicalized,
+            so the ``needsNormalization`` pass is a no-op safeguard; ``q`` and
+            ``-q`` denote the same rotation, so the result is independent of the
+            stored sign convention.
+            """
+            from .._orekit_init import _ensure_started
+
+            _ensure_started()
+            from org.hipparchus.geometry.euclidean.threed import Rotation
+
+            q = self._quaternion
+            return Rotation(float(q[0]), float(q[1]), float(q[2]), float(q[3]), True)

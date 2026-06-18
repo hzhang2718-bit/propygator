@@ -7,26 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-13
+
 ### Added
 
-- Package scaffolding: `src/propygator/` layout, `pyproject.toml` (single-source
-  `0.1.0` version, MIT), and `environment.yml` pinning Python 3.11 / OpenJDK 17 /
-  orekit_jpype 13.1.x with an editable `pip: -e .[dev]` install.
-- Lazy JVM initialization (`propygator.init`, one JVM per process) and
-  `clear_cache`, with typed exceptions (`PropygatorError`,
-  `OrekitDataMissingError`, `JVMAlreadyStartedError`) and the orekit-data
-  resolution order (`OREKIT_DATA_PATH` → `~/.propygator/orekit-data/` →
-  `./orekit-data/`). Importing the package does not start the JVM.
-- Pure-Python core data model with shape/dtype/finiteness validation: `Epoch` +
-  `TimeScale` (bundled leap-second table), `Frame`, `State`, `Trajectory` +
-  `TrajectoryMetadata`, `KeplerianElements`, `Orientation`, and the observation
-  types `GroundStation` / `GeodeticPosition` / `Pass`. Orekit conversions
-  (`to_orekit` / `to_frame`) are deferred to Feature 1.1.
-- Test harness: session-scoped JVM + orekit-data fixture (`tests/conftest.py`),
-  pure-Python core tests, and the NumPy ↔ JPype ↔ Orekit stack-compatibility
-  boundary test.
-- Tooling: pre-commit hooks (ruff lint + format, mypy, nbstripout, file hygiene),
-  ruff/mypy configuration, and `scripts/download_orekit_data.py`.
-- Continuous integration: GitHub Actions workflow (Ubuntu, Python 3.11) that
-  builds the conda env from `environment.yml`, caches orekit-data, and runs
-  `pytest` followed by `pre-commit run --all-files`.
+- Configuration and environment files. Pinned Python 3.11, OpenJDK 17, and
+  orekit_jpype 13.1.x. These are the basis of all future code.
+- Lazy JVM init process, setting up and securing the tricky Python-Java interface for
+  all future code.
+- Set up pre-commit, lint, and CI as a sign of maintenance and care.
+- Created core data types, including Epoch, Frame, State, KeplerianElements,
+  Orientation, Trajectory, and TrajectoryMetadata. These types will be used by almost all,
+  if not all future features. These ones are especially relevant to the numerical
+  propagator feature.
+- The numerical propagator feature, which is the first and most important feature of
+  propygator. This major build included setting up conversion functions and propagation
+  tools built upon Orekit.
+- A table which takes altitude and atmospheric density to a Cd value, which can be
+  interpolated. The table provides variable Cd when the Orekit atmosphere pipeline makes
+  Sentman impossible to cleanly implement. An experiment folder which contains code
+  that justifies this practice was also added.
+- Structured exports interface, involving CSV, matplotlib graphs, and plotly graphs
+  exports. These are used extensively by the numerical propagator and are good for future
+  use by other features as well.
+- Created Jupyter notebooks folder for casual users to interact with propygator.

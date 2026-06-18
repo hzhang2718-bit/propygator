@@ -1,0 +1,13 @@
+# Dependencies for the drag-coefficient-verification experiments (reference only).
+#
+# Deliberately NOT in the propygator conda env — that env is a pinned, tested
+# combination. Install these into a throwaway virtual environment instead; see
+# README.md "How to run". All ship prebuilt Windows wheels (no compiler needed).
+#
+# Unpinned on purpose (exploratory reference code). Latest verified June 2026:
+# numpy 2.x, scipy 1.x, matplotlib 3.x, pymsis 0.12. Pin exactly if you need
+# byte-reproducibility.
+numpy
+scipy
+matplotlib
+pymsis

@@ -71,14 +71,9 @@ def test_rejects_non_ndarray():
         State(_epoch(), [1.0, 2.0, 3.0], _vec(0.0, 0.0, 0.0), Frame.EME2000)
 
 
-def test_deferred_methods_raise():
-    s = State(_epoch(), _vec(1.0, 2.0, 3.0), _vec(4.0, 5.0, 6.0), Frame.EME2000)
-    with pytest.raises(NotImplementedError):
-        s.to_frame(Frame.ITRF)
-    with pytest.raises(NotImplementedError):
-        s.to_keplerian()
-    with pytest.raises(NotImplementedError):
-        s.to_orekit()
+# to_frame / to_keplerian / to_orekit are Orekit-crossing (Feature 1.1, build-plan
+# chunks 1–2); they start the JVM, so they are exercised under the ``orekit``
+# fixture in tests/test_conversions.py rather than in this pure-Python suite.
 
 
 # --- equality / hashing ----------------------------------------------------

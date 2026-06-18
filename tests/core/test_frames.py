@@ -6,8 +6,6 @@ before init" surface (architecture §10). ``test_no_jvm_started`` guards that.
 
 from __future__ import annotations
 
-import pytest
-
 from propygator import Frame
 
 
@@ -40,7 +38,6 @@ def test_supported_value_set():
     assert {f.value for f in Frame} == {"EME2000", "ITRF", "TEME"}
 
 
-@pytest.mark.parametrize("frame", list(Frame))
-def test_to_orekit_deferred(frame):
-    with pytest.raises(NotImplementedError):
-        frame.to_orekit()
+# Frame.to_orekit() is JVM-touching as of Feature 1.1 — its resolution is tested
+# under the orekit fixture in tests/test_conversions.py, not here (this suite must
+# stay JVM-free; see test_no_jvm_started).

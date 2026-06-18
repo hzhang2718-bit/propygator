@@ -13,9 +13,11 @@ therefore cannot even be imported until after ``initVM()``.
 
 from __future__ import annotations
 
+import importlib.metadata
 import logging
 import os
 import shutil
+from functools import cache
 from pathlib import Path
 
 from .core.exceptions import JVMAlreadyStartedError, OrekitDataMissingError
@@ -33,6 +35,26 @@ _OREKIT_DATA_URL = "https://gitlab.orekit.org/orekit/orekit-data"
 _initialized: bool = False
 _init_vmargs: str | None = None
 _data_loaded: bool = False
+
+
+@cache
+def _orekit_version() -> str:
+    """Return the installed Orekit-stack version string, or ``"unknown"``.
+
+    Resolved from the ``orekit_jpype`` distribution metadata (e.g.
+    ``"13.1.4.0"``), which is the version that pins the bundled Orekit jar — the
+    Orekit Java library itself exposes no version constant and its jar manifest
+    carries no ``Implementation-Version``, so the wrapper distribution is the
+    authoritative, reproducible source. Pure-Python (``importlib.metadata``) — no
+    JVM, memoized. Recorded as the ``orekit_version`` reproducibility key on every
+    propagation ``Trajectory`` (architecture §6, features.md §1.1); falls back to
+    ``"unknown"`` from a source tree without the distribution metadata, matching
+    the placeholder :func:`core.states._default_metadata` writes.
+    """
+    try:
+        return importlib.metadata.version("orekit_jpype")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
 
 
 def _data_missing_message(searched: list[tuple[str, Path]]) -> str:

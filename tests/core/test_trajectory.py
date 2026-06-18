@@ -247,6 +247,28 @@ def test_rejects_nonfinite_positions():
         )
 
 
+def test_rejects_non_monotonic_epochs():
+    # __post_init__ requires strictly-increasing epochs: Trajectory.at and the
+    # Ephemeris that backs it take the first/last samples as the span and assume
+    # chronological order, so out-of-order samples are rejected at construction.
+    n = 4
+    epochs = [_epoch(0), _epoch(2), _epoch(1), _epoch(3)]
+    with pytest.raises(ValueError, match="strictly increasing"):
+        Trajectory.from_arrays(
+            epochs, _positions(n), _velocities(n), Frame.EME2000, metadata=_meta()
+        )
+
+
+def test_rejects_duplicate_epochs():
+    # Duplicate timestamps are not strictly increasing (and would break Hermite).
+    n = 2
+    epochs = [_epoch(0), _epoch(0)]
+    with pytest.raises(ValueError, match="strictly increasing"):
+        Trajectory.from_arrays(
+            epochs, _positions(n), _velocities(n), Frame.EME2000, metadata=_meta()
+        )
+
+
 def test_direct_init_rejects_int_epochs_wrong_dtype():
     n = 2
     with pytest.raises(ValueError, match="int64"):
@@ -421,12 +443,6 @@ def test_equality_is_identity():
     assert traj != 42
 
 
-# --- deferred methods ------------------------------------------------------
-
-
-def test_at_and_to_frame_deferred():
-    traj = _traj()
-    with pytest.raises(NotImplementedError):
-        traj.at(_epoch(0))
-    with pytest.raises(NotImplementedError):
-        traj.to_frame(Frame.ITRF)
+# Note: Trajectory.at and Trajectory.to_frame are Orekit-crossing (they start the
+# JVM), so their tests live in tests/test_conversions.py under the `orekit` fixture
+# — they cannot run here without violating the safe-before-init invariant.

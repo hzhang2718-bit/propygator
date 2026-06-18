@@ -1,0 +1,52 @@
+# propygator.mplstyle — the shipped matplotlib styling baseline (build-plan chunk 11a).
+#
+# Applied PER FIGURE through plotting.style._mpl_style() (a context manager wrapping
+# matplotlib.style.context); never applied on import and never by mutating the global
+# rcParams. This is the locked cosmetic baseline the §11 snapshot tests record against
+# (features.md §1.1 "Styling"): white background, light-grey grid, black outlines, a
+# dark-navy default line. Hex colours are written without '#', per the style-file format.
+
+# --- figure / saving ---
+figure.facecolor:   white
+figure.dpi:         100
+savefig.dpi:        150
+savefig.bbox:       tight
+savefig.facecolor:  white
+
+# --- axes (black outlines; grid below the data) ---
+axes.facecolor:     white
+axes.edgecolor:     black
+axes.linewidth:     1.0
+axes.grid:          True
+axes.axisbelow:     True
+axes.titlesize:     12
+axes.titleweight:   bold
+axes.labelsize:     10
+axes.labelcolor:    black
+axes.prop_cycle:    cycler('color', ['1f3b73'])
+
+# --- grid (light grey) ---
+grid.color:         cccccc
+grid.linewidth:     0.6
+grid.alpha:         0.7
+
+# --- ticks ---
+xtick.color:        black
+ytick.color:        black
+xtick.labelsize:    9
+ytick.labelsize:    9
+xtick.direction:    out
+ytick.direction:    out
+
+# --- lines ---
+lines.linewidth:    1.4
+lines.solid_capstyle: round
+
+# --- legend ---
+legend.frameon:     True
+legend.framealpha:  0.9
+legend.fontsize:    9
+legend.edgecolor:   black
+
+# --- font ---
+font.size:          10

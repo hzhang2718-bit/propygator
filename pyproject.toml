@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "Henry Zhang", email = "hzhang2718@gmail.com" }]
+authors = [{ name = "Henry Zhang", email = "282068036+hzhang2718-bit@users.noreply.github.com" }]
 dependencies = [
     "numpy",
     "pandas",
@@ -59,6 +59,10 @@ addopts = ["-p", "no:faulthandler"]
 src = ["src", "tests", "scripts"]
 line-length = 88
 target-version = "py311"
+# experiments/ holds exploratory reference code kept verbatim (it mirrors an
+# external sandbox run); exclude it from lint + format. The ruff pre-commit hooks
+# pass --force-exclude, so this is honored even when those files are staged.
+extend-exclude = ["experiments"]
 
 [tool.ruff.lint]
 # ruff subsumes flake8 (E/F/W) and isort (I); ruff-format subsumes black. Kept
@@ -93,7 +97,15 @@ module = [
     "java.*",
     "pandas",
     "pandas.*",
+    "plotly",
+    "plotly.*",
     "requests",
     "requests.*",
+    # Generation-only deps for scripts/generate_sphere_cd_table.py (not in the
+    # runtime env; imported lazily there). See scripts/requirements-generate.txt.
+    "scipy",
+    "scipy.*",
+    "pymsis",
+    "pymsis.*",
 ]
 ignore_missing_imports = true

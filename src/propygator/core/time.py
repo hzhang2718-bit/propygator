@@ -189,6 +189,24 @@ def _parse_tz_offset_seconds(tz: str) -> int:
     return sign * (int(digits[:2]) * 3600 + int(digits[2:4]) * 60)
 
 
+def _abs_date(int_seconds: int, frac_seconds: float) -> "org.orekit.time.AbsoluteDate":
+    """Build an Orekit ``AbsoluteDate`` from the two-part TAI-since-J2000 count.
+
+    The single Epoch -> ``AbsoluteDate`` crossing point. Shared by
+    :meth:`Epoch.to_orekit` and the array-backed ``Trajectory`` paths that hold the
+    same two-part count directly (``_epochs_int``/``_epochs_frac``) and would
+    otherwise materialize a throwaway :class:`Epoch` per sample just to convert. The
+    caller must have started the JVM. The two ``shiftedBy`` steps preserve precision
+    — an exact integer-second shift lands on a whole TAI second (Orekit keeps the
+    long part exact), then the sub-second fraction is added.
+    """
+    from org.orekit.time import AbsoluteDate
+
+    return AbsoluteDate.J2000_EPOCH.shiftedBy(float(int_seconds)).shiftedBy(
+        float(frac_seconds)
+    )
+
+
 @dataclass(frozen=True)
 class Epoch:
     """An instant in time, stored as seconds since J2000 with a presentation scale.
@@ -346,15 +364,36 @@ class Epoch:
             """Build the Orekit ``AbsoluteDate`` for this instant.
 
             The only JVM-touching Epoch method: starts the JVM on first call via
-            ``_ensure_started()``. The two ``shiftedBy`` steps preserve precision —
-            an exact integer-second shift lands on a whole TAI second (Orekit
-            keeps the long part exact), then the sub-second fraction is added.
+            ``_ensure_started()``, then delegates to the shared :func:`_abs_date`
+            so the two-part-count -> ``AbsoluteDate`` conversion lives in one place.
             """
             from .._orekit_init import _ensure_started
 
             _ensure_started()
-            from org.orekit.time import AbsoluteDate
+            return _abs_date(self._int_seconds, self._frac_seconds)
 
-            return AbsoluteDate.J2000_EPOCH.shiftedBy(
-                float(self._int_seconds)
-            ).shiftedBy(self._frac_seconds)
+
+def _epoch_from_orekit(
+    abs_date: "org.orekit.time.AbsoluteDate", scale: TimeScale = TimeScale.UTC
+) -> "Epoch":
+    """Reconstruct an :class:`Epoch` from an Orekit ``AbsoluteDate`` — the inverse
+    of :func:`_abs_date`.
+
+    Module-internal and JVM-crossing (the caller must have started the JVM). Used
+    where Orekit hands back a date that must cross *back* into a propygator
+    ``Epoch`` — chiefly the ``CustomAttitude`` attitude provider
+    (``propagation/attitude.py``), which builds a propygator ``State`` for the
+    user's law from the Orekit state inside the integration loop.
+
+    The elapsed physical seconds since J2000 (``durationFrom(J2000_EPOCH)``) are the
+    exact inverse of the two ``shiftedBy`` steps in :func:`_abs_date`, so
+    ``_epoch_from_orekit(epoch.to_orekit())`` round-trips ``epoch`` to ~microsecond
+    precision. ``durationFrom`` returns a plain ``double``, so the two-part count's
+    sub-microsecond headroom is not preserved — irrelevant for attitude geometry.
+    ``scale`` sets presentation only (UT1 is rejected by ``Epoch.__post_init__``).
+    """
+    from org.orekit.time import AbsoluteDate
+
+    total = float(abs_date.durationFrom(AbsoluteDate.J2000_EPOCH))
+    int_s, frac = _normalize(0, total)
+    return Epoch(int_s, frac, scale)

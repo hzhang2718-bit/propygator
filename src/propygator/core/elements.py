@@ -4,8 +4,8 @@ A frozen, SI dataclass holding the six classical elements with the **true
 anomaly** as the canonical angular coordinate (architecture §6). Construction and
 field validation are pure-Python and safe before JVM init; the conversions
 (:meth:`KeplerianElements.from_state`, :meth:`to_state`) and the derived-anomaly
-methods (:meth:`mean_anomaly`, :meth:`eccentric_anomaly`) are deferred to
-Feature 1 (build-plan chunk 5 ships the validated skeleton only).
+methods (:meth:`mean_anomaly`, :meth:`eccentric_anomaly`) cross into Orekit and
+start the JVM lazily on first use (Feature 1.1, build-plan chunk 2).
 
 Conventions pinned now (architecture §6):
 
@@ -34,12 +34,6 @@ if TYPE_CHECKING:
     from .frames import Frame
     from .states import State
     from .time import Epoch
-
-
-_DEFERRED_NOTE = (
-    "{name} is deferred to Feature 1 (numerical propagator); KeplerianElements "
-    "ships as a validated skeleton in the groundwork build (build-plan chunk 5)."
-)
 
 
 @dataclass(frozen=True)
@@ -96,27 +90,107 @@ class KeplerianElements:
             if not math.isfinite(val):
                 raise ValueError(f"{name} must be finite, got {val!r}")
 
+        # Hyperbolic orbits: the true anomaly is confined to the open interval
+        # (-acos(-1/e), +acos(-1/e)) — the asymptote limit beyond which the
+        # trajectory has no real point. Outside it the ν→M / ν→E conversions return
+        # NaN, so reject it at construction rather than emitting a silent NaN later
+        # (elliptic ν is unbounded mod 2π, so this applies only to e > 1).
+        if e > 1.0:
+            nu_limit = math.acos(-1.0 / e)
+            if abs(self.true_anomaly_rad) >= nu_limit:
+                raise ValueError(
+                    f"hyperbolic (e={e!r}) true_anomaly_rad must satisfy "
+                    f"|ν| < acos(-1/e) = {nu_limit!r}, got {self.true_anomaly_rad!r}"
+                )
+
     def mean_anomaly(self) -> float:
-        """Mean anomaly M from the stored true anomaly (deferred to Feature 1)."""
-        raise NotImplementedError(
-            _DEFERRED_NOTE.format(name="KeplerianElements.mean_anomaly")
-        )
+        """Mean anomaly M derived from the stored true anomaly ν.
+
+        Crosses into Orekit (``KeplerianAnomalyUtility``) so the conversion matches
+        the rest of the library bit-for-bit; the elliptic (e < 1) and hyperbolic
+        (e > 1) branches are selected on the eccentricity (e == 1 is rejected at
+        construction). A pure angle conversion — independent of frame, epoch, and µ.
+        """
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+        from org.orekit.orbits import KeplerianAnomalyUtility
+
+        e = self.eccentricity
+        nu = self.true_anomaly_rad
+        if e < 1.0:
+            return float(KeplerianAnomalyUtility.ellipticTrueToMean(e, nu))
+        return float(KeplerianAnomalyUtility.hyperbolicTrueToMean(e, nu))
 
     def eccentric_anomaly(self) -> float:
-        """Eccentric anomaly E from the stored true anomaly (deferred to Feature 1)."""
-        raise NotImplementedError(
-            _DEFERRED_NOTE.format(name="KeplerianElements.eccentric_anomaly")
-        )
+        """Eccentric anomaly E (hyperbolic anomaly H for e > 1) from true anomaly ν.
+
+        Orekit-backed (``KeplerianAnomalyUtility``), same elliptic/hyperbolic branch
+        logic as :meth:`mean_anomaly`.
+        """
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+        from org.orekit.orbits import KeplerianAnomalyUtility
+
+        e = self.eccentricity
+        nu = self.true_anomaly_rad
+        if e < 1.0:
+            return float(KeplerianAnomalyUtility.ellipticTrueToEccentric(e, nu))
+        return float(KeplerianAnomalyUtility.hyperbolicTrueToEccentric(e, nu))
 
     @classmethod
     def from_state(cls, state: "State") -> "KeplerianElements":
-        """Osculating elements of ``state`` in its own frame (deferred to Feature 1)."""
-        raise NotImplementedError(
-            _DEFERRED_NOTE.format(name="KeplerianElements.from_state")
-        )
+        """Osculating classical elements of ``state`` in its own frame.
+
+        Thin alias for :meth:`State.to_keplerian` (architecture §6): both compute
+        the osculating elements in the state's own frame with no implicit
+        conversion, so the conversion logic lives in exactly one place.
+        """
+        return state.to_keplerian()
 
     def to_state(self, epoch: "Epoch", frame: "Frame") -> "State":
-        """Cartesian state at ``epoch`` in ``frame`` (deferred to Feature 1)."""
-        raise NotImplementedError(
-            _DEFERRED_NOTE.format(name="KeplerianElements.to_state")
+        """Cartesian :class:`State` at ``epoch`` in ``frame`` built from these elements.
+
+        Builds an Orekit ``KeplerianOrbit`` (true-anomaly convention) with Earth's
+        WGS84 µ (:func:`core.bodies._earth_mu`) and reads its position+velocity in
+        ``frame``. ``frame`` must be pseudo-inertial — a rotating frame such as
+        ``ITRF`` raises ``ValueError``, since classical elements are only well-
+        defined there. Note Orekit's constructor takes the perigee argument *before*
+        the RAAN.
+        """
+        from .._orekit_init import _ensure_started
+
+        _ensure_started()
+        from org.orekit.orbits import KeplerianOrbit, PositionAngleType
+
+        from .bodies import _earth_mu
+        from .frames import _require_pseudo_inertial
+        from .states import State, _vector3d_to_array
+
+        ok_frame = _require_pseudo_inertial(
+            frame,
+            "to_state",
+            "Build in an inertial frame (e.g. Frame.EME2000) and convert the "
+            "resulting State with to_frame if you need a rotating frame.",
+        )
+
+        orbit = KeplerianOrbit(
+            self.semi_major_axis_m,
+            self.eccentricity,
+            self.inclination_rad,
+            self.arg_perigee_rad,
+            self.raan_rad,
+            self.true_anomaly_rad,
+            PositionAngleType.TRUE,
+            ok_frame,
+            epoch.to_orekit(),
+            _earth_mu(),
+        )
+        pv = orbit.getPVCoordinates()
+        return State(
+            epoch,
+            _vector3d_to_array(pv.getPosition()),
+            _vector3d_to_array(pv.getVelocity()),
+            frame,
         )

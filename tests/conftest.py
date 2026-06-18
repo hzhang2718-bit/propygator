@@ -67,3 +67,38 @@ def orekit() -> None:
     import propygator as pgr
 
     pgr.init()
+
+
+def pytest_collection_modifyitems(items: "list[pytest.Item]") -> None:
+    """Schedule every JVM-starting test after all pure-Python tests (single-process).
+
+    Holds for any single-process run, which is every run this project performs:
+    pytest-xdist is not used (architecture §11), so collection is not split across
+    workers and this stable reorder governs the whole session.
+
+    JPype is one-JVM-per-process and ``jpype.isJVMStarted()`` is a *monotonic*
+    global flag — once any test starts the JVM it stays up for the rest of the
+    process and can never be torn down. The ``tests/core`` "safe before init"
+    guards (each module's ``test_no_jvm_started``) assert that flag is still
+    ``False``, so they hold only while *no* JVM-starting test has run yet in the
+    process. They are tripwires for "did pure-Python construction leak a JVM
+    start?", not self-contained checks of a single call.
+
+    The default filesystem collection order already runs ``tests/core`` before the
+    JVM files (``test_conversions`` / ``test_stack_compat`` sort after ``core``),
+    so a bare ``pytest`` is fine. But an explicit ``pytest <jvm-file> tests/core``
+    flips that and the guards spuriously fail — the JVM is up before they run. This
+    hook removes that footgun by stably moving every test that requests the session
+    ``orekit`` fixture (the one and only thing that starts the JVM) to the end, so
+    the pure-Python guards always run first regardless of CLI path order.
+
+    **Contributor invariant:** any new Orekit/JVM-touching test MUST acquire the
+    JVM through the ``orekit`` fixture (a direct argument or
+    ``pytest.mark.usefixtures("orekit")``). That is both how it gets a started JVM
+    and how this hook knows to schedule it last; a test that starts the JVM by some
+    other route would defeat the ordering guarantee (and the guards with it).
+    """
+    # list.sort is stable: False (0) sorts before True (1), so non-JVM tests keep
+    # their order and land first. ``fixturenames`` includes fixtures applied via
+    # ``usefixtures`` markers, so both JVM test modules are caught.
+    items.sort(key=lambda item: "orekit" in getattr(item, "fixturenames", ()))

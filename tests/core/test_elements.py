@@ -1,8 +1,9 @@
 """Pure-Python tests for ``KeplerianElements`` (build-plan chunk 5).
 
 Field validation is part of the "safe before init" surface (architecture §10) —
-these tests must not start the JVM. The conversion / anomaly methods are deferred
-to Feature 1 and assert ``NotImplementedError``.
+these tests must not start the JVM. The conversion / anomaly methods are
+Orekit-crossing (Feature 1.1, build-plan chunk 2) and are exercised under the
+``orekit`` fixture in tests/test_conversions.py.
 """
 
 from __future__ import annotations
@@ -85,6 +86,26 @@ def test_rejects_hyperbolic_positive_semi_major_axis():
         _ke(semi_major_axis_m=7.0e6, eccentricity=1.5)
 
 
+def test_rejects_hyperbolic_true_anomaly_past_asymptote():
+    # For e > 1 the true anomaly must satisfy |ν| < acos(-1/e); beyond the
+    # asymptote the orbit has no real point and ν→M/E would silently return NaN.
+    limit = math.acos(-1.0 / 1.5)  # ~2.30 rad
+    with pytest.raises(ValueError, match="acos"):
+        _ke(semi_major_axis_m=-7.0e6, eccentricity=1.5, true_anomaly_rad=limit + 0.1)
+
+
+def test_allows_hyperbolic_true_anomaly_inside_asymptote():
+    limit = math.acos(-1.0 / 1.5)
+    k = _ke(semi_major_axis_m=-7.0e6, eccentricity=1.5, true_anomaly_rad=limit - 0.1)
+    assert k.eccentricity == 1.5
+
+
+def test_allows_large_elliptic_true_anomaly():
+    # Elliptic ν is unbounded (mod 2π); the asymptote guard must not touch e < 1.
+    k = _ke(true_anomaly_rad=3.0)
+    assert k.true_anomaly_rad == 3.0
+
+
 @pytest.mark.parametrize("i", [-0.1, math.pi + 0.1, math.nan, math.inf])
 def test_rejects_bad_inclination(i):
     with pytest.raises(ValueError):
@@ -98,13 +119,6 @@ def test_rejects_nonfinite_angles(field, bad):
         _ke(**{field: bad})
 
 
-def test_deferred_methods_raise():
-    k = _ke()
-    with pytest.raises(NotImplementedError):
-        k.mean_anomaly()
-    with pytest.raises(NotImplementedError):
-        k.eccentric_anomaly()
-    with pytest.raises(NotImplementedError):
-        k.to_state(None, None)
-    with pytest.raises(NotImplementedError):
-        KeplerianElements.from_state(None)
+# mean_anomaly / eccentric_anomaly / to_state / from_state are Orekit-crossing
+# (Feature 1.1, build-plan chunk 2); they start the JVM, so they are exercised
+# under the ``orekit`` fixture in tests/test_conversions.py.

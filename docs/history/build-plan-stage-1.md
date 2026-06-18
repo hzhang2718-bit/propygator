@@ -60,7 +60,7 @@ import does **not** start the JVM.
 - `pyproject.toml` — `[build-system]` setuptools + src layout
   (`[tool.setuptools.packages.find] where = ["src"]`); `[project]` name
   `propygator`, `version = "0.1.0"` (single source of truth, SemVer 0.x),
-  `requires-python = ">=3.11"`, author Henry Zhang / hzhang2718@gmail.com,
+  `requires-python = ">=3.11"`, author Henry Zhang / 282068036+hzhang2718-bit@users.noreply.github.com,
   MIT license; `[project.dependencies]`: `numpy`, `pandas`, `matplotlib`,
   `plotly`, `requests`, `python-dotenv` (**not** orekit — conda owns it);
   `[project.optional-dependencies] dev`: `pytest`, `ruff`, `mypy`, `pre-commit`,

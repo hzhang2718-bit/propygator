@@ -1,0 +1,20 @@
+# Generation-only dependencies for scripts/generate_sphere_cd_table.py.
+#
+# These are NOT part of the propygator runtime or its conda env (that env is a
+# pinned, tested Python 3.11 / OpenJDK 17 / orekit_jpype trio). The Cd-table
+# generator is a one-time maintainer step that needs a thermosphere model
+# (NRLMSISE-00 via pymsis) plus erf/scattered-interpolation (scipy) — neither of
+# which the package ships or imports at runtime. End users never run this; they
+# load the committed data/sphere_cd_default.npz.
+#
+# Install into a throwaway environment (a venv or a clone of the conda env), e.g.:
+#   python -m venv .venv-generate
+#   .venv-generate\Scripts\Activate.ps1      # Windows PowerShell
+#   pip install -r scripts/requirements-generate.txt
+#   python scripts/generate_sphere_cd_table.py
+#
+# Versions are left unpinned; the combination verified during authoring was
+# numpy 2.4.6 / scipy 1.17.1 / pymsis 0.12.0 (see docs/experiments_venv.md).
+numpy
+scipy
+pymsis

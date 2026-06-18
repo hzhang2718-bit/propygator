@@ -27,7 +27,7 @@ htmlcov/
 
 # Environments
 .env
-.venv/
+.venv*/
 venv/
 env/
 
@@ -44,3 +44,6 @@ Thumbs.db
 # propygator-specific
 orekit-data/
 docs/_build/
+
+# Claude Code / review artifacts
+.review_diff.patch
