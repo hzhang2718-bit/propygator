@@ -13,7 +13,7 @@ never goes stale — which is exactly the design described in `docs/features.md`
 > maps *where* the collapse holds rather than only re-confirming the interior:
 > a dense sweep ~130–1400 km **keyed on geocentric radius** (the production axis),
 > a deliberate storm cohort, and the collapse RMS reported **PASS/WARN/FAIL**
-> against coded thresholds (green ≤ 5 %, red ≥ 30 %; `docs/feature-1.1-addendum-
+> against coded thresholds (green ≤ 5 %, red ≥ 30 %; `docs/history/feature-1.1-addendum-
 > drag-validity-and-altitude-guards.md` §3.1–3.6). It measures only the *high*-
 > altitude (collapse) limit; the *low*-altitude model-validity floor is found by a
 > separate Knudsen diagnostic the collapse metric is blind to (addendum §2, Chunk 2

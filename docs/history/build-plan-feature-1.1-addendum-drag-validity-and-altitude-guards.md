@@ -1,7 +1,7 @@
 # Build plan: Feature 1.1 Addendum — Drag-model validity domain & altitude guards
 
 > **Status: BUILD PLAN (started).** Derived from
-> `docs/feature-1.1-addendum-drag-validity-and-altitude-guards.md`, which is the
+> `docs/history/feature-1.1-addendum-drag-validity-and-altitude-guards.md`, which is the
 > **binding contract** for this work (the way `features.md` §1.1 was for the
 > original 1.1 build plan). Every threshold, signature, metadata key, and
 > invariant below traces to a section of that addendum — cited inline as
@@ -40,7 +40,7 @@ terminate cleanly; reasonable user limits stop & report (unreasonable ones rejec
 altitude band the experiment validated.
 
 **Source-of-truth docs (do not silently diverge):**
-- `docs/feature-1.1-addendum-drag-validity-and-altitude-guards.md` — **the
+- `docs/history/feature-1.1-addendum-drag-validity-and-altitude-guards.md` — **the
   binding contract.** §1 supersession map, §2 the collapse-vs-Kn asymmetry, §3
   the experiment, §4 derived quantities, §5 the model-equivalence invariant, §6
   the runtime guard contract (6.1 thresholds, 6.3 mechanism, 6.4 `AltitudeLimits`,

@@ -45,5 +45,8 @@ Thumbs.db
 orekit-data/
 docs/_build/
 
+# personal propagation scripts + outputs
+/run/
+
 # Claude Code / review artifacts
 .review_diff.patch
