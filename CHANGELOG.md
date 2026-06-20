@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - DATE
+
+### Added
+
+### Changed
+
+- PropagationError rewired to account for numerical integration errors and TLE propagation
+  errors separately. Separate NumericalPropagationError and TLEPropagationError now in
+  place.
+
 ## [0.2.0] - 2026-06-19
 
 ### Added

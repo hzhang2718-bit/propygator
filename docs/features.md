@@ -276,7 +276,7 @@ class IntegratorConfig:
 
 - **DOP853** (eighth-order adaptive) is the default, matching Orekit's reference examples. **DormandPrince54** is the lower-order adaptive alternative for short propagations. **ClassicalRK4** is fixed-step (requires `fixed_step_s`), mainly for exercising `keplerian` at a known step in tests.
 - Tolerances are interpreted as meters of position via Orekit's `OrbitType.CARTESIAN` tolerance computation; the propagator builds the `[abs[7], rel[7]]` array from these two scalars.
-- `min_step_s` / `max_step_s` bound the adaptive controller; the wide defaults (1 ms–1000 s) mean a healthy propagation never bumps either bound. If the adaptive step is driven below `min_step_s` (usually an ill-posed problem), Hipparchus cannot meet tolerance and **stops** rather than silently continuing at an oversized step — the propagation raises `PropagationError` (see the failure table below). (Earlier drafts described this as an end-of-run *warning*; that assumed the integrator clamps at `min_step_s` and continues, which it does not — it raises.)
+- `min_step_s` / `max_step_s` bound the adaptive controller; the wide defaults (1 ms–1000 s) mean a healthy propagation never bumps either bound. If the adaptive step is driven below `min_step_s` (usually an ill-posed problem), Hipparchus cannot meet tolerance and **stops** rather than silently continuing at an oversized step — the propagation raises `NumericalPropagationError` (see the failure table below). (Earlier drafts described this as an end-of-run *warning*; that assumed the integrator clamps at `min_step_s` and continues, which it does not — it raises.)
 - **`high_precision` caveat:** `rel_tolerance = 1e-12` is demanding; on a stiff or ill-posed case it can drive the step below `min_step_s` and raise `NumericalPropagationError`. Verify against the §11 round-trip tests at implementation; if it raises on representative LEO/GEO cases, loosen to `1e-11` rather than shipping a preset that fails.
 
 ### `propagate_numerical` behavior
@@ -595,7 +595,7 @@ def propagate_tle(
     *,
     output_step: float,           # seconds; required, keyword-only (matches 1.1 exactly)
     start: Epoch | None = None,   # None → tle.epoch
-    name: str | None = None,      # optional, recorded in metadata
+    name: str | None = None,      # optional; falls back to tle.name, recorded in metadata
 ) -> Trajectory:
 ```
 
@@ -608,6 +608,8 @@ Notice what is absent relative to `propagate_numerical`: no `force_models`, `spa
 **`output_step` required (no default).** `output_step` is required and keyword-only, **exactly as in 1.1** — there is no 60 s default. An earlier draft defaulted it for quick-look convenience; that is dropped in favour of full cross-feature consistency. The decisive reason is that a *defaulted* step turns the `output_step > duration` guard into a foot-gun: a short quick-look like `propagate_tle(tle, 30)` would raise `ValueError` for a step the user never chose. Requiring the step makes that guard unambiguous (the user always picked it) and lets 1.3 reuse 1.1's pre-flight validation **wholesale** — the positive/ordered-step checks *and* the output-sample cap (below) — rather than a bespoke relaxed copy. The cost is one extra keyword at the call site (`propagate_tle(tle, 3600, output_step=60)`); the README / §9 examples already pass it explicitly.
 
 **`start` default.** Defaults to the TLE's own epoch (`tle.epoch`), because SGP4 is most accurate at epoch and degrades away from it. The common alternative is `start=Epoch.now()` for a "where is it now and next" view; both are documented, with the accuracy caveat below.
+
+**`name` default.** When `name` is omitted it falls back to the TLE's own name (`tle.name`), so a fetched or 3-line TLE (`fetch_tle("ISS")` → `"ISS (ZARYA)"`) carries its identity into the trajectory's metadata `name` with no extra typing. An explicit `name=` always wins; a bare 2-line TLE whose `tle.name` is `None` leaves the metadata `name` unset (unchanged from supplying nothing). This reuses the existing optional `name` metadata field — no new key — so 1.1's metadata grammar and its CSV-header snapshots are untouched. (For the fallback to carry anything, the fetch path / `TLE.from_strings`' 3-line form must populate `tle.name`; see `docs/build-plan-feature-1.3-notes.md` Note 3.)
 
 ### Frame handling
 
@@ -657,13 +659,54 @@ Three independent reasons it will **not** reproduce the trajectory under SGP4 �
 
 1. **Mean vs osculating.** TLE elements are *mean* elements (Kozai-Brouwer, with periodic variations averaged out); the osculating elements computed from a state are not. The J2 short-period term alone moves the osculating semi-major axis by tens of kilometers relative to the mean value.
 2. **B\* is not recoverable from a state.** B\* is a drag *fit residual*, not a physical ballistic coefficient (architecture §1.2), so it cannot be derived from a position/velocity — only passed in or defaulted. A default `bstar=0.0` gives the rebuilt TLE *no drag*, so it diverges immediately from any decaying orbit.
-3. **The anomaly and element fields are osculating values placed in mean-element slots**, as in (1).
+3. **The anomaly and element fields are osculating values placed in mean-element slots**, as in (1). (The mean-motion field in particular is derived as `n = sqrt(µ/a³)` from the library's WGS84 GM, not SGP4's WGS72 constants — a further small offset, folded under "format-valid, not faithful.")
 
 So a TLE built this way is for format-level interop and inspection, not fidelity. For a TLE that actually round-trips, use `fit_tle` (feature 1.2), which performs the proper iterative osculating→mean fit on Orekit's TLE-generation machinery.
 
 One expected artifact: because osculating elements wobble over an orbit, emitting one TLE per row yields a *family* of slightly different TLEs for the same orbit, each epoch-stamped to its row. That is correct behavior — and is itself a visualization of the osculating-vs-mean gap — but it surprises anyone expecting identical element sets.
 
 `TLE.from_state_unfitted` lives on the `TLE` type in `core/` (architecture §6); building a TLE from a `State` (both core types) respects the dependency rule. The `unfitted` qualifier is deliberate: `fit_tle` is the faithful sibling, and the asymmetry should be visible at the call site.
+
+### Sky view (observer-centric output)
+
+> **Status: DRAFTED — pulls Feature 1.5 infrastructure forward.** A geometry-only sky-track plot plus the topocentric look-angle primitive it rides on. Both are reused verbatim by Feature 1.5, so building them here brings 1.5's foundation forward; it is *not* throwaway 1.3 work (see `docs/build-plan-feature-1.3-notes.md` Note 4).
+
+Beyond the trajectory and CSV products above, 1.3 adds one **observer-centric** output: the satellite's path across the sky as seen from a `GroundStation`, drawn on a whole-sky polar plot. This does **not** change `propagate_tle` — exactly like `plot_3d` / `export_csv`, it consumes the returned `Trajectory` (here together with a station), so the propagator signature stays frozen. It is an additive plotting verb, not a propagator knob.
+
+**The look-angle primitive.** A new core helper computes the topocentric look angles of a state from a station:
+
+```python
+@dataclass(frozen=True)
+class AzElRange:
+    azimuth_deg: float       # 0 = North, increasing clockwise toward East
+    elevation_deg: float     # 0 = horizon, +90 = zenith (negative = below horizon)
+    range_m: float           # straight-line station → satellite distance
+
+
+def look_angles(station: GroundStation, state: State) -> AzElRange: ...
+```
+
+`look_angles` is the exact analogue of `to_geodetic` (architecture §6): its result (`AzElRange`) carries **no `Frame`**, so by the explicit-frame rule (architecture §10, which governs only `State`/`Trajectory`-returning paths) it is *allowed* to convert its input internally — the caller need not pre-convert the trajectory's TEME states. Internally it builds an Orekit `TopocentricFrame` on the canonical WGS84 Earth ellipsoid (`core/bodies.py`) at the station's geodetic point and reads off azimuth / elevation / range, so it **touches the JVM** (lazy-imports jpype inside the body, like `to_geodetic`; it is *not* part of the safe-before-init surface). It lives in `core/observation.py` beside `GroundStation` / `AzElRange`, which keeps it reachable from both `plotting/` (this sky track) and `tracking/` (Feature 1.5's `find_passes`) without crossing the inward dependency rule (architecture §7). Built once here, used by both features.
+
+**The plot verb.**
+
+```python
+def plot_sky_track(
+    trajectory: Trajectory,
+    station: GroundStation,
+    *,
+    min_elevation_deg: float = 0.0,    # horizon clip; samples below are lifted from the line
+) -> "matplotlib.figure.Figure":
+```
+
+It lives in `plotting/trajectories.py` next to `plot_ground_track` — the two are siblings (the *ground track* is the nadir view, the *sky track* is the observer view; both matplotlib, both take a `Trajectory`). It maps each trajectory sample through `look_angles` and draws the result on a **matplotlib polar projection** (architecture §10: polar is the sky-chart backend). Conventions: North at the top, azimuth increasing clockwise (`set_theta_zero_location('N')`, `set_theta_direction(-1)`); the radius is the zenith angle, so the **zenith sits at the centre and the horizon is the outer rim** (elevation 90°→0° mapped to radius 0°→90°). The sky disk (the polar axes face) is a fixed **light blue**; the satellite track is a single **dark-blue** line — deliberately *not* the blue→red time gradient of the ground-track / 3-D views, because an observer reads a sky track as one continuous path (a per-arc direction glyph, in the spirit of the `v0.2.0` direction-markers addendum, is a natural later add). It returns the native matplotlib `Figure` (architecture §10), so it composes with `savefig` / the export path like the other matplotlib verbs.
+
+**Geometry only — the 1.3 ↔ 1.5 line.** `plot_sky_track` draws *only the geometry*: where the satellite is in the sky, with no notion of discrete passes, no eclipse / lit shading, and no brightness. Those belong to Feature 1.5's richer `plot_sky_chart` (`plotting/passes.py`, architecture §7), which consumes `Pass` objects (rise / culmination / set, `peak_magnitude`, `sunlit_at_culmination`) and layers them on the **same** `look_angles` primitive. Holding this line is what stops 1.3 from absorbing 1.5: 1.3 ships the reusable primitive plus a thin geometry plot; 1.5 adds passes and brightness on top.
+
+**Two build-time points** (flagged for the build plan; neither is signature-level):
+
+- **Disjoint arcs.** Over a multi-hour span the satellite rises and sets several times, so its sky track is several separate arcs. Drawn as one polyline, matplotlib would join each set to the next rise with a chord straight across the disk. The fix is to mask samples below `min_elevation_deg` to `NaN` (lifting the pen), so each visible arc draws on its own.
+- **Never-visible span.** If no sample clears `min_elevation_deg` (the satellite never rises for that station over the span), draw the empty sky disk and emit a one-time `warnings.warn` rather than returning a blank figure silently — mirroring 1.3's other warn-once idiom (the stale-TLE warning).
 
 ### Metadata
 
@@ -679,11 +722,11 @@ One expected artifact: because osculating elements wobble over an orbit, emittin
     "start": <iso utc str>,        # optional, populated
     "output_step_s": <float>,      # optional, populated
     "created_at": <iso utc str>,   # optional, populated
-    "name": <str>,                 # optional, only if name supplied
+    "name": <str>,                 # optional; the name arg, else tle.name if set
 }
 ```
 
-The source TLE lines make an SGP4 trajectory exactly reproducible. The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. `norad_id` is stored as an `int` (mirroring `TLE.norad_id`, architecture §6); the export writer stringifies it in the CSV header like every other metadata value, so storing it as a number costs nothing at the boundary. No `force_models` / `integrator` keys — they don't apply.
+The source TLE lines make an SGP4 trajectory exactly reproducible. `propagator` is always `"sgp4"` — that single token also covers the auto-selected deep-space (SDP4) branch (`selectExtrapolator` switches internally past the ~225-min period cutoff), and because the TLE lines are recorded the branch is reproducible with no separate token, so no `"sdp4"` value is introduced (it stays the architecture §6 `"numerical" | "sgp4"` set). The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. `norad_id` is stored as an `int` (mirroring `TLE.norad_id`, architecture §6); the export writer stringifies it in the CSV header like every other metadata value, so storing it as a number costs nothing at the boundary. No `force_models` / `integrator` keys — they don't apply.
 
 ### CSV export edits still needed (temporary note)
 
@@ -704,7 +747,7 @@ SGP4 is accurate to roughly 1 km near the TLE epoch, degrading to many kilometer
 
 Per architecture §11:
 
-- **SGP4 implementation-agreement.** Verify `propagate_tle` output against **published Vallado SGP4 test vectors** (the canonical *Revisiting Spacetrack Report #3* / AIAA 2006-6753 cases) to centimetre agreement at sampled times. This is *implementation-agreement* with the reference SGP4, **not** absolute accuracy against truth (which degrades with time from epoch; see the accuracy caveat above).
+- **SGP4 implementation-agreement.** Verify `propagate_tle` output against **published Vallado SGP4 test vectors** (the canonical *Revisiting Spacetrack Report #3* / AIAA 2006-6753 cases) to centimetre agreement at sampled times, **compared in the native TEME frame** — comparing after a TEME→EME2000 conversion injects EOP-dependent differences that would blow the centimetre budget, so the test reads the raw SGP4 output frame. Cover **both branches**: at least one near-Earth (SGP4, period < 225 min) *and* one deep-space (SDP4) vector from the same suite (e.g. a Molniya-type case such as 08195 / 04632 — verify the catalog number against the published case list), so `selectExtrapolator`'s automatic branch pick is exercised. This is *implementation-agreement* with the reference SGP4/SDP4, **not** absolute accuracy against truth (which degrades with time from epoch; see the accuracy caveat above).
 - **ISS end-to-end.** Exercise a fixed ISS TLE through `propagate_tle` → `plot_summary` / `export_all`, confirming the 1.1 output stack consumes a TEME-framed trajectory unchanged.
 - **Sample-count contract.** Assert `propagate_tle` honours the §1.1 sample-count formula exactly (`floor(duration/output_step + tol) + 1`, first sample at `start`), so the two propagators produce identically-gridded trajectories — this is the test that would catch the dependency-rule duplication/promotion decision drifting (see `docs/build-plan-feature-1.3-notes.md`).
 - **CSV snapshot.** Once the `mean_anomaly` token lands, add a CSV snapshot for a fixed ISS TLE + `columns=["keplerian", "mean_anomaly"]`, pinning the EME2000 element frame and the `keplerian, mean_anomaly, sun` column order.
@@ -714,7 +757,8 @@ Per architecture §11:
 - **Signature** — `duration` required, **positional-or-keyword** (aligned with 1.1); `output_step` required and keyword-only, **no default** (the former 60 s default is dropped for full 1.1 consistency and to keep the `output_step > duration` guard unambiguous); `start` defaults to `tle.epoch`. No force/spacecraft/attitude/integrator inputs.
 - **Output frame** — native TEME from the propagator; EME2000 as the default display inertial frame (TEME selectable **in the plot verbs**, not in `export_csv`); ITRF for ground-relative views. Opt-in Keplerian / `mean_anomaly` CSV columns are always computed in EME2000 (architecture §6), since only i/Ω/ω are frame-sensitive.
 - **Outputs** — 1.1's `plot_summary` / `plot_3d` / `plot_speed` / `export_all` reused unchanged; **Keplerian elements stay opt-in** (1.1's convention), with mean anomaly **M** as a new separate `mean_anomaly` token (not yet built — see the temporary CSV note).
-- **Terminal behavior** — no altitude-guard family and no `limits=` (SGP4 has none of numerical integration's failure modes; escape is structurally moot for a bound TLE); argument errors raise `ValueError`, and SGP4/SDP4 decay / internal failures are caught and re-raised as `PropagationError` (no stop-and-report, no `termination_*` metadata). Pre-flight reuses 1.1's input validation, including the shared output-sample cap (`_MAX_OUTPUT_SAMPLES`); a far-from-epoch span emits a warn-once stale-TLE warning, never an error.
+- **Sky view** — a new observer-centric output: `plot_sky_track(trajectory, station, *, min_elevation_deg=0.0)` (matplotlib polar, **geometry-only**) built on the reusable `look_angles(station, state) -> AzElRange` topocentric primitive in `core/observation.py`. Both are shared verbatim with Feature 1.5 (`find_passes` / `plot_sky_chart`), so this pulls 1.5's look-angle foundation forward; passes / lighting / brightness stay in 1.5. `propagate_tle`'s signature is unchanged — the sky view is an additive plotting verb (architecture §6/§7; build-plan notes Note 4).
+- **Terminal behavior** — no altitude-guard family and no `limits=` (SGP4 has none of numerical integration's failure modes; escape is structurally moot for a bound TLE); argument errors raise `ValueError`, and SGP4/SDP4 decay / internal failures are caught and re-raised as `TLEPropagationError` (no stop-and-report, no `termination_*` metadata). Pre-flight reuses 1.1's input validation, including the shared output-sample cap (`_MAX_OUTPUT_SAMPLES`); a far-from-epoch span emits a warn-once stale-TLE warning, never an error.
 - **Row → TLE** — `TLE.from_state_unfitted`, a format-valid (not round-trip-faithful) utility using TEME osculating elements and ν→M; `norad_id` / `bstar` are optional with placeholder defaults (a `State` carries neither); faithful TLEs are 1.2's `fit_tle`.
 - **Metadata** — `propagator: "sgp4"` plus source-TLE keys (`norad_id` typed `int`); requires the §6 `TrajectoryMetadata` additions.
 

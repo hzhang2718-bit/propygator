@@ -589,6 +589,25 @@ class GeodeticPosition:
 
 `to_geodetic` lives in `core/frames.py` (not in `tracking/`) because it's a pure coordinate transformation operating on `State` + `Frame` — both `core/` types — and because the `tracking/` → `core/` dependency direction (§7) means anything `tracking/` might want to reuse must be reachable from `core/`. The function requires an Earth-fixed input frame; passing a `State` in J2000/TEME raises `ValueError` rather than silently auto-converting (consistent with the explicit-frame-conversion rule, §10).
 
+### `AzElRange` and `look_angles`
+
+The topocentric look angles of a satellite from a ground station — the observer-centric counterpart to `to_geodetic`. `look_angles(station, state)` returns the azimuth, elevation, and slant range of `state` as seen from `station`:
+
+```python
+@dataclass(frozen=True)
+class AzElRange:
+    azimuth_deg: float       # 0 = North, increasing clockwise toward East
+    elevation_deg: float     # 0 = horizon, +90 = zenith (negative = below horizon)
+    range_m: float           # straight-line station → satellite distance
+
+
+def look_angles(station: GroundStation, state: State) -> AzElRange: ...
+```
+
+`look_angles` and `AzElRange` live in `core/observation.py` (with `GroundStation`), co-located so the observe-primitive and its output type sit beside the observer type they key on. Like `to_geodetic` the *function* is placed in `core/` so both `tracking/` (Feature 1.5's `find_passes`) and `plotting/` (Feature 1.3's `plot_sky_track`) can reach it without inverting the inward dependency rule (§7); building it on the canonical WGS84 Earth ellipsoid (`core/bodies.py`), it internally constructs an Orekit `TopocentricFrame` at the station's geodetic point, so it **touches the JVM** and lazy-imports jpype inside the function body. `core/observation.py` therefore stays JVM-free on *import* — the value types (`GroundStation`, `GeodeticPosition`, `Pass`, `AzElRange`) remain safe-before-init — while this one *call* does not. Its result carries no `Frame`, so unlike `to_geodetic` it need not demand a particular input frame: per the explicit-frame rule (§10, which governs only frame-carrying `State`/`Trajectory` returns) it may convert its input internally.
+
+Introduced for Feature 1.3's sky view (features §1.3) but shared verbatim with Feature 1.5's pass finder, so building it in 1.3 brings 1.5's topocentric foundation forward.
+
 ### `Pass`
 
 Output of pass prediction.
@@ -612,11 +631,11 @@ class Pass:
 src/propygator/
 ├── __init__.py
 │       Exposes most-used names: State, Trajectory, TLE, Epoch, Frame,
-|       TimeScale, KeplerianElements, GroundStation, Pass, GeodeticPosition,
+|       TimeScale, KeplerianElements, GroundStation, Pass, GeodeticPosition, AzElRange,
 |       ForceModelConfig, SpacecraftConfig, SpacecraftGeometry, VariableCd,
 |       IntegratorConfig, AltitudeLimits, the attitude family, propagate_numerical,
 |       propagate_tle, fit_tle, fetch_tle, current_position, current_ground_position,
-|       find_passes, the plot_*/export* functions, init, clear_cache,
+|       find_passes, look_angles, the plot_*/export* functions, init, clear_cache,
 |       and the exception types.
 │       Also exposes init() for explicit JVM configuration.
 │       Attaches logging.NullHandler() to the "propygator" logger so the
@@ -639,7 +658,9 @@ src/propygator/
 │   ├── states.py        The State class, conversions to/from Orekit types
 │   ├── elements.py      KeplerianElements, conversions to/from State
 │   ├── bodies.py        Earth model (canonical instance), Sun, Moon
-│   ├── observation.py   GroundStation, Pass, GeodeticPosition.
+│   ├── observation.py   GroundStation, Pass, GeodeticPosition, AzElRange,
+│   │                    look_angles(station, state) -> AzElRange (topocentric
+│   │                    az/el/range; JVM-touching, shared with find_passes).
 │   │                    In core/ so io/ can import them without violating
 │   │                    the "io depends only on core" rule (§7 dep rule).
 │   └── catalogs.py      Popular satellite registry (friendly name → NORAD ID)
@@ -660,18 +681,20 @@ src/propygator/
 │   └── integrators.py   IntegratorConfig (tolerances, min/max step)
 │
 ├── tle/
-│   ├── propagator.py    propagate_tle(tle, duration, *, output_step=60.0,
+│   ├── propagator.py    propagate_tle(tle, duration, *, output_step,
 │   │                    start=None, name=None)
 │   │                    duration required, positional-or-keyword (aligned
-│   │                    with 1.1, features §1.3); output_step kw-only,
-│   │                    defaults to 60 s; start defaults to tle.epoch.
+│   │                    with 1.1, features §1.3); output_step required and kw-only,
+│   │                    with no default (dropped for 1.1 consistency, features §1.3); start
+│   │                    defaults to tle.epoch.
 │   │                    Default output frame: TEME.
 │   ├── fitter.py        fit_tle(reference, fitting_span, ...)
 │   │                    Accepts State (then propagates internally) or
 │   │                    Trajectory (used directly). See §8.
 │   ├── sources.py       fetch_tle, fetch_celestrak, fetch_spacetrack
 │   │                    Caches to ~/.propygator/cache/
-|   |                    fetch_tle(name_or_id, source='auto)
+|   |                    fetch_tle(name_or_id, source='celestrak')
+|   |                    (v1: CelesTrak only; 'auto'/Space-Track deferred)
 │   │                    Two TTLs: 6h (realtime workflows), 24h (general).
 │   └── parsing.py       Validation, checksum, formatting
 │
@@ -690,10 +713,14 @@ src/propygator/
 │                        Pulls the standard-magnitude table from core/catalogs.py.
 │
 ├── plotting/
-│   ├── trajectories.py  plot_3d (Plotly), plot_ground_track (matplotlib)
+│   ├── trajectories.py  plot_3d (Plotly), plot_ground_track (matplotlib),
+│   │                    plot_sky_track (matplotlib polar; takes a GroundStation,
+│   │                    geometry-only observer view — features §1.3)
 │   ├── timeseries.py    plot_altitude, plot_elements, plot_velocity
 │   │                    (matplotlib — 2D timeseries)
-│   └── passes.py        plot_sky_chart (matplotlib polar),
+│   └── passes.py        plot_sky_chart (matplotlib polar; Feature 1.5,
+│                        shares core look_angles with plot_sky_track, adds
+│                        passes + brightness),
 │                        plot_pass_timeline (matplotlib)
 │
 └── io/

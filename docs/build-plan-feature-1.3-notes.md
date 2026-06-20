@@ -31,10 +31,16 @@ building a TLE from a `State` keeps the dependency rule clean):
 - `.epoch -> Epoch`, `.norad_id -> int`, `.to_orekit()` (lazy, `TYPE_CHECKING`-
   annotated, same pattern as `Epoch.to_orekit`).
 
-`from_strings` / `from_state_unfitted` are safe-before-init (parse/validate only);
-`to_orekit()` and `from_norad_id` cross the JVM / network. Add `TLE` to the
+**Only `from_strings` is safe-before-init** (pure-Python parse + checksum, no JVM).
+`from_state_unfitted` is **not**: its settled mechanics (Note 2) call
+`state.to_frame(Frame.TEME).to_keplerian()`, and both `State.to_frame` and
+`State.to_keplerian` run `_ensure_started()` (`core/states.py:162,196`), so building
+a TLE from a state **starts the JVM** — it groups with `to_orekit()` and
+`from_norad_id` (JVM / network), not with `from_strings`. Add `TLE` to the
 top-level re-exports and to the "safe before init" surface list (architecture §10)
-for the construction/parse paths.
+for `from_strings` and bare construction only — **not** `from_state_unfitted`
+(which starts the JVM), so the `tests/core/*` "no JVM started" suite must not
+exercise it.
 
 ## Note 2 — `from_state_unfitted` needs more field decisions than §1.3 lists
 
@@ -55,7 +61,11 @@ Mechanics already settled by §1.3: compute osculating elements **in TEME**
 (`KeplerianElements.mean_anomaly()`), derive the mean-motion field from `a`
 (`n = sqrt(µ/a³)` — the *osculating* mean motion, part of the documented
 non-faithfulness), then format + checksum. Pin a single source of µ (reuse the
-Earth GM the rest of the library already uses). The checksum/format logic has no
+Earth GM the rest of the library already uses) — note that is the library's WGS84 GM, while
+SGP4/TLE mean motion is a WGS72/Kozai quantity, so the derived mean-motion field
+carries a small constants mismatch *on top of* the mean-vs-osculating gap; fold this
+into the docstring's documented non-faithfulness rather than reconciling it (it is a
+format-valid, not faithful, utility). The checksum/format logic has no
 sub-design in §1.3 — it lives in `tle/parsing.py` and needs its own build step (or
 lean on Orekit's `TLE` formatting + checksum).
 
@@ -70,22 +80,90 @@ stage the fetch infrastructure separately (it is shared with feature 1.4). Flag 
 dependency so the "usable from the README" milestone is not assumed to fall out of
 `propagate_tle` alone.
 
+**Source scope — DECIDED: CelesTrak only for v1.** Both `fetch_tle` and `from_norad_id`
+default `source="celestrak"` (architecture §6/§7 reconciled — §7's stale
+`source="auto"` literal is dropped). `"auto"` multi-source resolution and
+`fetch_spacetrack` (with the `SPACETRACK_*` credentials, architecture §3/§10) are
+**deferred** until a second source is actually wired; with a single source an `"auto"`
+default would only mislead. The `source` parameter stays in both signatures
+(forward-compatible) but `"celestrak"` is its only valid value for v1 — the broader
+Space-Track design in architecture §3/§7/§8/§10 remains as deferred future capability,
+not deleted. For the name-fallback (features §1.3) to carry anything, `fetch_tle` and
+`TLE.from_strings`' 3-line form must populate `tle.name` from CelesTrak's line-0 / the
+catalog friendly name.
+
+## Note 4 — The sky view pulls Feature 1.5's topocentric math forward
+
+§1.3's sky-view output (`plot_sky_track` + the `look_angles` primitive, features §1.3
+"Sky view") introduces the **first topocentric look-angle computation in the
+codebase**. That math is otherwise Feature 1.5's: `find_passes` "is allowed to
+internally convert to topocentric" (architecture §10) and the planned
+`plot_sky_chart` (`plotting/passes.py`) is a 1.5 deliverable. Building it in 1.3 is
+**pulling 1.5's foundation forward, deliberately** — not duplicating it. Build-plan
+consequences:
+
+- **`look_angles(station, state) -> AzElRange` is the shared primitive**, built once
+  in `core/observation.py` (with the `AzElRange` value type) and reused *verbatim* by
+  1.5's `find_passes`. Stage it as its own build step, ahead of the plot verb.
+- **It is JVM-touching, NOT safe-before-init.** It builds an Orekit `TopocentricFrame`
+  on the `core/bodies.py` Earth ellipsoid, so it lazy-imports jpype inside the body
+  (same pattern as `to_geodetic`) and joins the "starts the JVM" group. `core/
+  observation.py`'s module docstring currently states construction "never touches the
+  JVM" — that stays true for the **value types** (`GroundStation` / `GeodeticPosition`
+  / `Pass` / `AzElRange`), but the docstring must be updated to carve out
+  `look_angles`, and the `tests/core/*` "no JVM started" suite must **not** call it
+  (acquire the JVM via the `orekit` fixture instead, per the one-JVM-per-process
+  ordering rule).
+- **`AzElRange` value type is safe-before-init** (pure-Python frozen dataclass, like
+  its siblings) — only the `look_angles` *call* starts the JVM. Add `AzElRange` to the
+  top-level re-exports.
+- **Scope discipline = geometry only.** `plot_sky_track` draws the raw az/el path and
+  nothing else; passes (rise/set/culmination), eclipse/lit shading, and magnitude stay
+  in 1.5's `plot_sky_chart`. This is the line that keeps 1.3 from absorbing 1.5.
+- **Disjoint-arc rendering.** Mask samples below `min_elevation_deg` to `NaN` so the
+  polyline lifts between successive passes instead of drawing chords across the sky
+  disk; if *no* sample clears the horizon, draw the empty disk + warn-once (features
+  §1.3 "Sky view").
+- **`plot_sky_track` is an additive plotting verb** in `plotting/trajectories.py`
+  (beside `plot_ground_track`) — `propagate_tle`'s signature is untouched; the sky view
+  consumes the returned `Trajectory` + a `GroundStation`, like every other output.
+
 ## Also fold in
 
 - **Sample-count reuse — DECIDED (#7).** `propagate_tle` lives in
   `tle/propagator.py`, which may import only from `core/` (§7 dependency rule), so
-  it **cannot** import `_sample_count` from `propagation/numerical.py`. **Promote**
-  `_sample_count`, the epoch-grid generation, **and the `_MAX_OUTPUT_SAMPLES` cap +
-  its guard** (`numerical.py:120,271`) down into `core/`, so both propagators share
-  one contract-bearing helper *and* one memory cap (the cap is propagator-agnostic —
-  each sample is a p/v row + a propagate call either way). `_realized_sample_count`
+  it **cannot** import `_sample_count` from `propagation/numerical.py`. **Promote
+  into a new `core/sampling.py`**: `_sample_count`, the epoch-grid generation, the
+  `_MAX_OUTPUT_SAMPLES` cap + its guard (`numerical.py:120,271`), **and the
+  propagator-agnostic pre-flight checks** — `duration > 0`, `output_step > 0`,
+  `output_step <= duration`. Those three currently live inside the *monolithic*
+  `_validate_inputs` (`numerical.py:205`) intermixed with numerical-only checks
+  (inertial frame, integrator type, gravity/atmosphere names), so "reuse 1.1's
+  validation wholesale" is **not** literally possible — the shared subset must be
+  extracted, leaving the numerical-specific checks behind in `numerical.py`. Both
+  propagators then share one contract-bearing helper *and* one memory cap (the cap is propagator-agnostic —
+  each sample is a p/v row + a propagate call either way; generalize the cap's error
+  message, which currently reasons about "an ephemeris query," since 1.3 evaluates the
+  analytic propagator per grid epoch with no `EphemerisGenerator`). `_realized_sample_count`
   is *not* needed by 1.3 (no stop-and-report). Refactor `numerical.py` to import the
   promoted helpers instead of defining them locally.
 - **Stale-TLE warn-once — DECIDED (#7).** Add a 1.3-specific warn-once (not an
   error) when the worst-case age over the span,
   `max(|start − tle.epoch|, |(start + duration) − tle.epoch|)`, exceeds 30 days.
   Pure-`Epoch` arithmetic, in the propygator-side pre-flight. (features §1.3
-  "Failure modes and terminal behavior".)
+  "Failure modes and terminal behavior".) **Prerequisite — the difference helper does
+  not exist yet.** `Epoch.shifted_by` is pure-Python (`time.py:312`) so
+  `start + duration` is fine, and `Epoch.now` / `to_iso` exist, but there is **no
+  `Epoch − Epoch` difference** (seconds between two epochs) — add one as its own build
+  step (trivial from the two-part TAI count). The "pure-`Epoch` arithmetic" claim, and
+  the both-ends age computation, depend on it.
+- **Metadata timestamps must be forced to UTC — build reminder.** `Epoch.to_iso()`
+  renders the wall-clock *in the epoch's own scale with no zone suffix* (`time.py:325`),
+  so the `tle_epoch` / `start` / `created_at` keys (documented "iso utc str") must be
+  serialized via `epoch.in_scale(TimeScale.UTC).to_iso()` (a pure relabel of the same
+  instant, `time.py:302`). `start` defaults to `tle.epoch` and the trajectory inherits
+  its scale, so this is not hypothetical — reuse 1.1's existing UTC-ISO serialization
+  path and never hand `to_iso()` a TT/TAI epoch for a metadata value.
 - **`output_step` default — DECIDED (#8).** Drop the 60 s default: `output_step` is
   **required + keyword-only**, matching 1.1 exactly. This makes the
   `output_step > duration` guard unambiguous and lets 1.3 reuse 1.1's pre-flight
