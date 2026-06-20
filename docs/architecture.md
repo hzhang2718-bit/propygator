@@ -345,10 +345,16 @@ The classical-element representation returned by `State.to_keplerian()` and acce
 - **Units:** SI throughout (semi-major axis in meters, angles in radians, time-derivatives where applicable in SI). Conversion to degrees happens at the user-facing boundary, not in the dataclass.
 - Frame. Classical elements are frame-dependent (i and Ω are measured against
   the frame's equator/reference direction). to_keplerian() computes in the
-  State's own frame; no implicit conversion. CSV element columns are computed
-  in the trajectory's frame, named in the column headers. For 1.3 this is the
-  EME2000 display frame unless TEME is requested — distinct from TLE.from_state,
-  which uses TEME by design (features §1.3).
+  State's own frame; no implicit conversion. CSV element columns, however, are
+  always computed in EME2000: export_csv converts the trajectory to EME2000 for
+  every column (matching the default x/y/z_eme2000 columns) regardless of the
+  input trajectory's frame, and has no per-frame element switch. So a 1.3 TEME
+  trajectory's opt-in Keplerian columns are reported in EME2000, not TEME. Note
+  a, e, ν (and the mean-anomaly token M) are rotation-invariant between inertial
+  frames, so only i, Ω, ω would ever differ by frame — the EME2000-vs-TEME
+  distinction is confined to those three angles. This is distinct from
+  TLE.from_state_unfitted, which uses TEME osculating elements by design
+  (features §1.3).
 - Singularities. ω and ν are individually ill-conditioned as e→0 (only their
   sum, the argument of latitude, is well-defined); Ω is ill-conditioned as
   i→0. Orekit returns finite values but they go erratic for the near-circular
@@ -511,7 +517,7 @@ class TrajectoryMetadata(TypedDict, total=False):
     name: str
     tle_line1: str
     tle_line2: str
-    norad_id: str
+    norad_id: int                          # catalog number; mirrors TLE.norad_id (int)
     tle_epoch: str                         # ISO 8601 UTC
     start: str                             # ISO 8601 UTC
     # Termination reporting (drag-validity & altitude-guards addendum §6.6) —
@@ -542,8 +548,8 @@ class TLE:
     @classmethod
     def from_norad_id(cls, norad_id: int, source: str = "celestrak") -> "TLE": ...
     @classmethod
-    def from_state(cls, state: State, *, norad_id: int | None = None,
-                   bstar: float | None = None, name: str | None = None) -> "TLE": ...
+    def from_state_unfitted(cls, state: State, *, norad_id: int | None = None,
+                            bstar: float | None = None, name: str | None = None) -> "TLE": ...
 
     @property
     def epoch(self) -> Epoch: ...
@@ -556,7 +562,7 @@ class TLE:
         def to_orekit(self): ...
 ```
 
-`from_state` builds a *format-valid* TLE from a state's osculating elements (converted to TEME internally, with true anomaly mapped to mean anomaly); `norad_id` and `bstar` default to placeholders (`00000` / `0.0`) when not supplied. It is not round-trip-faithful — osculating elements placed in mean-element fields do not reproduce the state under SGP4. For a faithful fit use `fit_tle` (§8 / feature 1.2). See `features.md` §1.3 for the full rationale.
+`from_state_unfitted` builds a *format-valid* TLE from a state's osculating elements (converted to TEME internally, with true anomaly mapped to mean anomaly); `norad_id` and `bstar` are optional and default to placeholders (`00000` / `0.0`) when not supplied — a bare `State` carries neither, so there is nothing to recover from it. It is not round-trip-faithful: osculating elements placed in mean-element fields do not reproduce the state under SGP4, and a placeholder `bstar=0.0` strips drag entirely. The `unfitted` in the name flags this; for a faithful fit use `fit_tle` (§8 / feature 1.2). See `features.md` §1.3 for the full rationale.
 
 ### `GroundStation`
 
@@ -654,10 +660,11 @@ src/propygator/
 │   └── integrators.py   IntegratorConfig (tolerances, min/max step)
 │
 ├── tle/
-│   ├── propagator.py    propagate_tle(tle, *, duration, output_step=60.0,
+│   ├── propagator.py    propagate_tle(tle, duration, *, output_step=60.0,
 │   │                    start=None, name=None)
-│   │                    duration required (kw-only); output_step defaults
-│   │                    to 60 s; start defaults to tle.epoch.
+│   │                    duration required, positional-or-keyword (aligned
+│   │                    with 1.1, features §1.3); output_step kw-only,
+│   │                    defaults to 60 s; start defaults to tle.epoch.
 │   │                    Default output frame: TEME.
 │   ├── fitter.py        fit_tle(reference, fitting_span, ...)
 │   │                    Accepts State (then propagates internally) or
@@ -1048,6 +1055,6 @@ A preliminary build of **1.1 Numerical propagator** is complete.
 - **`FitResult` return type for `fit_tle`** — backward-compatible to add later (introduce `fit_tle_detailed()` or extend the return). v1 returns a bare `TLE`.
 - **Coefficient of drag modeling.** The numerical integrator interpolates a variable Cd from a table keyed on geocentric radius and total density. v1 ships this for the sphere (VariableCd) and a box density-varying scalar Cd (Tier A): Orekit's box computes projected area from attitude, the table supplies the scalar Cd. An attitude/incidence-keyed box table (Tier B, IncidenceVariableCd, generated offline by a panel method or DSMC) is the documented faithful extension. Full per-facet free-molecular Sentman remains deferred for plumbing reasons (Orekit's DragSensitive is passed only total density). The table is keyed on geocentric radius, not geodetic altitude, to avoid a per-substep frame transform; the geodetic reconciliation is done once during offline table generation. As built (Feature 1.1 + the Chunk-9 addendum), **every** drag path — sphere or box, fixed Cd or VariableCd — routes through a single custom `DragSensitive` proxy so the §6.2 free-molecular-floor warn-once hook is shared; consequently it exposes no drag `ParameterDriver`. That is invisible to forward/backward-in-time propagation and to TLE fitting (which reads only the propagated *states* and estimates the TLE's own elements + B*), and would matter only for numerical orbit determination — estimating the propagator's own Cd — which is out of scope for v1. The per-substep proxy cost for the fixed-Cd path (which Orekit could otherwise drive natively) is marginal next to the default NRLMSISE-00 density query; uniformity was judged worth it for v1 (features.md §1.1). **Validity domain (drag-validity & altitude-guards addendum).** The table is empirically valid only within an altitude band: a body-size-dependent free-molecular **Knudsen floor** (`Kn = λ/L = 10`; ~110 km for a CubeSat rising to ~220 km for a station) below which the Sentman/DRIA closed form over-predicts, up to a Cd-table ceiling (~1400 km, where drag is negligible so the high limit is non-binding). The runtime computes the floor once at setup from a conservative high-activity composition captured offline and embedded in `propagation/guards.py` (Orekit exposes only total density, and pymsis is not a runtime dependency). The shipped table is generated by a Cd model **proven equal** to the validity experiment's over the same axis/conditions/band — the §5 model-equivalence invariant (cross-validated to 0.0191 %) — so it claims only the band that was validated. See features.md §1.1 and the addendum §5/§6.
 - **`NadirPointing` ECEF-relative velocity yaw (`velocity_reference="ecef"`) — RESOLVED (ECEF-nadir & direction-markers addendum).** Both `velocity_reference` options are now wired. `inertial` (ECI velocity) uses Orekit's `PredefinedTarget.VELOCITY`; `ecef` — yaw-steering to the Earth-relative (ground) velocity, which differs from inertial by the Earth-rotation term ω⊕×r (up to a few degrees of yaw in LEO) — is lowered via a custom `@JImplements TargetProvider` (`attitude._build_ecef_velocity_target_provider`) swapped into the same `AlignedAndConstrained` secondary slot (primary −Z→NADIR unchanged). The provider returns the normalized `v_rel = v_inertial − ω⊕×r` direction, derived from the inertial↔ITRF `Transform` at the sample date (exact, not a hardcoded ω). The former validated-skeleton `NotImplementedError` is removed; the config still constructs, validates, and serializes the unchanged `nadir_pointing:vel=ecef` token — no signature or metadata change. Full contract: the addendum §2. (The `IncidenceVariableCd` Tier-B path remains a validated skeleton — see the drag note above.)
-- **Escape / re-entry guards — RESOLVED (drag-validity & altitude-guards addendum).** `propagate_numerical` now carries a geocentric-radius guard family, closing the old "no purpose-built guard" gap. **Terminal backstops (always on):** impact at `r < R⊕` and **escape** at the lunar-gravity-parity radius (~327,000 km, perigee parity — a fixed hard-coded policy fence, replacing the previously-planned ~1,000,000 km SOI ceiling). A drag-driven decay is **caught and classified**: a genuine re-entry (drag on, descending, osculating perigee below the ~150 km drag-table floor) stops & reports (`termination_reason="reentry"`), while a non-re-entry min-step failure still raises `PropagationError` (replacing the previously-planned ~120 km hardcoded floor). Optional user `AltitudeLimits` (`limits=`) nest inside the backstops and may only tighten termination; an unreasonable limit raises `ValueError` at construction. Every runtime termination stops and reports a partial `Trajectory` with `terminated`/`termination_reason`/`termination_epoch` metadata (written only when terminated). The eccentricity gates are **retained** — a hyperbolic `State` already propagated; only the escape backstop is added. propygator *guards* these boundaries but does not *model* atmospheric entry or deep-space/cislunar regimes (the escape backstop is the clean boundary marker for the latter). Full contract: features.md §1.1 + the addendum §6.
+- **Escape / re-entry guards — RESOLVED (drag-validity & altitude-guards addendum).** `propagate_numerical` now carries a geocentric-radius guard family, closing the old "no purpose-built guard" gap. **Terminal backstops (always on):** impact at `r < R⊕` and **escape** at the lunar-gravity-parity radius (~327,000 km, perigee parity — a fixed hard-coded policy fence, replacing the previously-planned ~1,000,000 km SOI ceiling). A drag-driven decay is **caught and classified**: a genuine re-entry (drag on, descending, osculating perigee below the ~150 km drag-table floor) stops & reports (`termination_reason="reentry"`), while a non-re-entry min-step failure still raises `NumericalPropagationError` — a subclass of the base `PropagationError` (1.3's SGP4 failures raise the sibling `TLEPropagationError`; catch the base for any propagator) — replacing the previously-planned ~120 km hardcoded floor. Optional user `AltitudeLimits` (`limits=`) nest inside the backstops and may only tighten termination; an unreasonable limit raises `ValueError` at construction. Every runtime termination stops and reports a partial `Trajectory` with `terminated`/`termination_reason`/`termination_epoch` metadata (written only when terminated). The eccentricity gates are **retained** — a hyperbolic `State` already propagated; only the escape backstop is added. propygator *guards* these boundaries but does not *model* atmospheric entry or deep-space/cislunar regimes (the escape backstop is the clean boundary marker for the latter). Full contract: features.md §1.1 + the addendum §6.
 
 None of these block starting the build.

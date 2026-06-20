@@ -83,8 +83,9 @@ class IntegratorConfig:
         """Precision work / reference trajectories: DOP853, abs 1e-5 m, rel 1e-12.
 
         The tight ``rel_tolerance`` is demanding: on a stiff/ill-posed case it can
-        drive the adaptive step below ``min_step_s``, which raises ``PropagationError``
-        (Hipparchus stops rather than continuing at an oversized step). Flagged for
-        verification against the round-trip tests (features.md §1.1).
+        drive the adaptive step below ``min_step_s``, which raises
+        ``NumericalPropagationError`` (Hipparchus stops rather than continuing at an
+        oversized step). Flagged for verification against the round-trip tests
+        (features.md §1.1).
         """
         return cls(type="DOP853", abs_tolerance_m=1e-5, rel_tolerance=1e-12)

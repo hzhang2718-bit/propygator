@@ -25,6 +25,7 @@ from propygator import (
     Epoch,
     Frame,
     KeplerianElements,
+    NumericalPropagationError,
     Orientation,
     PropagationError,
     State,
@@ -374,6 +375,8 @@ def test_min_step_saturation_raises_propagation_error():
     )
     with pytest.raises(PropagationError) as exc_info:
         propagate_numerical(_leo_state(), 600.0, output_step=60.0, integrator=stiff)
+    # propagate_numerical raises the numerical subclass (still a PropagationError).
+    assert isinstance(exc_info.value, NumericalPropagationError)
     msg = str(exc_info.value)
     assert msg.strip()  # carries the underlying Orekit message
     # No raw Java trace leaks to the caller.

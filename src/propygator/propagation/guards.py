@@ -300,9 +300,10 @@ def _is_reentry_failure(
     the floor — is a genuine numeric/config failure, and the caller re-raises.
 
     **Invariant: prefer a false re-raise over a false ``reentry``.** A missed re-entry
-    surfaces as a loud, fixable ``PropagationError``; a false ``reentry`` would return a
-    silently-truncated wrong trajectory. So every condition must hold to claim re-entry;
-    when in doubt the caller re-raises. Pure-Python (no JVM), so unit-testable.
+    surfaces as a loud, fixable ``NumericalPropagationError``; a false ``reentry``
+    would return a silently-truncated wrong trajectory. So every condition must hold to
+    claim re-entry; when in doubt the caller re-raises. Pure-Python (no JVM), so
+    unit-testable.
     """
     return (
         drag_enabled and radial_velocity_m_s < 0.0 and perigee_radius_m < floor_radius_m

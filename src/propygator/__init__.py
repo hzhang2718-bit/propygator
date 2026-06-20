@@ -21,9 +21,11 @@ from ._orekit_init import clear_cache, init
 from .core.elements import KeplerianElements
 from .core.exceptions import (
     JVMAlreadyStartedError,
+    NumericalPropagationError,
     OrekitDataMissingError,
     PropagationError,
     PropygatorError,
+    TLEPropagationError,
 )
 from .core.frames import Frame
 from .core.observation import GeodeticPosition, GroundStation, Pass
@@ -71,6 +73,8 @@ __all__ = [
     "OrekitDataMissingError",
     "JVMAlreadyStartedError",
     "PropagationError",
+    "NumericalPropagationError",
+    "TLEPropagationError",
     "Epoch",
     "TimeScale",
     "Frame",

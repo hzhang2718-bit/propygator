@@ -277,7 +277,7 @@ class IntegratorConfig:
 - **DOP853** (eighth-order adaptive) is the default, matching Orekit's reference examples. **DormandPrince54** is the lower-order adaptive alternative for short propagations. **ClassicalRK4** is fixed-step (requires `fixed_step_s`), mainly for exercising `keplerian` at a known step in tests.
 - Tolerances are interpreted as meters of position via Orekit's `OrbitType.CARTESIAN` tolerance computation; the propagator builds the `[abs[7], rel[7]]` array from these two scalars.
 - `min_step_s` / `max_step_s` bound the adaptive controller; the wide defaults (1 ms–1000 s) mean a healthy propagation never bumps either bound. If the adaptive step is driven below `min_step_s` (usually an ill-posed problem), Hipparchus cannot meet tolerance and **stops** rather than silently continuing at an oversized step — the propagation raises `PropagationError` (see the failure table below). (Earlier drafts described this as an end-of-run *warning*; that assumed the integrator clamps at `min_step_s` and continues, which it does not — it raises.)
-- **`high_precision` caveat:** `rel_tolerance = 1e-12` is demanding; on a stiff or ill-posed case it can drive the step below `min_step_s` and raise `PropagationError`. Verify against the §11 round-trip tests at implementation; if it raises on representative LEO/GEO cases, loosen to `1e-11` rather than shipping a preset that fails.
+- **`high_precision` caveat:** `rel_tolerance = 1e-12` is demanding; on a stiff or ill-posed case it can drive the step below `min_step_s` and raise `NumericalPropagationError`. Verify against the §11 round-trip tests at implementation; if it raises on representative LEO/GEO cases, loosen to `1e-11` rather than shipping a preset that fails.
 
 ### `propagate_numerical` behavior
 
@@ -361,17 +361,17 @@ The optional physics keys are emitted only when they actually shaped the traject
 | `attitude.law` not callable (`CustomAttitude`) | `ValueError` |
 | `AltitudeLimits(...)` unreasonable — `min_altitude_km < 0`, `max_altitude_km` above the escape-parity altitude (≈ 320,621 km), or `min >= max` — raised at **construction**, not at a crossing | `ValueError` |
 | `box_and_panels` `IncidenceVariableCd` under drag — Tier B deferred (architecture §13) | `NotImplementedError` |
-| `NadirPointing(velocity_reference='ecef')` on an orbit whose ground-relative velocity is ~0 (e.g. geostationary / instantaneously ground-stationary) — the yaw target `v_rel = v − ω⊕×r` is undefined, so its direction can't be formed | `PropagationError` (carrying the underlying message; LEO yaw-steering is the validated domain — ECEF-nadir addendum §2) |
+| `NadirPointing(velocity_reference='ecef')` on an orbit whose ground-relative velocity is ~0 (e.g. geostationary / instantaneously ground-stationary) — the yaw target `v_rel = v − ω⊕×r` is undefined, so its direction can't be formed | `NumericalPropagationError` (carrying the underlying message; LEO yaw-steering is the validated domain — ECEF-nadir addendum §2) |
 | Integrator fails (usually `min_step_s` saturation) **and** the failure is a drag-driven re-entry (drag on, descending, osculating perigee already below the ~150 km drag-table floor) | *stop & report* — partial `Trajectory`, `termination_reason="reentry"` (**not** an error; addendum §6.6) |
-| Integrator fails for any **other** reason (over-tight tolerance, bad setup, non-low-altitude stiffness) | `PropagationError` (may carry a recovered `err.partial_trajectory`, or `None`) |
-| Unrecognized underlying Orekit failure | `PropagationError` wrapping the original |
+| Integrator fails for any **other** reason (over-tight tolerance, bad setup, non-low-altitude stiffness) | `NumericalPropagationError` (may carry a recovered `err.partial_trajectory`, or `None`) |
+| Unrecognized underlying Orekit failure | `NumericalPropagationError` wrapping the original |
 
-`PropagationError` lives in `propygator.exceptions` and carries the Java exception's message as a string — no raw Java stack trace surfaces (same principle as `OrekitDataMissingError`, architecture §3). String-valued config fields are validated at the top of `propagate_numerical`, before integration. A drag-driven decay is **caught and classified** rather than always re-raised (addendum §6.6): a genuine re-entry stops and reports a partial `Trajectory` (`termination_reason="reentry"`), while any non-re-entry failure re-raises `PropagationError` — carrying a recoverable partial trajectory as `err.partial_trajectory` when usable steps were generated, else `None`. The invariant is **prefer a false re-raise over a false `reentry`**: when in doubt, raise.
+`propagate_numerical` raises **`NumericalPropagationError`** — a subclass of the base `PropagationError` (both in `propygator.exceptions`; catch the base to catch any propagator's failure, including 1.3's `TLEPropagationError`) — carrying the Java exception's message as a string, no raw Java stack trace (same principle as `OrekitDataMissingError`, architecture §3). String-valued config fields are validated at the top of `propagate_numerical`, before integration. A drag-driven decay is **caught and classified** rather than always re-raised (addendum §6.6): a genuine re-entry stops and reports a partial `Trajectory` (`termination_reason="reentry"`), while any non-re-entry failure re-raises `NumericalPropagationError` — carrying a recoverable partial trajectory as `err.partial_trajectory` when usable steps were generated, else `None`. The invariant is **prefer a false re-raise over a false `reentry`**: when in doubt, raise.
 
 **Escape and re-entry (drag-validity & altitude-guards addendum).** The propagator carries a geocentric-radius guard family that bounds both ends of the validity domain. All guards operate on `r = |position|` in the EME2000 propagation frame (one `sqrt`, no per-substep geodetic conversion).
 
 - **Terminal backstops (always on).** Two custom radius event detectors stop the run cleanly and **report**: **impact** at `r < R⊕` (WGS84 equatorial, 6,378,137 m) and **escape** at `r > r_lunar_parity` (≈ 327,000 km — the Earth-Moon gravity-parity radius at lunar perigee; a fixed hard-coded policy fence, not Orekit-derived). The escape backstop makes an already-supported unbound (hyperbolic) `State` *safe*: runaway integration terminates instead of running to absurd distances. The parabolic `e == 1` rejection in `KeplerianElements` stays (a representability limit, orthogonal to these guards).
-- **Re-entry (reactive).** A decaying orbit with drag on stiffens until the integrator saturates `min_step_s` (or the atmosphere model rejects the sub-surface query) and fails. That failure is **caught and classified**: drag on + descending + osculating perigee already below the ~150 km drag-table floor → a physical re-entry that **stops & reports** (`termination_reason="reentry"`, partial `Trajectory`); anything else re-raises `PropagationError` (invariant: prefer a false re-raise over a false `reentry`). See the Failure modes table.
+- **Re-entry (reactive).** A decaying orbit with drag on stiffens until the integrator saturates `min_step_s` (or the atmosphere model rejects the sub-surface query) and fails. That failure is **caught and classified**: drag on + descending + osculating perigee already below the ~150 km drag-table floor → a physical re-entry that **stops & reports** (`termination_reason="reentry"`, partial `Trajectory`); anything else re-raises `NumericalPropagationError` (invariant: prefer a false re-raise over a false `reentry`). See the Failure modes table.
 - **Drag-regime warnings (run continues).** Two-tier, edge-aware, warn-once — the free-molecular Knudsen floor and the table edges; see "Drag-coefficient modeling".
 - **User limits (optional).** An `AltitudeLimits` passed as `limits=` adds terminal altitude bounds that **nest inside** the system backstops (they can only *tighten* termination). A reasonable crossing stops & reports (`termination_reason="user_min"`/`"user_max"`); an unreasonable limit (outside the backstops) is rejected at `AltitudeLimits` construction with `ValueError` (it could never bind — the system backstop fires first).
 - **Reporting contract.** Every runtime termination — impact, escape, re-entry, reasonable user-limit — *stops and reports*: it returns the partial `Trajectory` (samples up to the crossing) with `terminated` / `termination_reason` / `termination_epoch` metadata, written only when terminated. The sole `raise` on the guard path is the construction-time `ValueError` for an unreasonable `AltitudeLimits`.
@@ -591,9 +591,9 @@ SGP4/SDP4 propagation of a TLE, producing the same `Trajectory` output and the s
 ```python
 def propagate_tle(
     tle: TLE,
+    duration: float,              # seconds; positional-or-keyword, aligned with 1.1
     *,
-    duration: float,              # seconds; required, keyword-only
-    output_step: float = 60.0,    # seconds; optional, unlike 1.1's required step
+    output_step: float,           # seconds; required, keyword-only (matches 1.1 exactly)
     start: Epoch | None = None,   # None → tle.epoch
     name: str | None = None,      # optional, recorded in metadata
 ) -> Trajectory:
@@ -603,41 +603,67 @@ The TLE comes from `TLE.from_strings(...)`, `TLE.from_norad_id(...)`, or `fetch_
 
 Notice what is absent relative to `propagate_numerical`: no `force_models`, `spacecraft`, `attitude`, or `integrator`. SGP4 is self-contained — its drag rides in the TLE's B\* term and the theory is fixed — which is what makes 1.3 the simple feature.
 
-**`output_step` default.** Unlike 1.1, where `output_step` is required (keyword-only) to prevent argument-order mistakes, 1.3 defaults it to 60 s. This is a deliberate, documented divergence: SGP4 is a quick-look tool with no force model to reason about, so the convenience outweighs the cross-feature inconsistency. It stays keyword-only.
+**`duration` calling convention.** `duration` sits before the `*`, so — exactly like 1.1's `propagate_numerical(initial, duration, *, ...)` — it is positional-or-keyword: `propagate_tle(tle, 86400)` and `propagate_tle(tle, duration=86400)` both work. An earlier draft made it keyword-only; that is dropped, so the two propagators share one calling convention for `duration`. With `output_step` now *also* required and keyword-only (below), the calling conventions are identical — the only signature differences are 1.3's **absent** `force_models` / `spacecraft` / `attitude` / `integrator` inputs and its added `start`.
+
+**`output_step` required (no default).** `output_step` is required and keyword-only, **exactly as in 1.1** — there is no 60 s default. An earlier draft defaulted it for quick-look convenience; that is dropped in favour of full cross-feature consistency. The decisive reason is that a *defaulted* step turns the `output_step > duration` guard into a foot-gun: a short quick-look like `propagate_tle(tle, 30)` would raise `ValueError` for a step the user never chose. Requiring the step makes that guard unambiguous (the user always picked it) and lets 1.3 reuse 1.1's pre-flight validation **wholesale** — the positive/ordered-step checks *and* the output-sample cap (below) — rather than a bespoke relaxed copy. The cost is one extra keyword at the call site (`propagate_tle(tle, 3600, output_step=60)`); the README / §9 examples already pass it explicitly.
 
 **`start` default.** Defaults to the TLE's own epoch (`tle.epoch`), because SGP4 is most accurate at epoch and degrades away from it. The common alternative is `start=Epoch.now()` for a "where is it now and next" view; both are documented, with the accuracy caveat below.
 
 ### Frame handling
 
-SGP4 outputs natively in **TEME**, so `propagate_tle` returns a `Trajectory` in `Frame.TEME` — no silent conversion, consistent with the explicit-frame rule (architecture §10). Users wanting another frame call `.to_frame(...)` on the result.
+SGP4 outputs natively in **TEME**, so `propagate_tle` returns a `Trajectory` in `Frame.TEME` — no silent conversion, consistent with the explicit-frame rule (architecture §10). Users wanting another frame call `.to_frame(...)` on the result. The returned `Trajectory`'s `epoch_scale` follows 1.1's convention: it inherits the scale of `start` (which defaults to `tle.epoch`), with no forced re-scaling — just as 1.1 inherits `initial.epoch`'s scale.
 
-For the *display* outputs, the inertial views default to **EME2000** — the same inertial frame 1.1 uses — so a ground track or 3D plot from a TLE is directly comparable to one from the numerical propagator, which is a common reason to run 1.3. The TEME→EME2000 conversion is cheap and needs only EOP, which the ITRF (ground-relative) outputs already require, so it adds no dependency; and it is visually inconsequential, because TEME and EME2000 differ by a slow frame rotation, so inertial *speed* is identical between them far below mm/s — only the axis label changes. TEME remains selectable for anyone who wants the raw SGP4 frame.
+For the *display* outputs, the inertial views default to **EME2000** — the same inertial frame 1.1 uses — so a ground track or 3D plot from a TLE is directly comparable to one from the numerical propagator, which is a common reason to run 1.3. The TEME→EME2000 conversion is cheap and needs only EOP, which the ITRF (ground-relative) outputs already require, so it adds no dependency; and it is visually inconsequential, because TEME and EME2000 differ by a slow frame rotation, so inertial *speed* is identical between them far below mm/s — only the axis label changes. TEME remains selectable **in the plot verbs** (`plot_3d(frame=Frame.TEME)`, `plot_speed(frames=...)`) for anyone who wants the raw SGP4 frame; `export_csv` has no frame switch — it always writes the EME2000 + ITRF columns (architecture §6), so a TEME view of the tabular data means converting the trajectory yourself or reading the EME2000 columns.
+
+### Failure modes and terminal behavior
+
+Unlike `propagate_numerical`, 1.3 carries **no altitude-guard family** and no `limits=` parameter — and that is deliberate, not an omission. 1.1's impact/escape radius detectors and min-step re-entry catch exist to tame *numerical integration* (adaptive-step stiffness, runaway integration of unbound states, sub-surface atmosphere queries); SGP4/SDP4 is a closed-form analytic evaluation with none of those failure modes. The escape backstop is also structurally moot: a TLE encodes a bound orbit (mean motion > 0 ⟹ finite `a`), so SGP4 cannot represent a hyperbolic escape. The contract is therefore to **let Orekit's `TLEPropagator` enforce its own validity envelope, and translate — never second-guess — its outcome.** Two error classes:
+
+| Condition | Exception |
+|---|---|
+| `duration <= 0` / `output_step <= 0` / `output_step > duration` | `ValueError` (propygator-side, before any Orekit call) |
+| output sample count `floor(duration/output_step + tol) + 1` over the shared cap (`_MAX_OUTPUT_SAMPLES` = 10,000,000; a tiny `output_step` over a long `duration`) | `ValueError` (propygator-side; reuses 1.1's cap via the promoted `core` helper — see `docs/build-plan-feature-1.3-notes.md` #7) |
+| Malformed TLE (bad checksum / field) | `ValueError` at `TLE.from_strings` construction (architecture §10), so `propagate_tle` receives a valid TLE |
+| SGP4/SDP4 internal failure during the span — orbit has **decayed**, sub-surface semi-major axis, eccentricity out of range | caught `OrekitException`, re-raised as `TLEPropagationError` (carrying the Orekit message string, no Java trace, per architecture §3) |
+| Unrecognized underlying Orekit failure | `TLEPropagationError` wrapping the original |
+
+**No stop-and-report on decay.** 1.1 catches a drag-driven re-entry and returns a *partial* `Trajectory` with `termination_*` metadata; 1.3 deliberately does **not**. The reason is fidelity-honesty, not effort: SGP4 is least reliable precisely as it approaches decay, so handing back a partial trajectory would imply accuracy that isn't there. A decay therefore raises **`TLEPropagationError`** cleanly — a subclass of the base `PropagationError` (so `except PropagationError` catches it and 1.1's `NumericalPropagationError` alike), but **without** a `partial_trajectory` attribute at all (1.1's `NumericalPropagationError` carries one; SGP4 never does). Consequently the `terminated` / `termination_reason` / `termination_epoch` `TrajectoryMetadata` keys (added by the drag-validity & altitude-guards addendum) are **never written by 1.3** — a completed SGP4 run's metadata is exactly the block in "Metadata" below, and a failed one raises rather than returning a partial. A user who needs a hard altitude cutoff on an SGP4 trajectory post-filters the returned `Trajectory` themselves.
+
+**Stale-TLE warning (warn-once, not an error).** SGP4 accuracy degrades with time from the TLE epoch, so when a propagation *reaches* far from epoch the run emits a one-time `warnings.warn` — it does **not** raise. SGP4 can evaluate at any time; it is merely inaccurate there, and blocking long spans would break legitimate qualitative / decay-visualisation and teaching uses. The trigger is the worst-case age over the whole span, `max(|start − tle.epoch|, |(start + duration) − tle.epoch|)` (both ends, because `start` may legally precede `tle.epoch`), exceeding a fixed **30-day** threshold. It is pure-`Epoch` arithmetic (no JVM), lives in the same propygator-side pre-flight as the `ValueError` checks, and is **1.3-specific** — 1.1 has no epoch-staleness analogue. It operationalises the accuracy caveat at the point the user sees it, mirroring 1.1's warn-once idiom (drag-regime / attitude-geometry warnings).
 
 ### Outputs
 
 The visual and CSV products are 1.1's, reused unchanged: the stacked `plot_summary` (ground track on top, altitude, then one speed panel per requested frame), `plot_3d` (inertial and/or ITRF, with the black-coastline map overlay on the ITRF view), `plot_speed`, and `export_all` (summary + 3D + CSV). Ground track and 3D are colored by time (blue→red); time-series are dark blue. The only 1.3-specific output choices:
 
-**Keplerian elements on by default in the CSV.** Because SGP4 is element-based, the six classical elements (a, e, i, Ω, ω, ν) — opt-in for 1.1 — are included by default in the 1.3 CSV. They are **osculating** elements computed from each row's state. Mean anomaly M is available alongside the true anomaly ν for the row→TLE path below.
+**Keplerian elements stay opt-in (1.1's convention).** An earlier draft turned the six classical elements (a, e, i, Ω, ω, ν) on by default for 1.3 because SGP4 is element-based. That is dropped: 1.3 respects 1.1's opt-in `columns=["keplerian"]` convention, so `export_csv(traj, path)` yields the identical 16 default columns for both propagators and `io/` needs no propagator-type branch. A 1.3 user who wants elements passes the token explicitly; they are **osculating** elements computed from each row's state **in EME2000** — `export_csv` converts to EME2000 for every column regardless of the trajectory's frame (architecture §6), so the elements are reported there, not in TEME. (Only i, Ω, ω are frame-sensitive; a, e, ν — and the `mean_anomaly` token below — are rotation-invariant between inertial frames, so the choice is immaterial for them.)
 
-**Row → TLE (`TLE.from_state`).** Any row's state can be turned into a syntactically valid TLE:
+**Mean anomaly M — a new opt-in token.** For the row→TLE path below it is convenient to have mean anomaly M alongside the true anomaly ν. M is exposed as its own additive CSV token (`columns=["mean_anomaly"]`), kept **separate** from the `keplerian` token so that token's pinned six-column set — and 1.1's CSV snapshot tests — stay byte-stable. M is cheap and already computed: `KeplerianElements.mean_anomaly()` exists (architecture §6) and the forward Kepler chain ν→E→M is closed-form (no iteration). **This token is not yet built — see "CSV export edits still needed" below.**
+
+**Row → TLE (`TLE.from_state_unfitted`).** Any row's state can be turned into a syntactically valid TLE:
 
 ```python
-TLE.from_state(
+TLE.from_state_unfitted(
     state: State,
     *,
-    norad_id: int | None = None,    # None → carried from source TLE, else placeholder
-    bstar: float | None = None,     # None → carried from source TLE, else 0.0
-    ...
+    norad_id: int | None = None,    # None → placeholder 00000
+    bstar: float | None = None,     # None → 0.0 (no drag info — see reason 2)
+    name: str | None = None,
 ) -> TLE
 ```
 
-This is a **format-valid, not round-trip-faithful** utility, by explicit design ("accuracy aside"). The mechanics: it computes the state's osculating elements **in TEME** (a TLE lives in TEME; building from EME2000 elements would stack a frame error on top of the mean/osculating error), converts true anomaly ν → mean anomaly M for the TLE's anomaly field, derives the mean-motion field from the semi-major axis, and carries B\* and the NORAD id from the source TLE (or 0 / placeholders for a hand-built state). It produces correct field formatting and checksums.
+This is a **format-valid, not round-trip-faithful** utility, by explicit design ("accuracy aside") — the `unfitted` in the name carries the warning. The mechanics: it computes the state's osculating elements **in TEME** (a TLE lives in TEME; building from EME2000 elements would stack a frame error on top of the mean/osculating error), converts true anomaly ν → mean anomaly M for the TLE's anomaly field, derives the mean-motion field from the semi-major axis, and formats the NORAD id and B\* the caller supplied — or placeholders (`00000` / `0.0`) when omitted. A bare `State` carries **neither** a catalog number nor a drag term, so there is nothing to "carry from a source TLE": those two fields are passed explicitly or defaulted. It produces correct field formatting and checksums.
 
-The critical caveat, stated loudly in the docstring: **TLE elements are *mean* elements (Kozai-Brouwer, with periodic variations averaged out); the osculating elements computed from a state are not.** The J2 short-period term alone moves the osculating semi-major axis by tens of kilometers relative to the mean value. So a TLE built this way will **not** reproduce the trajectory when re-propagated with SGP4 — it is for format-level interop and inspection, not fidelity. For a TLE that actually round-trips, use `fit_tle` (feature 1.2), which performs the proper iterative osculating→mean fit on Orekit's TLE-generation machinery.
+Three independent reasons it will **not** reproduce the trajectory under SGP4 — all stated loudly in the docstring:
+
+1. **Mean vs osculating.** TLE elements are *mean* elements (Kozai-Brouwer, with periodic variations averaged out); the osculating elements computed from a state are not. The J2 short-period term alone moves the osculating semi-major axis by tens of kilometers relative to the mean value.
+2. **B\* is not recoverable from a state.** B\* is a drag *fit residual*, not a physical ballistic coefficient (architecture §1.2), so it cannot be derived from a position/velocity — only passed in or defaulted. A default `bstar=0.0` gives the rebuilt TLE *no drag*, so it diverges immediately from any decaying orbit.
+3. **The anomaly and element fields are osculating values placed in mean-element slots**, as in (1).
+
+So a TLE built this way is for format-level interop and inspection, not fidelity. For a TLE that actually round-trips, use `fit_tle` (feature 1.2), which performs the proper iterative osculating→mean fit on Orekit's TLE-generation machinery.
 
 One expected artifact: because osculating elements wobble over an orbit, emitting one TLE per row yields a *family* of slightly different TLEs for the same orbit, each epoch-stamped to its row. That is correct behavior — and is itself a visualization of the osculating-vs-mean gap — but it surprises anyone expecting identical element sets.
 
-`TLE.from_state` lives on the `TLE` type in `core/` (architecture §6); building a TLE from a `State` (both core types) respects the dependency rule.
+`TLE.from_state_unfitted` lives on the `TLE` type in `core/` (architecture §6); building a TLE from a `State` (both core types) respects the dependency rule. The `unfitted` qualifier is deliberate: `fit_tle` is the faithful sibling, and the asymmetry should be visible at the call site.
 
 ### Metadata
 
@@ -657,23 +683,45 @@ One expected artifact: because osculating elements wobble over an orbit, emittin
 }
 ```
 
-The source TLE lines make an SGP4 trajectory exactly reproducible. The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. No `force_models` / `integrator` keys — they don't apply.
+The source TLE lines make an SGP4 trajectory exactly reproducible. The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. `norad_id` is stored as an `int` (mirroring `TLE.norad_id`, architecture §6); the export writer stringifies it in the CSV header like every other metadata value, so storing it as a number costs nothing at the boundary. No `force_models` / `integrator` keys — they don't apply.
+
+### CSV export edits still needed (temporary note)
+
+> **TEMPORARY — delete once built.** When `export_csv` and its additive token set were designed for 1.1 (features §1.1, "CSV columns"), a mean-anomaly column was not anticipated; the tokens that shipped are `keplerian` and `sun` only. Adding the **`mean_anomaly`** token for 1.3 is therefore a small but real change to `io/exports.py`, not a free reuse — the one place 1.3's "outputs reused unchanged" claim is not literally true. The work:
+>
+> - Register `"mean_anomaly"` as a new additive group token alongside `keplerian` / `sun` — a single column (`mean_anomaly_deg`), computed per row via `KeplerianElements.mean_anomaly()` (frame-invariant: it depends only on e and ν, so the export's fixed EME2000 element frame is immaterial here).
+> - Insert `"mean_anomaly"` into `_GROUP_ORDER` between `keplerian` and `sun` (canonical appended order `keplerian, mean_anomaly, sun`) so the opt-in column block stays deterministic and 1.1's CSV snapshots are unaffected when the token is unused.
+> - Keep it **separate** from the `keplerian` token so that token's pinned six-column set — and 1.1's CSV snapshot tests — stay byte-stable.
+> - No change to the 16-column default (`columns=None`) and no propagator-type branch: the token is opt-in for both 1.1 and 1.3.
+>
+> When the token lands, fold this note's content into the "CSV columns" spec (features §1.1) and delete this section.
 
 ### Accuracy caveat (docstring)
 
 SGP4 is accurate to roughly 1 km near the TLE epoch, degrading to many kilometers over days to weeks as drag and unmodeled perturbations dominate. It is not portable to a numerical propagator — B\* is a fit residual, not a physical ballistic coefficient (architecture §1.2). Propagating far from epoch, or from `Epoch.now()` against an old TLE, degrades accuracy accordingly.
 
+### Testing / reference cases
+
+Per architecture §11:
+
+- **SGP4 implementation-agreement.** Verify `propagate_tle` output against **published Vallado SGP4 test vectors** (the canonical *Revisiting Spacetrack Report #3* / AIAA 2006-6753 cases) to centimetre agreement at sampled times. This is *implementation-agreement* with the reference SGP4, **not** absolute accuracy against truth (which degrades with time from epoch; see the accuracy caveat above).
+- **ISS end-to-end.** Exercise a fixed ISS TLE through `propagate_tle` → `plot_summary` / `export_all`, confirming the 1.1 output stack consumes a TEME-framed trajectory unchanged.
+- **Sample-count contract.** Assert `propagate_tle` honours the §1.1 sample-count formula exactly (`floor(duration/output_step + tol) + 1`, first sample at `start`), so the two propagators produce identically-gridded trajectories — this is the test that would catch the dependency-rule duplication/promotion decision drifting (see `docs/build-plan-feature-1.3-notes.md`).
+- **CSV snapshot.** Once the `mean_anomaly` token lands, add a CSV snapshot for a fixed ISS TLE + `columns=["keplerian", "mean_anomaly"]`, pinning the EME2000 element frame and the `keplerian, mean_anomaly, sun` column order.
+
 ### Resolved decisions for 1.3
 
-- **Signature** — `duration` required keyword-only; `output_step` defaults to 60 s (deliberate divergence from 1.1); `start` defaults to `tle.epoch`. No force/spacecraft/attitude/integrator inputs.
-- **Output frame** — native TEME from the propagator; EME2000 as the default display inertial frame (TEME selectable); ITRF for ground-relative views.
-- **Outputs** — 1.1's `plot_summary` / `plot_3d` / `plot_speed` / `export_all` reused unchanged; Keplerian (osculating) elements on by default in the CSV.
-- **Row → TLE** — `TLE.from_state`, a format-valid (not round-trip-faithful) utility using TEME osculating elements and ν→M; faithful TLEs are 1.2's `fit_tle`.
-- **Metadata** — `propagator: "sgp4"` plus source-TLE keys; requires the §6 `TrajectoryMetadata` additions.
+- **Signature** — `duration` required, **positional-or-keyword** (aligned with 1.1); `output_step` required and keyword-only, **no default** (the former 60 s default is dropped for full 1.1 consistency and to keep the `output_step > duration` guard unambiguous); `start` defaults to `tle.epoch`. No force/spacecraft/attitude/integrator inputs.
+- **Output frame** — native TEME from the propagator; EME2000 as the default display inertial frame (TEME selectable **in the plot verbs**, not in `export_csv`); ITRF for ground-relative views. Opt-in Keplerian / `mean_anomaly` CSV columns are always computed in EME2000 (architecture §6), since only i/Ω/ω are frame-sensitive.
+- **Outputs** — 1.1's `plot_summary` / `plot_3d` / `plot_speed` / `export_all` reused unchanged; **Keplerian elements stay opt-in** (1.1's convention), with mean anomaly **M** as a new separate `mean_anomaly` token (not yet built — see the temporary CSV note).
+- **Terminal behavior** — no altitude-guard family and no `limits=` (SGP4 has none of numerical integration's failure modes; escape is structurally moot for a bound TLE); argument errors raise `ValueError`, and SGP4/SDP4 decay / internal failures are caught and re-raised as `PropagationError` (no stop-and-report, no `termination_*` metadata). Pre-flight reuses 1.1's input validation, including the shared output-sample cap (`_MAX_OUTPUT_SAMPLES`); a far-from-epoch span emits a warn-once stale-TLE warning, never an error.
+- **Row → TLE** — `TLE.from_state_unfitted`, a format-valid (not round-trip-faithful) utility using TEME osculating elements and ν→M; `norad_id` / `bstar` are optional with placeholder defaults (a `State` carries neither); faithful TLEs are 1.2's `fit_tle`.
+- **Metadata** — `propagator: "sgp4"` plus source-TLE keys (`norad_id` typed `int`); requires the §6 `TrajectoryMetadata` additions.
 
 ### Still open / deferred for 1.3
 
-- Period-relative default `output_step` (a fixed number of points per revolution) instead of a flat 60 s — would suit GEO better; deferred as a refinement.
+- A *convenience default* for `output_step` — dropped from v1: `output_step` is now required, matching 1.1. If a default is ever reintroduced, a period-relative one (a fixed number of points per revolution) would suit GEO better than a flat number; deferred as a refinement.
+- Tuning the 30-day stale-TLE warning threshold (or making it configurable) — fixed at 30 days for v1; deferred.
 - Backward propagation before the TLE epoch (SGP4 supports it natively) — deferred; no v1 feature needs it.
 
 ## 1.4 Real-time tracker

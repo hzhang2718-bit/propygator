@@ -18,6 +18,7 @@ from propygator import (
     AltitudeLimits,
     Epoch,
     Frame,
+    NumericalPropagationError,
     PropagationError,
     State,
     TimeScale,
@@ -354,6 +355,7 @@ def test_overtight_tolerance_failure_still_raises():
         )
     # No raw Java trace leaks (architecture §3).
     assert "org.orekit" not in str(excinfo.value)
+    assert isinstance(excinfo.value, NumericalPropagationError)
     # A recoverable partial is attached, and it is a plain (non-terminated) Trajectory.
     partial = excinfo.value.partial_trajectory
     assert isinstance(partial, Trajectory)

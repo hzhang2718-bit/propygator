@@ -5,7 +5,7 @@ gravity force, the full perturbation set (Sun/Moon third body, drag with a fixed
 :class:`VariableCd` coefficient, conical-shadow SRP, solid/ocean tides, relativity)
 acting on either the **sphere** or the **box** (``BoxAndSolarArraySpacecraft``)
 geometry, the full seven-mode attitude family, output-step ephemeris sampling, the
-``Trajectory`` + metadata assembly, input validation, and ``PropagationError``.
+``Trajectory`` + metadata assembly, input validation, and ``NumericalPropagationError``.
 
 **Geometry + attitude (chunk 9).** A ``box_and_panels`` geometry builds one
 ``BoxAndSolarArraySpacecraft`` driving both drag and SRP; a box :class:`VariableCd`
@@ -890,10 +890,10 @@ def propagate_numerical(
     ``gravity_field``, or ``atmosphere_model``, ``ClassicalRK4`` without
     ``fixed_step_s``); ``NotImplementedError`` for a box ``IncidenceVariableCd`` under
     drag (Tier B deferred); and
-    :class:`~propygator.core.exceptions.PropagationError` if the integrator fails and
-    the failure is **not** a drag-driven re-entry (a too-tight tolerance, a bad setup,
-    or any non-low-altitude stiffness) — carrying the Orekit message only (no Java
-    trace). Any recoverable partial trajectory is attached as
+    :class:`~propygator.core.exceptions.NumericalPropagationError` if the integrator
+    fails and the failure is **not** a drag-driven re-entry (a too-tight tolerance, a
+    bad setup, or any non-low-altitude stiffness) — carrying the Orekit message only
+    (no Java trace). Any recoverable partial trajectory is attached as
     ``err.partial_trajectory`` (``None`` when no usable steps were generated).
 
     Spacecraft-model limitations (v1):
@@ -948,7 +948,7 @@ def propagate_numerical(
     from org.orekit.propagation import SpacecraftState
     from org.orekit.propagation.numerical import NumericalPropagator
 
-    from ..core.exceptions import PropagationError
+    from ..core.exceptions import NumericalPropagationError
     from ..core.time import _epoch_from_orekit
     from .guards import (
         _altitude_km_to_radius_m,
@@ -1044,7 +1044,7 @@ def propagate_numerical(
         ephemeris = _recover_ephemeris(generator)
         if ephemeris is None:
             # No usable steps recovered (edge a): fail loudly with no partial attached.
-            raise PropagationError(
+            raise NumericalPropagationError(
                 f"numerical propagation failed: {failure_msg}"
             ) from None
     else:
@@ -1148,7 +1148,7 @@ def propagate_numerical(
     if reraise:
         # Fail loudly, but carry the samples computed before the failure for advanced
         # recovery (addendum §6.6) — a non-terminated partial (no termination keys).
-        err = PropagationError(f"numerical propagation failed: {failure_msg}")
+        err = NumericalPropagationError(f"numerical propagation failed: {failure_msg}")
         err.partial_trajectory = traj
         raise err from None
     logger.info(

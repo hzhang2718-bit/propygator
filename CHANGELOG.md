@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Plot end markers are updated. For groundtrack, the end marker is now a
+- Plot end markers are updated. For ground track, the end marker is now a
   directed triangle instead of star. For 3D plots, the end marker is now
   a directed cone instead of diamond.
 
