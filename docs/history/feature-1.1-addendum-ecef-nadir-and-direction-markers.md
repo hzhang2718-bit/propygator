@@ -1,6 +1,6 @@
 # propygator — Feature 1.1 Addendum: ECEF Nadir Yaw-Steering & Direction-Indicating Plot Markers
 
-> **Status: DESIGN — binding reference for the next build plan.** This is an add-on
+> **Status: RETIRED — binding reference for the next build plan.** This is an add-on
 > design for the already-feature-complete-and-released numerical propagator (Feature
 > 1.1, shipped in `v0.1.0`). The chunked build plan will be derived from this, the way
 > `docs/history/build-plan-feature-1.1.md` was derived from `features.md` §1.1. It is
@@ -10,7 +10,8 @@
 > `features.md`** (see §1, the supersession map). Where this document and those two
 > conflict, *this* document wins until a future reconciliation folds it back.
 > It supersedes **only** what it must; everything not listed in §1 is untouched and
-> those docs remain authoritative.
+> those docs remain authoritative. **THE RECONCILIATION IS ALREADY COMPLETE, AND THE
+  SUPERCESSIONS NO LONGER HOLD.**
 
 > **Naming convention.** This is one of several planned add-ons to Feature 1.1. Each
 > lives in its own file named `feature-1.1-addendum-<topic>.md` so they can be written,

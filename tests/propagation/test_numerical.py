@@ -812,6 +812,7 @@ def test_custom_attitude_completes_real_propagation():
         (Inertial(), "inertial:EME2000;roll=0.0,pitch=0.0,yaw=0.0"),
         (InPlaneTracking(), "in_plane_tracking"),
         (NadirPointing(), "nadir_pointing:vel=inertial"),
+        (NadirPointing(velocity_reference="ecef"), "nadir_pointing:vel=ecef"),
         (SunPointing(), "sun_pointing:point=(0,0,1),phase=(1,0,0):orbit_normal"),
     ],
 )
@@ -876,6 +877,29 @@ def test_sphere_non_default_attitude_warns_once_and_omits_key():
     # pins the stacklevel in _resolve_attitude (warn -> _resolve_attitude ->
     # propagate_numerical -> here). stacklevel=2 would report numerical.py instead.
     assert att_warnings[0].filename == __file__
+    assert isinstance(traj, Trajectory)
+    assert "attitude" not in traj.metadata
+
+
+def test_sphere_ecef_nadir_attitude_warns_and_falls_back():
+    """An ``ecef`` ``NadirPointing`` on a sphere is ignored like any non-default mode.
+
+    The ecef path lowers to a custom ``TargetProvider``, but a sphere's cross-section
+    is orientation-invariant, so ``_resolve_attitude`` warns once and falls back to
+    ``LofAligned`` *before* lowering — the new ecef provider never participates.
+    Confirms workstream A left the sphere short-circuit (features.md §1.1) untouched.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        traj = propagate_numerical(
+            _keplerian_state(),
+            600.0,
+            output_step=600.0,
+            force_models=ForceModelConfig.keplerian(),
+            attitude=NadirPointing(velocity_reference="ecef"),
+        )
+    att_warnings = [w for w in caught if "orientation-independent" in str(w.message)]
+    assert len(att_warnings) == 1
     assert isinstance(traj, Trajectory)
     assert "attitude" not in traj.metadata
 

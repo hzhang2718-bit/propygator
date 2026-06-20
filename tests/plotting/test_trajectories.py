@@ -23,6 +23,9 @@ import numpy as np
 import pytest
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from matplotlib.markers import MarkerStyle
+from matplotlib.transforms import Affine2D
 
 from propygator import Frame
 from propygator.core.frames import to_geodetic
@@ -31,6 +34,7 @@ from propygator.plotting.style import TIME_CMAP, TIMESERIES_COLOR
 from propygator.plotting.trajectories import (
     _dateline_segments,
     _draw_ground_track,
+    _track_heading_deg,
     plot_ground_track,
 )
 
@@ -100,6 +104,31 @@ def test_dateline_segments_drops_wrapping_segment() -> None:
     assert none_values is None
 
 
+# --- _track_heading_deg (pure) ---------------------------------------------
+
+
+def test_track_heading_deg_uses_last_segment() -> None:
+    lon = np.array([0.0, 1.0, 3.0])
+    lat = np.array([0.0, 1.0, 3.0])  # last segment: Δlon=2, Δlat=2 -> 45°
+    assert _track_heading_deg(lon, lat) == pytest.approx(45.0)
+
+
+def test_track_heading_deg_skips_dateline_wrap() -> None:
+    # Final segment wraps the dateline (179 -> -179); fall back to the previous one,
+    # which heads due east (Δlat=0, Δlon>0) -> 0°.
+    lon = np.array([170.0, 179.0, -179.0])
+    lat = np.array([10.0, 10.0, 20.0])
+    assert _track_heading_deg(lon, lat) == pytest.approx(0.0)
+
+
+def test_track_heading_deg_degenerate_points_north() -> None:
+    # A single point and a coincident pair both lack a usable segment -> north (90°).
+    assert _track_heading_deg(np.array([5.0]), np.array([5.0])) == pytest.approx(90.0)
+    assert _track_heading_deg(
+        np.array([5.0, 5.0]), np.array([5.0, 5.0])
+    ) == pytest.approx(90.0)
+
+
 # --- plot_ground_track structure -------------------------------------------
 
 
@@ -152,6 +181,56 @@ def test_ground_track_markers_match_geodetic_endpoints() -> None:
             [end.longitude_deg, end.latitude_deg],
             rtol=1e-9,
         )
+    finally:
+        plt.close(fig)
+
+
+def test_ground_track_end_marker_oriented_to_heading() -> None:
+    """The end triangle is rotated to the track heading (pinned heading-90 offset)."""
+    traj = _inclined_trajectory()
+    fig = plot_ground_track(traj, show_map_overlay=False)
+    try:
+        ax = fig.axes[0]
+        _start_marker, end_marker = _scatter_collections(ax)
+
+        # Independently recover the end heading from the last two geodetic points (this
+        # trajectory's final segment does not wrap the dateline).
+        itrf = traj.to_frame(Frame.ITRF)
+        prev, last = to_geodetic(itrf[-2]), to_geodetic(itrf[-1])
+        dlon = last.longitude_deg - prev.longitude_deg
+        dlat = last.latitude_deg - prev.latitude_deg
+        assert abs(dlon) <= 180.0  # guards the simple two-point heading below
+        heading = math.degrees(math.atan2(dlat, dlon))
+
+        # Rebuild the expected rotated-triangle path and compare to the rendered glyph.
+        expected = MarkerStyle("^").transformed(Affine2D().rotate_deg(heading - 90.0))
+        expected_path = expected.get_path().transformed(expected.get_transform())
+        np.testing.assert_allclose(
+            end_marker.get_paths()[0].vertices, expected_path.vertices, atol=1e-12
+        )
+        # Still a single scatter collection per endpoint.
+        assert len(_scatter_collections(ax)) == 2
+    finally:
+        plt.close(fig)
+
+
+def test_ground_track_legend_glyphs_are_upright() -> None:
+    """Legend keys are canonical upright proxies, not the data-rotated map markers."""
+    traj = _inclined_trajectory()  # its end heading is well off due north
+    fig = plot_ground_track(traj, show_map_overlay=False)
+    try:
+        leg = fig.axes[0].get_legend()
+        assert [t.get_text() for t in leg.get_texts()] == ["start", "end"]
+        start_handle, end_handle = leg.legend_handles
+        # Proxy Line2D handles, not the rotated scatter PathCollections.
+        assert isinstance(start_handle, Line2D)
+        assert isinstance(end_handle, Line2D)
+        assert end_handle.get_marker() == "^"
+        # The handle's triangle points straight up (apex x ≈ 0): upright, un-rotated.
+        mk = MarkerStyle(end_handle.get_marker())
+        verts = mk.get_path().transformed(mk.get_transform()).vertices
+        apex = verts[np.argmax(verts[:, 1])]
+        assert abs(apex[0]) < 1e-9
     finally:
         plt.close(fig)
 

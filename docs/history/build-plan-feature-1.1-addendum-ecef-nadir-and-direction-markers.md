@@ -1,6 +1,6 @@
 # Build plan: Feature 1.1 Addendum — ECEF Nadir Yaw-Steering & Direction-Indicating Plot Markers
 
-> **Status: BUILD PLAN (not started).** Derived from
+> **Status: BUILD PLAN (completed and retired).** Derived from
 > `docs/feature-1.1-addendum-ecef-nadir-and-direction-markers.md`, which is the **binding
 > contract** for this work (the way `features.md` §1.1 was for the original 1.1 build plan and
 > the drag-validity addendum was for its plan). Every signature, threshold, and route below
@@ -113,7 +113,7 @@ or open/merge a PR without being asked.
 
 ---
 
-## Chunk 1 — ECEF velocity `TargetProvider` + wire into `_to_provider`
+## Chunk 1 — ECEF velocity `TargetProvider` + wire into `_to_provider` - Done
 
 **Goal:** replace the `_ECEF_DEFERRED_MESSAGE` raise (`attitude.py:405-407`) with a working
 custom `@JImplements(TargetProvider)` proxy that yields the Earth-relative velocity direction,
@@ -167,7 +167,7 @@ propygator, jpype; print(jpype.isJVMStarted())"` → `False`.
 
 ---
 
-## Chunk 2 — ECEF verification tests + attitude docstring
+## Chunk 2 — ECEF verification tests + attitude docstring - Done
 
 **Goal:** lock the ECEF behavior with tests (addendum §2.4) and update the in-module docstring
 wording. (features.md / architecture.md reconciliation is deferred to Chunk 5.)
@@ -198,7 +198,7 @@ wording. (features.md / architecture.md reconciliation is deferred to Chunk 5.)
 **Verify:** `pytest tests/propagation/test_attitude_providers.py -v` green; the equatorial yaw
 pins to ≈ 3.08° (± tol) and → 0 at max latitude.
 
-> ### ✅ Checkpoint A — Workstream A (ECEF) complete
+> ### ✅ Checkpoint A — Workstream A (ECEF) complete - Done
 > 1. `NadirPointing(velocity_reference="ecef")` lowers to a working provider, verified inside a
 >    real `propagate()`; the deferral raise is gone (addendum §8 items 1–2).
 > 2. **Refresh `CLAUDE.md`** "Project state": ECEF nadir now wired; remove it from the
@@ -211,7 +211,7 @@ pins to ≈ 3.08° (± tol) and → 0 at max latitude.
 
 ---
 
-## Chunk 3 — Ground-track heading-oriented triangle (matplotlib)
+## Chunk 3 — Ground-track heading-oriented triangle (matplotlib) - Done
 
 **Goal:** replace the ground-track end **star** with a **triangle rotated to the local track
 heading** (addendum §3.1). `plot_summary` inherits it for free via `_draw_ground_track`.
@@ -261,7 +261,7 @@ tests/plotting/test_composite.py -v` green; the end glyph is a heading-oriented 
 
 ---
 
-## Chunk 4 — 3-D velocity-oriented cone (Plotly)
+## Chunk 4 — 3-D velocity-oriented cone (Plotly) - Done
 
 **Goal:** replace the 3-D end **diamond** with a **scene-relative `go.Cone`** oriented along the
 final velocity (addendum §3.2). Start circle unchanged.
@@ -300,7 +300,7 @@ vs the old diamond).
 end pointing along the velocity; on a large-scene (e.g. GEO) trajectory the cone stays visible
 (scene-relative); the start circle is unchanged.
 
-> ### ✅ Checkpoint B — Workstream B (glyphs) complete
+> ### ✅ Checkpoint B — Workstream B (glyphs) complete - Done
 > 1. Both spatial plots read directionally (triangle + cone); `plot_summary` inherits the
 >    triangle; start markers unchanged (addendum §8 items 3–4).
 > 2. **Refresh `CLAUDE.md`** "Project state": the direction glyphs are in.
@@ -309,7 +309,7 @@ end pointing along the velocity; on a large-scene (e.g. GEO) trajectory the cone
 
 ---
 
-## Chunk 5 — Wrap-up: docs reconciliation, full sweep, version/CHANGELOG, PR
+## Chunk 5 — Wrap-up: docs reconciliation, full sweep, version/CHANGELOG, PR - Done
 
 **Goal:** land the addendum — clean diff, the §1 supersession map folded back into the governing
 docs, version bump, PR (addendum §8 items 5–8, §1, §6).
@@ -347,14 +347,14 @@ go-ahead for the squash-merge (outward actions — Claude won't push/merge/autho
 as pgr` stays JVM-free (no new public name to expose); the §1 supersession map is fully carried
 into `features.md`/`architecture.md`; the three "star"/"diamond" docstrings are updated.
 
-> ### ✅ Final checkpoint — addendum done
+> ### ✅ Final checkpoint — addendum done - Done
 > CLAUDE.md, CHANGELOG, features.md, and architecture.md all reflect ECEF nadir + direction
 > glyphs as built; the §1 supersession map is discharged; no new `NotImplementedError`; the
 > intended deferrals (Tier B `IncidenceVariableCd`, UT1, backward propagation) untouched.
 
 ---
 
-## End-state verification (addendum complete → §8 definition of done)
+## End-state verification (addendum complete → §8 definition of done) - Done
 
 From repo root, `conda activate propygator`, on the merged branch:
 1. **ECEF wired (§8.1):** `_to_provider` lowers `NadirPointing(velocity_reference="ecef")` to a

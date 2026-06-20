@@ -140,8 +140,8 @@ def test_sun_pointing_rejects_bad_pointing_axis(axis):
 
 
 def test_nadir_pointing_accepts_ecef():
-    # 'ecef' is a validated skeleton: it constructs here; lowering it raises
-    # (see test_attitude_providers.py).
+    # 'ecef' constructs here (pure-Python); it lowers to a working custom
+    # TargetProvider in test_attitude_providers.py (addendum §2).
     assert NadirPointing(velocity_reference="ecef").velocity_reference == "ecef"
 
 

@@ -208,9 +208,9 @@ class NadirPointing:
     vector. Earth-pointing with velocity yaw. Exact when the flight-path angle
     is zero (circular orbits, apsides); off-apsis on eccentric orbits, nadir is
     held exactly and velocity is best-effort."""
-    velocity_reference: str = "inertial"      # "inertial" (ECI); "ecef" is a
-    # validated skeleton deferred in v1 — propagating with it raises
-    # NotImplementedError (architecture §13)
+    velocity_reference: str = "inertial"      # "inertial" (ECI velocity);
+    # "ecef" = Earth-relative (ground-track) velocity yaw, v_rel = v - ω⊕×r,
+    # implemented via a custom TargetProvider (architecture §13)
 
 @dataclass(frozen=True)
 class InPlaneTracking:
@@ -360,8 +360,8 @@ The optional physics keys are emitted only when they actually shaped the traject
 | `SunPointing.pointing_axis` parallel to `phasing_axis` | `ValueError` |
 | `attitude.law` not callable (`CustomAttitude`) | `ValueError` |
 | `AltitudeLimits(...)` unreasonable — `min_altitude_km < 0`, `max_altitude_km` above the escape-parity altitude (≈ 320,621 km), or `min >= max` — raised at **construction**, not at a crossing | `ValueError` |
-| `NadirPointing(velocity_reference='ecef')` — deferred in v1 (architecture §13) | `NotImplementedError` |
 | `box_and_panels` `IncidenceVariableCd` under drag — Tier B deferred (architecture §13) | `NotImplementedError` |
+| `NadirPointing(velocity_reference='ecef')` on an orbit whose ground-relative velocity is ~0 (e.g. geostationary / instantaneously ground-stationary) — the yaw target `v_rel = v − ω⊕×r` is undefined, so its direction can't be formed | `PropagationError` (carrying the underlying message; LEO yaw-steering is the validated domain — ECEF-nadir addendum §2) |
 | Integrator fails (usually `min_step_s` saturation) **and** the failure is a drag-driven re-entry (drag on, descending, osculating perigee already below the ~150 km drag-table floor) | *stop & report* — partial `Trajectory`, `termination_reason="reentry"` (**not** an error; addendum §6.6) |
 | Integrator fails for any **other** reason (over-tight tolerance, bad setup, non-low-altitude stiffness) | `PropagationError` (may carry a recovered `err.partial_trajectory`, or `None`) |
 | Unrecognized underlying Orekit failure | `PropagationError` wrapping the original |
@@ -570,7 +570,7 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 
 ### Still open / deferred for 1.1
 
-- Cosmetic plot details (dark-blue hex, colormap endpoints, axis labels, figure sizes, legend placement) — deferred; structural layout is fixed.
+- Cosmetic plot details (dark-blue hex, colormap endpoints, axis labels, figure sizes, legend placement) — deferred; structural layout is fixed. Endpoint glyphs are the current cosmetic baseline: a blue start circle in both spatial plots, and direction-indicating end glyphs — a heading-oriented triangle on the ground track and a velocity-oriented cone in the 3-D view (ECEF-nadir & direction-markers addendum §3).
 - Full per-facet Sentman drag coefficient — deferred (architecture §13); `IncidenceVariableCd` is the faithful v1-extension path for the box.
 - Time-varying / programmed attitude and local-orbital frames beyond TNW — deferred; `CustomAttitude` is the v1 escape hatch.
 

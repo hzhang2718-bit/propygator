@@ -19,7 +19,7 @@ import pytest
 from propygator import Frame
 from propygator.core.states import Trajectory, _default_metadata
 from propygator.plotting.style import TIME_COLOR_END, TIME_COLOR_START, TIMESERIES_COLOR
-from propygator.plotting.trajectories import plot_3d
+from propygator.plotting.trajectories import _scene_aspect_ratio, plot_3d
 
 pytestmark = pytest.mark.usefixtures("orekit")
 
@@ -113,20 +113,85 @@ def test_color_by_time_false_is_uniform_navy() -> None:
 
 
 def test_endpoint_markers() -> None:
-    fig = plot_3d(_inclined_trajectory())
+    traj = _inclined_trajectory()
+    fig = plot_3d(traj)
     start, end = _named_trace(fig, "start"), _named_trace(fig, "end")
-    assert start.mode == "markers" and end.mode == "markers"
+
+    # Start is unchanged: a blue circle marker.
+    assert start.mode == "markers"
     assert start.marker.symbol == "circle"
-    assert end.marker.symbol == "diamond"  # Plotly 3-D has no star
     assert start.marker.color == TIME_COLOR_START
-    assert end.marker.color == TIME_COLOR_END
+
+    # End is a velocity-oriented cone (Scatter3d markers have no rotation/triangle).
+    assert end.type == "cone"
+    # Positioned at the final sample (EME2000->EME2000 is identity, so == traj km).
+    pos_km = traj.positions / 1000.0
+    assert (end.x[0], end.y[0], end.z[0]) == pytest.approx(tuple(pos_km[-1]))
+    # Oriented along the final velocity direction: u/v/w parallel to velocity.
+    cone_vec = np.array([end.u[0], end.v[0], end.w[0]])
+    vel = traj.velocities[-1]
+    cos = float(
+        np.dot(cone_vec, vel) / (np.linalg.norm(cone_vec) * np.linalg.norm(vel))
+    )
+    assert cos == pytest.approx(1.0, abs=1e-9)
+    # Single flat red colour: a constant two-stop colorscale, no colorbar shown.
+    assert end.showscale is False
+    assert {stop[1] for stop in end.colorscale} == {TIME_COLOR_END}
+    # The cone carries the "end" legend entry (a cone defaults showlegend off).
+    assert end.showlegend is True
+
+
+def test_scene_axis_ranges_explicit() -> None:
+    """plot_3d fixes the 3-D axis ranges + a matching manual aspect ratio.
+
+    aspectmode="data" derives the aspect ratio from cone-perturbed trace bounds, not the
+    axis ranges, and squashes the globe on a flat scene. plot_3d instead sets explicit
+    ranges and a manual aspect ratio proportional to those range spans, so the rendered
+    per-axis scale (aspectratio/range_span) is equal => round Earth. Lock in that the
+    ranges enclose the orbit and that aspectratio tracks the range spans.
+    """
+    traj = _inclined_trajectory()
+    fig = plot_3d(traj)
+    scene = fig.layout.scene
+    assert scene.aspectmode == "manual"
+    pos_km = traj.positions / 1000.0
+    scales = []
+    aspect = (scene.aspectratio.x, scene.aspectratio.y, scene.aspectratio.z)
+    for i, axis in enumerate((scene.xaxis, scene.yaxis, scene.zaxis)):
+        assert axis.range is not None
+        assert axis.range[0] <= float(pos_km[:, i].min())
+        assert axis.range[1] >= float(pos_km[:, i].max())
+        scales.append(aspect[i] / (axis.range[1] - axis.range[0]))
+    # Equal scale on every axis is what makes the Earth render round.
+    assert scales[0] == pytest.approx(scales[1])
+    assert scales[0] == pytest.approx(scales[2])
+
+
+def test_scene_aspect_ratio_handles_degenerate_spans() -> None:
+    """Zero-width spans (planar / single-point scenes) don't crash or zero the box.
+
+    Only reachable with show_earth=False (the Earth clamp otherwise floors every span),
+    but plot_3d is public, so guard it: a fully degenerate scene falls back to a cube
+    (no 0/0), and a planar axis is floored to a thin slab rather than zero thickness.
+    """
+    # Fully degenerate (single point, no Earth): a cube, not a ZeroDivisionError.
+    assert _scene_aspect_ratio([0.0, 0.0], [0.0, 0.0], [0.0, 0.0]) == {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0,
+    }
+    # Planar (zero z-span): x/y unaffected, z floored to a thin (non-zero) slab.
+    ar = _scene_aspect_ratio([-10.0, 10.0], [-10.0, 10.0], [5.0, 5.0])
+    assert ar["x"] == 1.0
+    assert ar["y"] == 1.0
+    assert 0.0 < ar["z"] < 0.01
 
 
 def test_template_and_title_applied() -> None:
     fig = plot_3d(_inclined_trajectory(name="Orbit demo"), frame=Frame.ITRF)
     assert fig.layout.template.layout.paper_bgcolor == "white"
     assert fig.layout.title.text == "Orbit demo (ITRF)"
-    assert fig.layout.scene.aspectmode == "data"
+    assert fig.layout.scene.aspectmode == "manual"
 
 
 def test_title_default_without_name() -> None:

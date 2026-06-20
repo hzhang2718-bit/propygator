@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-06-XX
+## [0.2.0] - 2026-06-19
 
 ### Added
 
+- Nadir-pointing attitude now supports ECEF (ground velocity) velocity
+  tracking.
+
 ### Changed
+
+- Plot end markers are updated. For groundtrack, the end marker is now a
+  directed triangle instead of star. For 3D plots, the end marker is now
+  a directed cone instead of diamond.
 
 ## [0.1.0] - 2026-06-17
 

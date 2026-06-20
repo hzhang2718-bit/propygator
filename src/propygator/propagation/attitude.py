@@ -228,10 +228,11 @@ class NadirPointing:
 
     Exact when the flight-path angle is zero (circular orbits, apsides);
     off-apsis on eccentric orbits, nadir is held exactly and velocity is
-    best-effort. ``velocity_reference`` is ``inertial`` (ECI) | ``ecef``
-    (Earth-relative); ``ecef`` is **deferred** (a validated skeleton — it
-    constructs and serializes, but lowering it raises ``NotImplementedError``;
-    architecture §13)."""
+    best-effort. ``velocity_reference`` is ``inertial`` (ECI velocity) | ``ecef``
+    (Earth-relative velocity ``v_inertial − ω⊕ × r``, the ground-track direction —
+    the yaw-steering mode for Earth-observation imaging). Both are implemented;
+    ``ecef`` lowers its secondary target through a custom ``TargetProvider``
+    (addendum §2)."""
 
     velocity_reference: str = "inertial"  # "inertial" (ECI) | "ecef"
 
@@ -309,14 +310,6 @@ def _serialize_attitude(config: AttitudeConfig) -> str:
 
 # --- provider lowering (JVM-crossing) --------------------------------------
 
-_ECEF_DEFERRED_MESSAGE = (
-    "NadirPointing(velocity_reference='ecef') is not yet implemented. "
-    "Earth-relative (ECEF) velocity yaw-steering needs a custom Orekit target "
-    "provider that subtracts Earth rotation; only 'inertial' (ECI) velocity is "
-    "wired in v1. Use NadirPointing(velocity_reference='inertial'). "
-    "Deferred — architecture §13."
-)
-
 
 def _to_provider(
     config: AttitudeConfig, *, inertial_frame: Frame = Frame.EME2000
@@ -328,8 +321,10 @@ def _to_provider(
     propagation frame (EME2000 in v1) the providers and the ``CustomAttitude`` law
     are referenced against. Six modes map to stock Orekit providers (constructor
     spellings verified against the installed 13.1.x API); ``CustomAttitude`` builds
-    a law-backed provider. ``NadirPointing(velocity_reference='ecef')`` raises
-    ``NotImplementedError`` (deferred — see :data:`_ECEF_DEFERRED_MESSAGE`).
+    a law-backed provider. ``NadirPointing`` wires both ``velocity_reference``
+    options: ``inertial`` via ``PredefinedTarget.VELOCITY`` and ``ecef`` via a
+    custom Earth-relative velocity ``TargetProvider`` (see
+    :func:`_build_ecef_velocity_target_provider`).
     """
     from .._orekit_init import _ensure_started
 
@@ -403,14 +398,21 @@ def _to_provider(
         )
 
     if isinstance(config, NadirPointing):
-        if config.velocity_reference == "ecef":
-            raise NotImplementedError(_ECEF_DEFERRED_MESSAGE)
-        # Primary -Z on nadir (exact), secondary +Y best-effort on inertial velocity.
+        # Primary -Z on nadir (exact); secondary +Y best-effort on the velocity.
+        # "inertial" tracks the ECI velocity (PredefinedTarget.VELOCITY); "ecef"
+        # tracks the Earth-relative (ground-track) velocity via a custom target
+        # provider (addendum §2.3) — the same AlignedAndConstrained path, only the
+        # secondary target swapped, so the two options differ by exactly ω⊕ × r.
+        velocity_target = (
+            _build_ecef_velocity_target_provider()
+            if config.velocity_reference == "ecef"
+            else PredefinedTarget.VELOCITY
+        )
         return AlignedAndConstrained(
             Vector3D(0.0, 0.0, -1.0),
             PredefinedTarget.NADIR,
             Vector3D(0.0, 1.0, 0.0),
-            PredefinedTarget.VELOCITY,
+            velocity_target,
             _sun(),
             _earth(),
         )
@@ -431,6 +433,94 @@ def _to_provider(
 
     # Unreachable: every AttitudeConfig member is handled above (fail loud).
     raise TypeError(f"unknown AttitudeConfig type {type(config).__name__!r}")
+
+
+def _build_ecef_velocity_target_provider() -> "org.orekit.attitudes.TargetProvider":
+    """Build the Earth-relative (ground-track) velocity ``TargetProvider`` for
+    ``NadirPointing(velocity_reference="ecef")``.
+
+    Implements Orekit's ``TargetProvider`` from Python via ``@JImplements`` (Java
+    classes can't be subclassed; CLAUDE.md) and drops into the ``NadirPointing``
+    ``AlignedAndConstrained`` secondary slot in place of ``PredefinedTarget.VELOCITY``
+    — so the ``ecef`` and ``inertial`` branches share one code path, differing only
+    by the returned target direction (addendum §2.3).
+
+    The target is the unit **Earth-relative** velocity ``v_rel = v_inertial − ω⊕ × r``
+    expressed back in the propagation frame. It is read off Orekit's inertial→ITRF
+    ``Transform`` at the sample date — transform the PV into ITRF, where the velocity
+    is exactly ``v_rel`` in Earth-fixed axes, then rotate that direction back into the
+    propagation frame. This is exact, not a hardcoded ``ω`` (addendum §2.3): the
+    ~0.3° EME2000-pole-vs-spin-axis offset is captured for free.
+
+    Two JPype traps, both surfacing only inside a real ``propagate()``
+    ([[jpype-jimplements-default-methods]]):
+
+    * **Overload collapse** — one Python ``getTargetDirection`` serves both Java
+      overloads; hand-dispatch on the argument type and return a ``FieldVector3D``
+      for a field PV, a ``Vector3D`` for a plain PV.
+    * **Default-method trap** — ``AlignedAndConstrained`` invokes the *default*
+      ``getDerivative2TargetDirection`` (not only the abstract method), so it is
+      implemented too; a proxy with only the abstract method fails with
+      ``UndeclaredThrowableException``.
+
+    **Zero-derivative trick:** v1 zeroes attitude rates, so the Field returns are
+    constants built from the value direction — no field calculus. The
+    ``FieldUnivariateDerivative2<T>`` field-state overload is never hit by a
+    double-precision ``NumericalPropagator``, so it is skipped (mirrors
+    ``_build_law_backed_provider`` skipping the Field ``getAttitude``).
+    """
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+
+    import jpype
+    from org.hipparchus.analysis.differentiation import UnivariateDerivative2
+    from org.hipparchus.geometry.euclidean.threed import FieldVector3D
+    from org.orekit.attitudes import TargetProvider
+
+    itrf = Frame.ITRF.to_orekit()
+
+    def _v_rel_direction(pv_value, frame):  # noqa: ANN001, ANN202 - Java types
+        # Transform the (plain) PV into ITRF: there the velocity is exactly the
+        # Earth-relative velocity v_rel = v_inertial − ω⊕ × r, in Earth-fixed axes.
+        # Rotate that direction back into `frame` (the propagation frame) and
+        # normalize -> the unit ground-track velocity in the propagation frame.
+        to_itrf = frame.getTransformTo(itrf, pv_value.getDate())
+        v_rel_itrf = to_itrf.transformPVCoordinates(pv_value).getVelocity()
+        return to_itrf.getRotation().applyInverseTo(v_rel_itrf).normalize()
+
+    @jpype.JImplements(TargetProvider)  # type: ignore[attr-defined]
+    class _EcefVelocityTargetProvider:
+        @jpype.JOverride  # type: ignore[attr-defined]
+        def getTargetDirection(  # noqa: ANN001, ANN202 - Java overloads
+            self, sun, earth, pv, frame
+        ):
+            # JPype collapses the field-PV (abstract) and plain-PV (default)
+            # overloads onto this one method; only a field PV carries
+            # toTimeStampedPVCoordinates(). For the field PV, build a CONSTANT
+            # FieldVector3D from the value direction (the zero-derivative trick).
+            if hasattr(pv, "toTimeStampedPVCoordinates"):
+                direction = _v_rel_direction(pv.toTimeStampedPVCoordinates(), frame)
+                field = pv.getPosition().getX().getField()
+                return FieldVector3D(field, direction)
+            return _v_rel_direction(pv, frame)
+
+        @jpype.JOverride  # type: ignore[attr-defined]
+        def getDerivative2TargetDirection(  # noqa: ANN001, ANN202 - Java overload
+            self, sun, earth, pv, frame
+        ):
+            # The default overload AlignedAndConstrained actually invokes (plain PV
+            # -> FieldVector3D<UnivariateDerivative2>). Zero the higher derivatives.
+            direction = _v_rel_direction(pv, frame)
+            return FieldVector3D(
+                UnivariateDerivative2(direction.getX(), 0.0, 0.0),
+                UnivariateDerivative2(direction.getY(), 0.0, 0.0),
+                UnivariateDerivative2(direction.getZ(), 0.0, 0.0),
+            )
+
+    # The class implements TargetProvider only at the JPype runtime level (via
+    # @JImplements), which mypy cannot see — hence the cast through the ignore.
+    return _EcefVelocityTargetProvider()  # type: ignore[return-value]
 
 
 def _build_law_backed_provider(

@@ -87,9 +87,11 @@ def test_locked_colours() -> None:
 
 
 def test_endpoint_markers() -> None:
-    """Start = blue circle, end = red star, both with a black edge."""
+    """Start = blue circle; end cosmetics = red + black edge (shape built at draw)."""
     assert MARKER_START["marker"] == "o"
-    assert MARKER_END["marker"] == "*"
+    # The end glyph's shape (a heading-rotated triangle) is data-dependent, so it has no
+    # "marker" key — it would collide with the MarkerStyle the caller passes.
+    assert "marker" not in MARKER_END
     assert mcolors.to_hex(MARKER_START["c"]) == TIME_COLOR_START
     assert mcolors.to_hex(MARKER_END["c"]) == TIME_COLOR_END
     assert MARKER_START["edgecolors"] == OUTLINE_COLOR

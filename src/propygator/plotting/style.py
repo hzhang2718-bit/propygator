@@ -93,13 +93,14 @@ PLOTLY_TIME_COLORSCALE: list[list[Any]] = [
 
 # --- endpoint markers (drawn on the time-coloured spatial plots; chunks 11c/11e) ---
 
-#: Base scatter size (points²) for an endpoint marker; the star is enlarged so it
-#: reads at the same visual weight as the circle.
+#: Base scatter size (points²) for an endpoint marker; the end glyph is enlarged so it
+#: reads at the same visual weight as the start circle.
 _MARKER_SIZE = 70.0
 
 #: Start-of-trajectory marker: a blue circle with a black edge. Spread as
-#: ``ax.scatter(lon, lat, **MARKER_START)`` (matplotlib) — the start/end glyph
-#: semantics (circle → star) are mirrored for Plotly in chunk 11e.
+#: ``ax.scatter(lon, lat, **MARKER_START)`` (matplotlib); the Plotly start glyph
+#: is a matching blue circle. The end glyph is direction-indicating (a heading
+#: triangle in 2-D, a velocity cone in 3-D) and is built in the draw functions.
 MARKER_START: dict[str, Any] = {
     "marker": "o",
     "c": TIME_COLOR_START,
@@ -109,9 +110,11 @@ MARKER_START: dict[str, Any] = {
     "label": "start",
 }
 
-#: End-of-trajectory marker: a red star with a black edge.
+#: End-of-trajectory marker cosmetics: a red glyph with a black edge. The glyph
+#: *shape* — a triangle rotated to the local track heading — is data-dependent, so it
+#: cannot live here; ``_draw_ground_track`` builds the rotated ``MarkerStyle`` and
+#: spreads these keys alongside it (hence no ``"marker"`` key, which would collide).
 MARKER_END: dict[str, Any] = {
-    "marker": "*",
     "c": TIME_COLOR_END,
     "edgecolors": OUTLINE_COLOR,
     "s": _MARKER_SIZE * 1.7,
