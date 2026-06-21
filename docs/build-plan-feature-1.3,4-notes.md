@@ -1,4 +1,4 @@
-# Feature 1.3 (TLE propagator) — pre-build-plan notes
+# Feature 1.3,4 (TLE propagator and live tracker) — pre-build-plan notes
 
 > **Status: NOTES, not a build plan.** Captured during the 1.3 design review
 > (2026-06-20). These are prerequisite/scoping items to fold into the Feature 1.3
@@ -92,15 +92,21 @@ not deleted. For the name-fallback (features §1.3) to carry anything, `fetch_tl
 `TLE.from_strings`' 3-line form must populate `tle.name` from CelesTrak's line-0 / the
 catalog friendly name.
 
-## Note 4 — The sky view pulls Feature 1.5's topocentric math forward
+## Note 4 — Sky view RELOCATED to Feature 1.4 (no longer a 1.3 build item)
 
-§1.3's sky-view output (`plot_sky_track` + the `look_angles` primitive, features §1.3
-"Sky view") introduces the **first topocentric look-angle computation in the
-codebase**. That math is otherwise Feature 1.5's: `find_passes` "is allowed to
-internally convert to topocentric" (architecture §10) and the planned
-`plot_sky_chart` (`plotting/passes.py`) is a 1.5 deliverable. Building it in 1.3 is
-**pulling 1.5's foundation forward, deliberately** — not duplicating it. Build-plan
-consequences:
+> **Superseded by the §1.3 redesign (features.md:594, 679–681).** Earlier drafts built
+> the observer-centric sky view *in* 1.3 to pull Feature 1.5's topocentric math forward.
+> The whole sky view — the `look_angles(station, state) -> AzElRange` primitive
+> (`core/observation.py`), the `_draw_sky_track` primitive, and the `plot_sky_track`
+> verb (`plotting/trajectories.py`) — has **moved to Feature 1.4**, whose live tracker
+> needs a live sky panel. It is still built *before* 1.5 in the build order
+> (architecture §12), so the forward-pull for 1.5's `find_passes` / `plot_sky_chart` is
+> preserved. **None of this is in the 1.3 build plan anymore;** `propagate_tle`'s
+> signature was never affected (the sky view was always an additive plotting verb, not a
+> propagator knob). The design substance below is retained as scoping for the **Feature
+> 1.4** build plan, not 1.3.
+
+Carry into the 1.4 build plan (re-homed, substance unchanged):
 
 - **`look_angles(station, state) -> AzElRange` is the shared primitive**, built once
   in `core/observation.py` (with the `AzElRange` value type) and reused *verbatim* by
@@ -117,16 +123,56 @@ consequences:
 - **`AzElRange` value type is safe-before-init** (pure-Python frozen dataclass, like
   its siblings) — only the `look_angles` *call* starts the JVM. Add `AzElRange` to the
   top-level re-exports.
+- **Carve `look_angles` / `AzElRange` into the architecture §10 safe-before-init
+  enumeration.** §6 and the two bullets above already state the split (the value types
+  are safe-before-init; the `look_angles` *call* is JVM-touching), but architecture
+  §10's worked "safe before init" list — and its companion "JVM startup is reserved
+  for" list — names `GroundStation` / `Pass` / `TLE.from_strings` / `VariableCd` and
+  does **not** yet mention `AzElRange` or `look_angles`. That list is illustrative, not
+  exhaustive (it already omits `GeodeticPosition`), so this is a docs-completeness
+  cleanup, not a blocker — but when 1.4 lands, add `AzElRange` construction to the
+  safe-before-init surface and `look_angles` to the JVM-startup list, alongside the
+  `core/observation.py` docstring carve-out noted above. (Surfaced by the 2026-06-20
+  §1.3 audit.)
 - **Scope discipline = geometry only.** `plot_sky_track` draws the raw az/el path and
   nothing else; passes (rise/set/culmination), eclipse/lit shading, and magnitude stay
-  in 1.5's `plot_sky_chart`. This is the line that keeps 1.3 from absorbing 1.5.
+  in 1.5's `plot_sky_chart`. This is the line that keeps the relocated sky view from
+  absorbing 1.5.
 - **Disjoint-arc rendering.** Mask samples below `min_elevation_deg` to `NaN` so the
   polyline lifts between successive passes instead of drawing chords across the sky
-  disk; if *no* sample clears the horizon, draw the empty disk + warn-once (features
-  §1.3 "Sky view").
+  disk; if *no* sample clears the horizon, draw the empty disk + warn-once.
 - **`plot_sky_track` is an additive plotting verb** in `plotting/trajectories.py`
   (beside `plot_ground_track`) — `propagate_tle`'s signature is untouched; the sky view
-  consumes the returned `Trajectory` + a `GroundStation`, like every other output.
+  consumes a `Trajectory` + a `GroundStation`, like every other output.
+
+Refinements surfaced by the 2026-06-20 §1.3 audit (fold into the 1.4 design — the
+codebase already chose these patterns elsewhere):
+
+- **Batch the topocentric path.** A `TopocentricFrame` depends only on the station, not
+  the sample, so calling `look_angles` per sample rebuilds it and re-crosses the JPype
+  boundary N times. Mirror the established batched idiom `geodetic_track(traj)`
+  (`core/frames.py:145`): add a `look_angles_track(station, trajectory)` returning
+  `AzElRange` arrays (or have `plot_sky_track` build the station `TopocentricFrame` once
+  and reuse it), keeping per-state `look_angles` as the ergonomic primitive. Cheap at
+  design time, awkward to retrofit once the call shape is frozen — and it compounds in
+  1.5, which also walks dense trajectories.
+- **Factor a `_draw_sky_track(ax, traj, station, ...)` primitive** for the polar setup
+  (N-up clockwise theta, light-blue disk, zenith-at-center radius, NaN arc-masking) so
+  1.5's `plot_sky_chart` layers passes/brightness on the same axes-drawing code — the
+  same `_draw_*(ax, ...)` convention features §1.1 established ("designing the
+  primitives up front is cheap; retrofitting is not").
+- **Scope the 1.5 de-risking honestly.** `look_angles` is a genuine shared primitive for
+  az/el *reporting* and a sampling-based finder, but accurate rise/culmination/set in
+  `find_passes` is naturally Orekit event detection (`ElevationDetector` / an extremum
+  detector) inside the propagator, not sampling a finished `Trajectory`. So the 1.4/1.5
+  build plan should record the open choice — sampling-based finder (full `look_angles`
+  reuse) vs. event-based finder (`look_angles` for reporting only) — and not overstate
+  how much the relocated sky view de-risks 1.5's core pass-finding algorithm.
+
+## Note 5 — TEME is an ECI frame
+
+- This means that the 3D plotly Earth in TEME should **not** have coastlines imposed
+  on it.
 
 ## Also fold in
 
@@ -141,12 +187,13 @@ consequences:
   (inertial frame, integrator type, gravity/atmosphere names), so "reuse 1.1's
   validation wholesale" is **not** literally possible — the shared subset must be
   extracted, leaving the numerical-specific checks behind in `numerical.py`. Both
-  propagators then share one contract-bearing helper *and* one memory cap (the cap is propagator-agnostic —
-  each sample is a p/v row + a propagate call either way; generalize the cap's error
-  message, which currently reasons about "an ephemeris query," since 1.3 evaluates the
-  analytic propagator per grid epoch with no `EphemerisGenerator`). `_realized_sample_count`
-  is *not* needed by 1.3 (no stop-and-report). Refactor `numerical.py` to import the
-  promoted helpers instead of defining them locally.
+  propagators then share one contract-bearing helper *and* one memory cap (the cap is
+  propagator-agnostic — each sample is a p/v row + a propagate call either way). The
+  cap's error message has been **pre-generalized in place** (`numerical.py`, now
+  propagator-neutral) so it moves to `core/sampling.py` verbatim; see "Sample-cap error
+  message" below for the canonical text and rationale. `_realized_sample_count` is *not*
+  needed by 1.3 (no stop-and-report). Refactor `numerical.py` to import the promoted
+  helpers instead of defining them locally.
 - **Stale-TLE warn-once — DECIDED (#7).** Add a 1.3-specific warn-once (not an
   error) when the worst-case age over the span,
   `max(|start − tle.epoch|, |(start + duration) − tle.epoch|)`, exceeds 30 days.
@@ -182,3 +229,25 @@ consequences:
   `getSpecifier()` / `getParts()` give a locale-independent enum + value), so if 1.3
   ever wants a *decay-specific message* it can match `getSpecifier()` without parsing
   strings.
+- **Sample-cap error message — DRAFTED & pre-generalized.** Once the cap moves to
+  `core/sampling.py` it is raised for **both** propagators, so its wording must be
+  propagator-neutral. The old numerical-only phrase "an ephemeris query" (true only of
+  1.1's `EphemerisGenerator` sampling — 1.3 evaluates `TLEPropagator` analytically per
+  grid epoch, no bounded ephemeris) has already been replaced **in place** in
+  `numerical.py` by "one propagator evaluation"; the cap constant's comment was
+  generalized the same way ("per-sample propagator evaluations"). Canonical text, which
+  moves to `core/sampling.py` verbatim during the promotion (item 1):
+
+  ```python
+  raise ValueError(
+      f"duration/output_step requests {n_samples} output samples, exceeding the "
+      f"{_MAX_OUTPUT_SAMPLES} cap; increase output_step or shorten duration "
+      "(each sample allocates a position+velocity row and one propagator "
+      "evaluation, so a much larger count would exhaust memory)."
+  )
+  ```
+
+  The stable substring `"output samples"` is preserved, so the existing pin
+  (`tests/propagation/test_numerical.py:174`, `match="output samples"`) stays green;
+  add the analogous cap test on the `propagate_tle` path so both propagators exercise
+  the shared raise.

@@ -15,8 +15,8 @@ A Python library for orbital simulation and satellite tracking, built on Orekit.
 | 1.1 | Numerical propagator | High-fidelity orbit propagation from an initial state vector, with configurable force models. Outputs trajectories and plots. |
 | 1.2 | TLE fitter | Given an observed state (or trajectory), fit a TLE via least-squares against a reference trajectory produced by 1.1. |
 | 1.3 | TLE propagator | SGP4 propagation of TLEs with plotting output. |
-| 1.4 | Real-time tracker | Current ground position, altitude, etc. for a given TLE. |
-| 1.5 | Ground passes + brightness | Find future visible passes from a ground station, including estimated visual magnitude. Combines tracking, lighting, and eclipse logic. |
+| 1.4 | Real-time tracker | Current position / ground position for a TLE, plus a **live dashboard** — a buffered, self-refreshing matplotlib view (ground track, altitude, speed, sky view) that tracks the satellite in real time. |
+| 1.5 | Ground passes + brightness | Find future visible passes from a ground station, including estimated visual magnitude. Outputs a pass table plus sky charts. Combines tracking, lighting, and eclipse logic. |
 
 ### Notes on TLE fitting (1.2)
 
@@ -55,7 +55,7 @@ The core library has no UI dependencies. Notebooks and (future) web apps are thi
 | orekit_jpype | 13.1.x | JPype-based wrapper (modern path) |
 | jpype1 | 1.5.x | Java/Python bridge |
 | NumPy | 2.x | computation at the boundary |
-| jupyterlab | 4.5.7 | for user interfaces
+| jupyterlab | 4.5.7 | for user interfaces |
 
 All from `conda-forge`. **Do not** use the legacy `orekit` (JCC-based) wrapper — it pulls OpenJDK 8 and is harder to maintain on modern systems.
 
@@ -94,9 +94,9 @@ For dependency updates after the initial install, use `conda env update -f envir
 
 ### TLE data sources
 
-- **CelesTrak** — default, no auth required, covers popular satellites
-- **Space-Track** — optional, requires account (env vars: `SPACETRACK_USERNAME`, `SPACETRACK_PASSWORD`), broader coverage
-- **Direct user input** — always available, takes priority
+- **CelesTrak** — the v1 source. No auth required, covers popular satellites.
+- **Direct user input** — always available, takes priority.
+- **Space-Track** — **deferred (not wired in v1).** A broader-coverage source requiring an account (env vars `SPACETRACK_USERNAME` / `SPACETRACK_PASSWORD`); the `fetch_tle(source=...)` parameter and a future `source='auto'` are designed to admit it, but v1 fetches CelesTrak only.
 
 A built-in registry of "popular" satellites (ISS, Hubble, GPS, NOAA, etc.) maps friendly names to NORAD IDs. The same registry carries a curated standard-magnitude table (intrinsic brightness at 1000 km range, 50% phase angle) used by feature 1.5. For satellites outside the registry, users supply magnitude explicitly or pass requests are returned without magnitude estimates.
 
@@ -145,7 +145,7 @@ Modern Python `src/` layout. Forces proper installation, catches path-import bug
 ```
 propygator/
 ├── src/
-│   └── propygator/                # importable package
+│   └── propygator/              # importable package
 │       ├── __init__.py
 │       ├── _orekit_init.py
 │       ├── core/
@@ -504,7 +504,7 @@ class TrajectoryMetadata(TypedDict, total=False):
     # in Trajectory.__post_init__.
     propygator_version: Required[str]
     orekit_version: Required[str]
-    propagator: Required[str]             # "numerical" | "sgp4"
+    propagator: Required[str]             # "numerical" | "sgp4" | "user"
 
     # Optional — populated when applicable.
     force_models: list[str]
@@ -604,9 +604,9 @@ class AzElRange:
 def look_angles(station: GroundStation, state: State) -> AzElRange: ...
 ```
 
-`look_angles` and `AzElRange` live in `core/observation.py` (with `GroundStation`), co-located so the observe-primitive and its output type sit beside the observer type they key on. Like `to_geodetic` the *function* is placed in `core/` so both `tracking/` (Feature 1.5's `find_passes`) and `plotting/` (Feature 1.3's `plot_sky_track`) can reach it without inverting the inward dependency rule (§7); building it on the canonical WGS84 Earth ellipsoid (`core/bodies.py`), it internally constructs an Orekit `TopocentricFrame` at the station's geodetic point, so it **touches the JVM** and lazy-imports jpype inside the function body. `core/observation.py` therefore stays JVM-free on *import* — the value types (`GroundStation`, `GeodeticPosition`, `Pass`, `AzElRange`) remain safe-before-init — while this one *call* does not. Its result carries no `Frame`, so unlike `to_geodetic` it need not demand a particular input frame: per the explicit-frame rule (§10, which governs only frame-carrying `State`/`Trajectory` returns) it may convert its input internally.
+`look_angles` and `AzElRange` live in `core/observation.py` (with `GroundStation`), co-located so the observe-primitive and its output type sit beside the observer type they key on. Like `to_geodetic` the *function* is placed in `core/` so both `tracking/` (Feature 1.5's `find_passes`) and `plotting/` (Feature 1.4's `plot_sky_track`) can reach it without inverting the inward dependency rule (§7); building it on the canonical WGS84 Earth ellipsoid (`core/bodies.py`), it internally constructs an Orekit `TopocentricFrame` at the station's geodetic point, so it **touches the JVM** and lazy-imports jpype inside the function body. `core/observation.py` therefore stays JVM-free on *import* — the value types (`GroundStation`, `GeodeticPosition`, `Pass`, `AzElRange`) remain safe-before-init — while this one *call* does not. Its result carries no `Frame`, so unlike `to_geodetic` it need not demand a particular input frame: per the explicit-frame rule (§10, which governs only frame-carrying `State`/`Trajectory` returns) it may convert its input internally.
 
-Introduced for Feature 1.3's sky view (features §1.3) but shared verbatim with Feature 1.5's pass finder, so building it in 1.3 brings 1.5's topocentric foundation forward.
+Introduced for Feature 1.4's live sky view (features §1.4) but shared verbatim with Feature 1.5's pass finder, so building it in 1.4 brings 1.5's topocentric foundation forward.
 
 ### `Pass`
 
@@ -631,12 +631,16 @@ class Pass:
 src/propygator/
 ├── __init__.py
 │       Exposes most-used names: State, Trajectory, TLE, Epoch, Frame,
-|       TimeScale, KeplerianElements, GroundStation, Pass, GeodeticPosition, AzElRange,
-|       ForceModelConfig, SpacecraftConfig, SpacecraftGeometry, VariableCd,
-|       IntegratorConfig, AltitudeLimits, the attitude family, propagate_numerical,
-|       propagate_tle, fit_tle, fetch_tle, current_position, current_ground_position,
-|       find_passes, look_angles, the plot_*/export* functions, init, clear_cache,
-|       and the exception types.
+|       TimeScale, KeplerianElements, Orientation, GroundStation, Pass,
+|       GeodeticPosition, AzElRange, ForceModelConfig, SpacecraftConfig,
+|       SpacecraftGeometry, VariableCd, IntegratorConfig, AltitudeLimits,
+|       the attitude family, propagate_numerical, propagate_tle, fit_tle,
+|       fetch_tle, current_position, current_ground_position, find_passes,
+|       look_angles, the plot_*/export* functions, init, clear_cache, and
+|       the exception types. (IncidenceVariableCd, the deferred Tier-B drag
+|       table, is intentionally NOT top-level — reach it via
+|       propygator.propagation.) Verbs beyond Feature 1.1 are added to this
+|       list as their features land.
 │       Also exposes init() for explicit JVM configuration.
 │       Attaches logging.NullHandler() to the "propygator" logger so the
 │       library is silent unless the application configures handlers.
@@ -657,6 +661,15 @@ src/propygator/
 │   │                    + to_geodetic(state) -> GeodeticPosition
 │   ├── states.py        The State class, conversions to/from Orekit types
 │   ├── elements.py      KeplerianElements, conversions to/from State
+│   ├── sampling.py      Propagator-agnostic output-sample grid: _sample_count,
+│   │                    the epoch-grid generator, the _MAX_OUTPUT_SAMPLES cap,
+│   │                    and the shared pre-flight checks (duration/output_step
+│   │                    positive + ordered). Promoted out of propagation/
+│   │                    numerical.py so both propagate_numerical and
+│   │                    propagate_tle (tle/ may import only from core/, §7 dep
+│   │                    rule) share one contract-bearing helper and produce
+│   │                    identically-gridded trajectories (features §1.3;
+│   │                    build-plan notes #7).
 │   ├── bodies.py        Earth model (canonical instance), Sun, Moon
 │   ├── observation.py   GroundStation, Pass, GeodeticPosition, AzElRange,
 │   │                    look_angles(station, state) -> AzElRange (topocentric
@@ -669,16 +682,32 @@ src/propygator/
 │                        dependency direction stays clean.
 │
 ├── propagation/
-│   ├── numerical.py     propagate_numerical(initial, duration,
-│   │                                        force_models, output_step,
-│   │                                        integrator=None)
+│   ├── numerical.py     propagate_numerical(initial, duration, *,
+│   │                                        output_step, force_models=None,
+│   │                                        spacecraft=None, attitude=None,
+│   │                                        integrator=None, limits=None,
+│   │                                        name=None)
+│   │                    All inputs after duration are keyword-only;
 │   │                    output_step is required (user-controlled).
 │   │                    integrator is an optional IntegratorConfig;
 │   │                    defaults to DOP853 with sensible tolerances.
+│   │                    limits is an optional AltitudeLimits (guards.py).
+│   │                    Imports the output-sample grid + cap from
+│   │                    core/sampling.py (shared with propagate_tle) rather
+│   │                    than defining them locally.
+│   │                    Full binding signature: features §1.1.
 │   ├── force_models.py  ForceModelConfig + presets (leo_default,
 │   │                    geo_default, keplerian)
-|   ├── attitude.py      holds the AttitudeConfig family
-│   └── integrators.py   IntegratorConfig (tolerances, min/max step)
+│   ├── spacecraft.py    SpacecraftConfig, SpacecraftGeometry (sphere /
+│   │                    box_and_panels factories), VariableCd, and the
+│   │                    deferred Tier-B IncidenceVariableCd drag tables
+│   ├── attitude.py      holds the AttitudeConfig family
+│   ├── integrators.py   IntegratorConfig (tolerances, min/max step)
+│   └── guards.py        AltitudeLimits + the altitude/regime guard system:
+│                        impact/escape radius detectors, the min-step
+│                        re-entry catch, and the Knudsen-floor + table-edge
+│                        drag-regime warnings (drag-validity & altitude-
+│                        guards addendum; architecture §6/§13).
 │
 ├── tle/
 │   ├── propagator.py    propagate_tle(tle, duration, *, output_step,
@@ -687,14 +716,15 @@ src/propygator/
 │   │                    with 1.1, features §1.3); output_step required and kw-only,
 │   │                    with no default (dropped for 1.1 consistency, features §1.3); start
 │   │                    defaults to tle.epoch.
-│   │                    Default output frame: TEME.
+│   │                    Default output frame: TEME. Reuses the shared
+│   │                    output-sample grid + cap from core/sampling.py.
 │   ├── fitter.py        fit_tle(reference, fitting_span, ...)
 │   │                    Accepts State (then propagates internally) or
 │   │                    Trajectory (used directly). See §8.
-│   ├── sources.py       fetch_tle, fetch_celestrak, fetch_spacetrack
+│   ├── sources.py       fetch_tle, fetch_celestrak (fetch_spacetrack deferred)
 │   │                    Caches to ~/.propygator/cache/
-|   |                    fetch_tle(name_or_id, source='celestrak')
-|   |                    (v1: CelesTrak only; 'auto'/Space-Track deferred)
+│   │                    fetch_tle(name_or_id, source='celestrak')
+│   │                    (v1: CelesTrak only; 'auto'/Space-Track deferred)
 │   │                    Two TTLs: 6h (realtime workflows), 24h (general).
 │   └── parsing.py       Validation, checksum, formatting
 │
@@ -706,6 +736,13 @@ src/propygator/
 │   │                    current_ground_position(tle) -> GeodeticPosition
 │   │                    Internally TEME→ITRF→geodetic; the user receives
 │   │                    lat/lon/alt directly, no frame to convert.
+│   ├── live.py          live_track(...) — the live dashboard (features §1.4).
+│   │                    A rolling Trajectory buffer (propagate_tle; auto-
+│   │                    refreshes the TLE when fetched) drives a matplotlib
+│   │                    FuncAnimation over the 1.1 _draw_* primitives +
+│   │                    _draw_sky_track. Lazily imports plotting/ (the
+│   │                    export_all precedent, dep rule below). Live display
+│   │                    only; not saved.
 │   ├── passes.py        find_passes(tle, station, start, duration,
 │   │                                min_elevation_deg)
 │   └── visibility.py    Eclipse check, sun angle, phase angle
@@ -713,11 +750,19 @@ src/propygator/
 │                        Pulls the standard-magnitude table from core/catalogs.py.
 │
 ├── plotting/
-│   ├── trajectories.py  plot_3d (Plotly), plot_ground_track (matplotlib),
-│   │                    plot_sky_track (matplotlib polar; takes a GroundStation,
-│   │                    geometry-only observer view — features §1.3)
-│   ├── timeseries.py    plot_altitude, plot_elements, plot_velocity
-│   │                    (matplotlib — 2D timeseries)
+│   ├── trajectories.py  plot_3d (Plotly), plot_ground_track + _draw_ground_track
+│   │                    (matplotlib), plot_sky_track + _draw_sky_track
+│   │                    (matplotlib polar; takes a GroundStation, geometry-only
+│   │                    observer view; built in 1.4, reused by 1.5 — features §1.4)
+│   ├── timeseries.py    plot_altitude + _draw_altitude, plot_speed + _draw_speed
+│   │                    (matplotlib — 2D timeseries; plot_speed is speed
+│   │                    magnitude, not velocity components — features §1.1)
+│   ├── composite.py     plot_summary — the default stacked GridSpec figure
+│   │                    (ground track + altitude + one speed panel per frame),
+│   │                    assembled from the _draw_* primitives (features §1.1)
+│   ├── style.py         per-figure mplstyle context manager + Plotly template
+│   ├── basemap.py       bundled low-res Natural Earth coastline overlay
+│   │                    (_render_earth_basemap; no cartopy)
 │   └── passes.py        plot_sky_chart (matplotlib polar; Feature 1.5,
 │                        shares core look_angles with plot_sky_track, adds
 │                        passes + brightness),
@@ -828,7 +873,7 @@ A `FitResult` return type (carrying RMS residual, iteration count, convergence f
 ### 1.3 TLE propagation
 
 ```
-User → TLE  (via fetch_celestrak / fetch_spacetrack / direct input)
+User → TLE  (via fetch_tle / fetch_celestrak / direct input)
      → tle.propagator.propagate_tle()
      → Trajectory  (TEME, optionally converted)
      → plotting.* / io.exports.*
@@ -840,6 +885,18 @@ User → TLE  (via fetch_celestrak / fetch_spacetrack / direct input)
 User → TLE
      → tracking.realtime.current_position()
      → State  (+ derived lat/lon/alt)
+```
+
+Live dashboard:
+
+```
+User → TLE or fetched name (+ optional GroundStation)
+     → tracking.live.live_track()
+            maintains a rolling Trajectory buffer (propagate_tle), samples
+            buffer.at(now) per frame, redraws ground-track / altitude / speed /
+            sky panels via the 1.1 _draw_* primitives + _draw_sky_track, and
+            refreshes (re-propagate; re-fetch if fetched) as the buffer drains
+     → matplotlib FuncAnimation  (desktop window or %matplotlib widget; live only)
 ```
 
 ### 1.5 Ground passes with brightness
@@ -962,7 +1019,7 @@ TLE fetches and force model loading cache to `~/.propygator/cache/`. Per-call `u
 Two TTLs serve different workflows:
 
 - **Realtime workflows** (`current_position`, `current_ground_position`): **6-hour TTL**. CelesTrak typically refreshes popular satellites several times per day, so a 6-hour TTL catches updates within roughly half a refresh cycle while avoiding pointless refetches of identical TLEs.
-- **General fetches** (`fetch_celestrak`, `fetch_spacetrack`): **24-hour TTL**. Notebook re-runs within a day hit the cache; daily re-issues are picked up automatically.
+- **General fetches** (`fetch_celestrak`): **24-hour TTL**. Notebook re-runs within a day hit the cache; daily re-issues are picked up automatically. (Space-Track's `fetch_spacetrack` is deferred — §3.)
 
 Note that the cache lives on the *fetch* path, not on `propagate_tle` (which takes a `TLE` directly). The TTL governs how often we re-hit the network, not the freshness of the underlying TLE epoch.
 
@@ -1038,11 +1095,13 @@ Suggested implementation sequence:
 
 1. **1.1 Numerical propagator** — core types, force model config, basic plotting
 2. **1.3 TLE propagator** — shares plotting infrastructure with 1.1
-3. **1.4 Real-time tracker** — cheap once 1.3 works
-4. **1.5 Ground passes + brightness** — builds on 1.4 and visibility
+3. **1.4 Real-time tracker** — the realtime primitives (`current_position` / `current_ground_position`) are cheap once 1.3 works, but 1.4 now also carries the **live buffered dashboard** (ground track / altitude / speed / sky view), making it the richest tracking feature. It first builds the `look_angles` primitive + `_draw_sky_track` (moved out of 1.3), so it still pulls Feature 1.5's topocentric foundation forward.
+4. **1.5 Ground passes + brightness** — builds on 1.4 and visibility; reuses 1.4's `look_angles`. Adds a pass table plus the richer sky/timeline charts.
 5. **1.2 TLE fitter** — hardest; lean on Orekit's built-in fitting machinery. Treated as a plus rather than a blocker.
 
-A preliminary build of **1.1 Numerical propagator** is complete.
+**1.1 Numerical propagator** is built and released, together with its
+drag-validity/altitude-guards and ECEF-nadir/direction-markers addenda.
+**1.3 TLE propagator** is the next feature.
 
 ---
 
@@ -1069,6 +1128,9 @@ A preliminary build of **1.1 Numerical propagator** is complete.
 - **Versioning policy** — semver, pre-1.0 may break in minor releases.
 - **Package name** — renamed from `orbitkit` to `propygator` before build to avoid acoustic/visual collision with `orekit`. Documented import alias is `pgr` (`import propygator as pgr`); shown throughout the §9 examples.
 - **Attitude family** — Native-provider-backed modes: `Inertial` (`FrameAlignedProvider`), `SunPointing` (`CelestialBodyPointed` or `AlignedAndConstrained`), `NadirPointing` and `InPlaneTracking` (`AlignedAndConstrained`), plus `LofAligned`/`LofOffset` (`LofOffset`). `CustomAttitude` (user law returning `propygator.Orientation`) is the only non-native escape hatch. `NadirPointing` is exact only for circular orbits (nadir primary, velocity secondary, for eccentric). `NadirPointing` wires **both** `velocity_reference` options: `inertial` via Orekit's `PredefinedTarget.VELOCITY`, and `ecef` (ground-track velocity yaw) via a custom `@JImplements TargetProvider` in the same `AlignedAndConstrained` secondary slot (ECEF-nadir & direction-markers addendum; see the §13 deferral note below).
+- **Sky view relocated 1.3 → 1.4.** The geometry-only sky-track plot and the `look_angles(station, state) -> AzElRange` primitive (`core/observation.py`) it rides on were originally scheduled in Feature 1.3 to pull Feature 1.5's foundation forward. They moved to Feature 1.4: the live tracker needs a live sky-view panel, so the primitive is first built there — still before 1.5 in the build order, so the forward-pull is preserved. 1.3 reverts to pure SGP4 propagation reusing 1.1's outputs. (features §1.3 / §1.4.)
+- **1.4 expanded to a live dashboard.** Beyond the `current_position` / `current_ground_position` primitives, 1.4 now ships a live, buffered matplotlib view (ground track, altitude, speed, sky view) driven by `FuncAnimation` over a rolling `Trajectory` buffer that re-propagates and **auto-refreshes a fetched TLE** (6-hour cache TTL). Backend-agnostic (desktop window or in-notebook `%matplotlib widget`), **live display only — not saved** (no animation-writer dependency; not snapshot-tested). The driver (`tracking/live.py`) lazily imports `plotting/` (the `export_all` precedent), keeping the static dependency graph clean. (features §1.4.)
+- **1.5 pass table.** Alongside the polar sky charts, 1.5 offers a tabular view of `list[Pass]` (a `passes_to_dataframe` DataFrame and/or formatted text), plus the already-anticipated `io/exports` Pass-list → ICS/CSV export. Cheap formatting of an existing core type; no new dependency. (features §1.5.)
 
 ### Still open
 

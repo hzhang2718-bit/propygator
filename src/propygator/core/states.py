@@ -303,7 +303,9 @@ class TrajectoryMetadata(TypedDict, total=False):
     name: str
     tle_line1: str
     tle_line2: str
-    norad_id: str  # architecture §6 types this str (features.md 1.3 shows an int)
+    norad_id: (
+        int  # catalog number; mirrors TLE.norad_id (architecture §6, features.md §1.3)
+    )
     tle_epoch: str
     start: str
 

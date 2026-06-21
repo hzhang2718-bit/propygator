@@ -114,7 +114,7 @@ _SAMPLE_COUNT_TOL = 1e-9
 
 # Upper bound on the output-sample count. With no cap, a tiny output_step against a
 # long duration (e.g. 1 ms over a year -> ~3e10 samples) would pre-allocate multi-GB
-# position/velocity arrays plus that many per-sample ephemeris queries and exhaust
+# position/velocity arrays plus that many per-sample propagator evaluations and exhaust
 # memory before any useful work. 1e7 covers ~19 years at a 60 s step; beyond it,
 # raise and tell the caller to coarsen output_step.
 _MAX_OUTPUT_SAMPLES = 10_000_000
@@ -273,8 +273,8 @@ def _validate_inputs(
         raise ValueError(
             f"duration/output_step requests {n_samples} output samples, exceeding the "
             f"{_MAX_OUTPUT_SAMPLES} cap; increase output_step or shorten duration "
-            "(each sample allocates a position+velocity row and an ephemeris query, "
-            "so a much larger count would exhaust memory)."
+            "(each sample allocates a position+velocity row and one propagator "
+            "evaluation, so a much larger count would exhaust memory)."
         )
 
 

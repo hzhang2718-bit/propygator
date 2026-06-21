@@ -285,6 +285,8 @@ class IntegratorConfig:
 
 **Sample count.** `floor(duration / output_step + tol) + 1` samples (with a small relative `tol ≈ 1e-9` to absorb float round-off so divisible cases are deterministic), first sample at `initial.epoch`, last at `initial.epoch + floor(...) * output_step`. If `duration` isn't an integer multiple of `output_step`, the trajectory ends just shy of `initial.epoch + duration`; no synthesized final partial-step sample.
 
+A pre-flight cap rejects pathological grids: if the computed sample count exceeds `_MAX_OUTPUT_SAMPLES` (10,000,000 — e.g. a tiny `output_step` over a long `duration`), `propagate_numerical` raises `ValueError` before integrating rather than attempting a multi-gigabyte allocation. This cap is the shared facility 1.3's `propagate_tle` reuses for its identical sample-grid contract (features §1.3).
+
 **Input frame.** `initial.frame` must be inertial — `Frame.EME2000` (alias `J2000`) for v1. Newtonian integration is only well-posed in an inertial frame, so `Frame.ITRF` / `Frame.TEME` raise `ValueError` at the top of the function, pointing to `state.to_frame(Frame.EME2000)`. Because input is inertial-only, the output `Trajectory` is always EME2000 (no automatic conversion; architecture §10).
 
 **Attitude/geometry consistency.** If a non-default attitude is supplied with sphere geometry, the propagator emits a one-time warning ("attitude has no effect on orientation-independent geometry; ignoring") and proceeds — a sphere's cross-section is attitude-invariant.
@@ -355,6 +357,7 @@ The optional physics keys are emitted only when they actually shaped the traject
 | `initial.frame` non-inertial | `ValueError` |
 | `initial` position/velocity non-finite | `ValueError` (at `State` construction, architecture §6) |
 | `duration <= 0` / `output_step <= 0` / `output_step > duration` | `ValueError` |
+| output sample count `floor(duration/output_step + tol) + 1` over the shared cap (`_MAX_OUTPUT_SAMPLES` = 10,000,000) | `ValueError` (propygator-side, before integration; reused by 1.3) |
 | `gravity_field` / `atmosphere_model` / `integrator.type` doesn't resolve | `ValueError` (with known-name list) |
 | `Inertial.reference_frame` non-inertial | `ValueError` |
 | `SunPointing.pointing_axis` parallel to `phasing_axis` | `ValueError` |
@@ -371,7 +374,7 @@ The optional physics keys are emitted only when they actually shaped the traject
 **Escape and re-entry (drag-validity & altitude-guards addendum).** The propagator carries a geocentric-radius guard family that bounds both ends of the validity domain. All guards operate on `r = |position|` in the EME2000 propagation frame (one `sqrt`, no per-substep geodetic conversion).
 
 - **Terminal backstops (always on).** Two custom radius event detectors stop the run cleanly and **report**: **impact** at `r < R⊕` (WGS84 equatorial, 6,378,137 m) and **escape** at `r > r_lunar_parity` (≈ 327,000 km — the Earth-Moon gravity-parity radius at lunar perigee; a fixed hard-coded policy fence, not Orekit-derived). The escape backstop makes an already-supported unbound (hyperbolic) `State` *safe*: runaway integration terminates instead of running to absurd distances. The parabolic `e == 1` rejection in `KeplerianElements` stays (a representability limit, orthogonal to these guards).
-- **Re-entry (reactive).** A decaying orbit with drag on stiffens until the integrator saturates `min_step_s` (or the atmosphere model rejects the sub-surface query) and fails. That failure is **caught and classified**: drag on + descending + osculating perigee already below the ~150 km drag-table floor → a physical re-entry that **stops & reports** (`termination_reason="reentry"`, partial `Trajectory`); anything else re-raises `NumericalPropagationError` (invariant: prefer a false re-raise over a false `reentry`). See the Failure modes table.
+- **Re-entry (reactive).** A decaying orbit with drag on stiffens until the integrator saturates `min_step_s` (or the atmosphere model rejects the sub-surface query) and fails. That failure is **caught and classified**: drag on + descending + osculating perigee already below the ~150 km drag-table floor (the shipped Cd table's lower data edge — distinct from the body-size-dependent ~110–220 km Knudsen free-molecular floor used for the drag-regime *warning* below) → a physical re-entry that **stops & reports** (`termination_reason="reentry"`, partial `Trajectory`); anything else re-raises `NumericalPropagationError` (invariant: prefer a false re-raise over a false `reentry`). See the Failure modes table.
 - **Drag-regime warnings (run continues).** Two-tier, edge-aware, warn-once — the free-molecular Knudsen floor and the table edges; see "Drag-coefficient modeling".
 - **User limits (optional).** An `AltitudeLimits` passed as `limits=` adds terminal altitude bounds that **nest inside** the system backstops (they can only *tighten* termination). A reasonable crossing stops & reports (`termination_reason="user_min"`/`"user_max"`); an unreasonable limit (outside the backstops) is rejected at `AltitudeLimits` construction with `ValueError` (it could never bind — the system backstop fires first).
 - **Reporting contract.** Every runtime termination — impact, escape, re-entry, reasonable user-limit — *stops and reports*: it returns the partial `Trajectory` (samples up to the crossing) with `terminated` / `termination_reason` / `termination_epoch` metadata, written only when terminated. The sole `raise` on the guard path is the construction-time `ValueError` for an unreasonable `AltitudeLimits`.
@@ -578,11 +581,17 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 
 ## 1.2 TLE fitter
 
-> **Status: NOT STARTED.**
+> **Status: NOT STARTED (design sketch).** The binding `fit_tle` signature, the three reference-input paths, and the data-flow diagrams already live in `architecture.md` §8; the blurb below is a placeholder to be expanded into a full sub-design when 1.2 is scheduled. It is built **last** (architecture §12) and treated as a plus, not a blocker.
+
+Fit a TLE to an observed orbit by least-squares, so a high-fidelity numerical result — or user-supplied observations — can be re-expressed as a shareable TLE under SGP4. `fit_tle(reference, *, fitting_span, force_models, initial_guess, max_iterations)` accepts either a `State` (propagated internally over `fitting_span` to build the reference trajectory) or a `Trajectory` (used directly), and returns a bare `TLE` (a richer `FitResult` is a deferred extension). It leans on Orekit's built-in TLE-generation/fitting machinery for the iterative osculating→mean fit.
+
+The defining caveat, stated loudly in the docstring: the fit is **inherently lossy** because SGP4 is a simplified model (J2/J3/J4 zonal + single B\* drag for the near-Earth branch; simplified luni-solar + resonance for deep-space). A full-force numerical orbit can never be reproduced exactly. This is the faithful sibling of 1.3's deliberately-unfaithful `TLE.from_state_unfitted`.
+
+**To flesh out when scheduled:** convergence/quality reporting (the deferred `FitResult`), B\* handling (fit vs. fixed), the initial-guess strategy, and failure modes (non-convergence).
 
 ## 1.3 TLE propagator
 
-> **Status: DRAFTED.** Signature, frame handling, outputs, the osculating-element CSV columns, the row→TLE utility, and metadata are settled. 1.3 reuses 1.1's `Trajectory`, plotting stack, and exporters wholesale; only the propagation core and the native output frame differ.
+> **Status: DRAFTED.** Signature, frame handling, outputs, the osculating-element CSV columns, the row→TLE utility, and metadata are settled. 1.3 reuses 1.1's `Trajectory`, plotting stack, and exporters wholesale; only the propagation core and the native output frame differ. **The observer-centric sky view (the `look_angles` primitive + sky-track plot) has moved out of 1.3 to Feature 1.4** — the live tracker now needs a live sky-view panel, so the primitive is first built there and still pulls Feature 1.5's foundation forward (architecture §12). 1.3 is therefore now purely SGP4 propagation reusing 1.1's outputs; see §1.4.
 
 SGP4/SDP4 propagation of a TLE, producing the same `Trajectory` output and the same visual/CSV products as 1.1. The propagation core is Orekit's `TLEPropagator.selectExtrapolator(tle)`, which automatically picks the near-Earth (SGP4, period < 225 min) or deep-space (SDP4) branch — no user-facing knob.
 
@@ -605,7 +614,7 @@ Notice what is absent relative to `propagate_numerical`: no `force_models`, `spa
 
 **`duration` calling convention.** `duration` sits before the `*`, so — exactly like 1.1's `propagate_numerical(initial, duration, *, ...)` — it is positional-or-keyword: `propagate_tle(tle, 86400)` and `propagate_tle(tle, duration=86400)` both work. An earlier draft made it keyword-only; that is dropped, so the two propagators share one calling convention for `duration`. With `output_step` now *also* required and keyword-only (below), the calling conventions are identical — the only signature differences are 1.3's **absent** `force_models` / `spacecraft` / `attitude` / `integrator` inputs and its added `start`.
 
-**`output_step` required (no default).** `output_step` is required and keyword-only, **exactly as in 1.1** — there is no 60 s default. An earlier draft defaulted it for quick-look convenience; that is dropped in favour of full cross-feature consistency. The decisive reason is that a *defaulted* step turns the `output_step > duration` guard into a foot-gun: a short quick-look like `propagate_tle(tle, 30)` would raise `ValueError` for a step the user never chose. Requiring the step makes that guard unambiguous (the user always picked it) and lets 1.3 reuse 1.1's pre-flight validation **wholesale** — the positive/ordered-step checks *and* the output-sample cap (below) — rather than a bespoke relaxed copy. The cost is one extra keyword at the call site (`propagate_tle(tle, 3600, output_step=60)`); the README / §9 examples already pass it explicitly.
+**`output_step` required (no default).** `output_step` is required and keyword-only, **exactly as in 1.1** — there is no 60 s default. An earlier draft defaulted it for quick-look convenience; that is dropped in favour of full cross-feature consistency. The decisive reason is that a *defaulted* step turns the `output_step > duration` guard into a foot-gun: a short quick-look like `propagate_tle(tle, 30)` would raise `ValueError` for a step the user never chose. Requiring the step makes that guard unambiguous (the user always picked it) and lets 1.3 reuse 1.1's propagator-agnostic pre-flight via the promoted shared `core/sampling.py` helper — the positive/ordered-step checks *and* the output-sample cap (below) — rather than a bespoke relaxed copy. (1.1's `_validate_inputs` interleaves these with numerical-only checks, so the shared subset is extracted to `core/` rather than reused in place; see `docs/build-plan-feature-1.3-notes.md` #7.) The cost is one extra keyword at the call site (`propagate_tle(tle, 3600, output_step=60)`); the README / §9 examples already pass it explicitly.
 
 **`start` default.** Defaults to the TLE's own epoch (`tle.epoch`), because SGP4 is most accurate at epoch and degrades away from it. The common alternative is `start=Epoch.now()` for a "where is it now and next" view; both are documented, with the accuracy caveat below.
 
@@ -667,46 +676,9 @@ One expected artifact: because osculating elements wobble over an orbit, emittin
 
 `TLE.from_state_unfitted` lives on the `TLE` type in `core/` (architecture §6); building a TLE from a `State` (both core types) respects the dependency rule. The `unfitted` qualifier is deliberate: `fit_tle` is the faithful sibling, and the asymmetry should be visible at the call site.
 
-### Sky view (observer-centric output)
+### Sky view — moved to Feature 1.4
 
-> **Status: DRAFTED — pulls Feature 1.5 infrastructure forward.** A geometry-only sky-track plot plus the topocentric look-angle primitive it rides on. Both are reused verbatim by Feature 1.5, so building them here brings 1.5's foundation forward; it is *not* throwaway 1.3 work (see `docs/build-plan-feature-1.3-notes.md` Note 4).
-
-Beyond the trajectory and CSV products above, 1.3 adds one **observer-centric** output: the satellite's path across the sky as seen from a `GroundStation`, drawn on a whole-sky polar plot. This does **not** change `propagate_tle` — exactly like `plot_3d` / `export_csv`, it consumes the returned `Trajectory` (here together with a station), so the propagator signature stays frozen. It is an additive plotting verb, not a propagator knob.
-
-**The look-angle primitive.** A new core helper computes the topocentric look angles of a state from a station:
-
-```python
-@dataclass(frozen=True)
-class AzElRange:
-    azimuth_deg: float       # 0 = North, increasing clockwise toward East
-    elevation_deg: float     # 0 = horizon, +90 = zenith (negative = below horizon)
-    range_m: float           # straight-line station → satellite distance
-
-
-def look_angles(station: GroundStation, state: State) -> AzElRange: ...
-```
-
-`look_angles` is the exact analogue of `to_geodetic` (architecture §6): its result (`AzElRange`) carries **no `Frame`**, so by the explicit-frame rule (architecture §10, which governs only `State`/`Trajectory`-returning paths) it is *allowed* to convert its input internally — the caller need not pre-convert the trajectory's TEME states. Internally it builds an Orekit `TopocentricFrame` on the canonical WGS84 Earth ellipsoid (`core/bodies.py`) at the station's geodetic point and reads off azimuth / elevation / range, so it **touches the JVM** (lazy-imports jpype inside the body, like `to_geodetic`; it is *not* part of the safe-before-init surface). It lives in `core/observation.py` beside `GroundStation` / `AzElRange`, which keeps it reachable from both `plotting/` (this sky track) and `tracking/` (Feature 1.5's `find_passes`) without crossing the inward dependency rule (architecture §7). Built once here, used by both features.
-
-**The plot verb.**
-
-```python
-def plot_sky_track(
-    trajectory: Trajectory,
-    station: GroundStation,
-    *,
-    min_elevation_deg: float = 0.0,    # horizon clip; samples below are lifted from the line
-) -> "matplotlib.figure.Figure":
-```
-
-It lives in `plotting/trajectories.py` next to `plot_ground_track` — the two are siblings (the *ground track* is the nadir view, the *sky track* is the observer view; both matplotlib, both take a `Trajectory`). It maps each trajectory sample through `look_angles` and draws the result on a **matplotlib polar projection** (architecture §10: polar is the sky-chart backend). Conventions: North at the top, azimuth increasing clockwise (`set_theta_zero_location('N')`, `set_theta_direction(-1)`); the radius is the zenith angle, so the **zenith sits at the centre and the horizon is the outer rim** (elevation 90°→0° mapped to radius 0°→90°). The sky disk (the polar axes face) is a fixed **light blue**; the satellite track is a single **dark-blue** line — deliberately *not* the blue→red time gradient of the ground-track / 3-D views, because an observer reads a sky track as one continuous path (a per-arc direction glyph, in the spirit of the `v0.2.0` direction-markers addendum, is a natural later add). It returns the native matplotlib `Figure` (architecture §10), so it composes with `savefig` / the export path like the other matplotlib verbs.
-
-**Geometry only — the 1.3 ↔ 1.5 line.** `plot_sky_track` draws *only the geometry*: where the satellite is in the sky, with no notion of discrete passes, no eclipse / lit shading, and no brightness. Those belong to Feature 1.5's richer `plot_sky_chart` (`plotting/passes.py`, architecture §7), which consumes `Pass` objects (rise / culmination / set, `peak_magnitude`, `sunlit_at_culmination`) and layers them on the **same** `look_angles` primitive. Holding this line is what stops 1.3 from absorbing 1.5: 1.3 ships the reusable primitive plus a thin geometry plot; 1.5 adds passes and brightness on top.
-
-**Two build-time points** (flagged for the build plan; neither is signature-level):
-
-- **Disjoint arcs.** Over a multi-hour span the satellite rises and sets several times, so its sky track is several separate arcs. Drawn as one polyline, matplotlib would join each set to the next rise with a chord straight across the disk. The fix is to mask samples below `min_elevation_deg` to `NaN` (lifting the pen), so each visible arc draws on its own.
-- **Never-visible span.** If no sample clears `min_elevation_deg` (the satellite never rises for that station over the span), draw the empty sky disk and emit a one-time `warnings.warn` rather than returning a blank figure silently — mirroring 1.3's other warn-once idiom (the stale-TLE warning).
+> **Relocated.** Earlier drafts gave 1.3 a geometry-only sky-track plot plus the topocentric `look_angles(station, state) -> AzElRange` primitive (`core/observation.py`) it rides on, built here to pull Feature 1.5's foundation forward. That infrastructure has moved to **Feature 1.4** (§1.4): the live tracker needs a live sky-view panel, so `look_angles` and the `_draw_sky_track` primitive / `plot_sky_track` verb (`plotting/trajectories.py`) are now first built there — still *before* 1.5 in the build order (architecture §12), so the forward-pull for 1.5's `find_passes` / `plot_sky_chart` is preserved. `propagate_tle`'s signature is unchanged either way; the sky view was always an additive plotting verb, never a propagator knob. The full design (primitive, plot verb, polar conventions, disjoint-arc and never-visible handling) now lives in §1.4. The `AzElRange` / `look_angles` types are still specified in architecture §6.
 
 ### Metadata
 
@@ -726,7 +698,7 @@ It lives in `plotting/trajectories.py` next to `plot_ground_track` — the two a
 }
 ```
 
-The source TLE lines make an SGP4 trajectory exactly reproducible. `propagator` is always `"sgp4"` — that single token also covers the auto-selected deep-space (SDP4) branch (`selectExtrapolator` switches internally past the ~225-min period cutoff), and because the TLE lines are recorded the branch is reproducible with no separate token, so no `"sdp4"` value is introduced (it stays the architecture §6 `"numerical" | "sgp4"` set). The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. `norad_id` is stored as an `int` (mirroring `TLE.norad_id`, architecture §6); the export writer stringifies it in the CSV header like every other metadata value, so storing it as a number costs nothing at the boundary. No `force_models` / `integrator` keys — they don't apply.
+The source TLE lines make an SGP4 trajectory exactly reproducible. `propagator` is always `"sgp4"` — that single token also covers the auto-selected deep-space (SDP4) branch (`selectExtrapolator` switches internally past the ~225-min period cutoff), and because the TLE lines are recorded the branch is reproducible with no separate token, so no `"sdp4"` value is introduced (it stays within the architecture §6 `"numerical" | "sgp4" | "user"` set — `"user"` tags a hand-assembled trajectory and is emitted by `_default_metadata`). The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. `norad_id` is stored as an `int` (mirroring `TLE.norad_id`, architecture §6); the export writer stringifies it in the CSV header like every other metadata value, so storing it as a number costs nothing at the boundary. No `force_models` / `integrator` keys — they don't apply.
 
 ### CSV export edits still needed (temporary note)
 
@@ -757,8 +729,8 @@ Per architecture §11:
 - **Signature** — `duration` required, **positional-or-keyword** (aligned with 1.1); `output_step` required and keyword-only, **no default** (the former 60 s default is dropped for full 1.1 consistency and to keep the `output_step > duration` guard unambiguous); `start` defaults to `tle.epoch`. No force/spacecraft/attitude/integrator inputs.
 - **Output frame** — native TEME from the propagator; EME2000 as the default display inertial frame (TEME selectable **in the plot verbs**, not in `export_csv`); ITRF for ground-relative views. Opt-in Keplerian / `mean_anomaly` CSV columns are always computed in EME2000 (architecture §6), since only i/Ω/ω are frame-sensitive.
 - **Outputs** — 1.1's `plot_summary` / `plot_3d` / `plot_speed` / `export_all` reused unchanged; **Keplerian elements stay opt-in** (1.1's convention), with mean anomaly **M** as a new separate `mean_anomaly` token (not yet built — see the temporary CSV note).
-- **Sky view** — a new observer-centric output: `plot_sky_track(trajectory, station, *, min_elevation_deg=0.0)` (matplotlib polar, **geometry-only**) built on the reusable `look_angles(station, state) -> AzElRange` topocentric primitive in `core/observation.py`. Both are shared verbatim with Feature 1.5 (`find_passes` / `plot_sky_chart`), so this pulls 1.5's look-angle foundation forward; passes / lighting / brightness stay in 1.5. `propagate_tle`'s signature is unchanged — the sky view is an additive plotting verb (architecture §6/§7; build-plan notes Note 4).
-- **Terminal behavior** — no altitude-guard family and no `limits=` (SGP4 has none of numerical integration's failure modes; escape is structurally moot for a bound TLE); argument errors raise `ValueError`, and SGP4/SDP4 decay / internal failures are caught and re-raised as `TLEPropagationError` (no stop-and-report, no `termination_*` metadata). Pre-flight reuses 1.1's input validation, including the shared output-sample cap (`_MAX_OUTPUT_SAMPLES`); a far-from-epoch span emits a warn-once stale-TLE warning, never an error.
+- **Sky view** — **moved to Feature 1.4** (§1.4). The `look_angles(station, state) -> AzElRange` primitive (`core/observation.py`) and the geometry-only sky-track plot are now first built for 1.4's live sky-view panel — still before 1.5 in the build order, so the forward-pull for 1.5 (`find_passes` / `plot_sky_chart`) is preserved. `propagate_tle`'s signature is unchanged.
+- **Terminal behavior** — no altitude-guard family and no `limits=` (SGP4 has none of numerical integration's failure modes; escape is structurally moot for a bound TLE); argument errors raise `ValueError`, and SGP4/SDP4 decay / internal failures are caught and re-raised as `TLEPropagationError` (no stop-and-report, no `termination_*` metadata). Pre-flight reuses 1.1's propagator-agnostic checks via the promoted shared `core/sampling.py` helper (positive/ordered-step checks + the shared `_MAX_OUTPUT_SAMPLES` cap), not the monolithic `_validate_inputs` in place; a far-from-epoch span emits a warn-once stale-TLE warning, never an error.
 - **Row → TLE** — `TLE.from_state_unfitted`, a format-valid (not round-trip-faithful) utility using TEME osculating elements and ν→M; `norad_id` / `bstar` are optional with placeholder defaults (a `State` carries neither); faithful TLEs are 1.2's `fit_tle`.
 - **Metadata** — `propagator: "sgp4"` plus source-TLE keys (`norad_id` typed `int`); requires the §6 `TrajectoryMetadata` additions.
 
@@ -770,8 +742,130 @@ Per architecture §11:
 
 ## 1.4 Real-time tracker
 
-> **Status: NOT STARTED.**
+> **Status: DRAFTED (core decisions settled; signature/parameters provisional).** Two layers: (a) the cheap **real-time primitives** (`current_position` / `current_ground_position`) sketched in architecture §7, and (b) a **live, buffered dashboard** — the substance of this feature. The live-view decisions below are settled; the concrete `live_track` signature, the buffer-window / refresh-cadence parameters, and the exact panel layout are provisional and will be finalized in the build plan. 1.4 is also where the sky-view infrastructure relocated from 1.3 (the `look_angles` primitive + sky-track plot) is first built — still before 1.5, so 1.5's foundation is pulled forward (architecture §12).
+
+1.4 answers "where is this satellite *now*, and show me." It has a cheap query layer and a richer live-visualization layer; both ride on 1.3's `propagate_tle` and 1.1's output primitives, so 1.4 adds little new physics — it is composition.
+
+### Real-time primitives
+
+```python
+def current_position(tle: TLE) -> State: ...              # TEME (SGP4-native); .to_frame(...) to convert
+def current_ground_position(tle: TLE) -> GeodeticPosition: ...  # TEME→ITRF→geodetic, lat/lon/alt directly
+```
+
+`current_position` returns the satellite state at `Epoch.now()` in **TEME** (the natural SGP4 frame; no silent conversion, architecture §10). `current_ground_position` returns a `GeodeticPosition` (lat/lon/alt) directly — it carries no `Frame`, so it is allowed to convert internally (TEME→ITRF→geodetic). Both live in `tracking/realtime.py`; both are `propagate_tle` evaluated at one instant. The **6-hour realtime cache TTL** (architecture §10) governs the fetch path that feeds them.
+
+### Live dashboard
+
+A live, self-updating matplotlib view that tracks the satellite in real time across four panels: **ground track, altitude, speed, and sky view**. It is a *display item only* — ephemeral, not saved.
+
+**Buffer engine (pure, headless-testable).** The engine maintains a rolling `Trajectory` buffer covering roughly `[now, now + window]`, produced by `propagate_tle`. Each frame it reads the current state by interpolation — `buffer.at(Epoch.now())`, the already-built cached-`Ephemeris` Hermite lookup (architecture §6) — so rendering is smooth and decoupled from the buffer's `output_step`. When `now` nears the end of the buffer (or on a refresh cadence), the engine extends/replaces the buffer by re-propagating. **Auto-refresh:** if the satellite was obtained via the fetch path (a name / NORAD id resolved through `fetch_tle`), the refresh also re-fetches the TLE — transparently picking up CelesTrak updates within the 6-hour cache TTL — so a long-running view stays accurate; a directly-supplied `TLE` is only re-propagated. The buffer/refresh state machine is plain Python over existing verbs and is tested directly, without a display.
+
+**The view (the only "live" part).** A single `matplotlib.animation.FuncAnimation` drives a 4-axes figure, redrawing each panel per tick via the **1.1 `_draw_*(ax, ...)` primitives** (`_draw_ground_track`, `_draw_altitude`, `_draw_speed`) plus the new **`_draw_sky_track`** (below). v1 uses clear-and-redraw per frame; blitting / artist-update is a later optimization. The function returns the native `FuncAnimation` object (consistent with "every `plot_*` returns its native figure", architecture §10).
+
+**Backend-agnostic rendering.** The same `FuncAnimation` renders in either context — *where* it draws is decided by the active matplotlib backend, not by the code:
+
+- **Desktop window** under a GUI backend (`%matplotlib qt` / `tk`, or run as a script) — a pop-out live dashboard window.
+- **In-notebook** under `%matplotlib widget` (ipympl) — a live interactive canvas embedded in the output cell (fits the Phase-1 "Learners / notebooks" audience, architecture §2).
+- **Caveat (documented):** the notebook *default* backend (`%matplotlib inline`) does **not** animate — it draws a static snapshot. Live animation requires `%matplotlib widget` or a GUI backend.
+
+**Display only, not saved.** A live `FuncAnimation` off the buffer is ephemeral by design — v1 never calls `anim.save()`, so there is no ffmpeg/Pillow writer dependency and no saved artifact. (Export to mp4/gif is explicitly out of scope; it could be added later.) The live view is therefore **not snapshot-tested** (architecture §11) — the buffer engine is tested headlessly; the animation loop is not.
+
+**Provisional signature** (to finalize in the build plan):
+
+```python
+def live_track(
+    target: TLE | str,                 # a TLE (re-propagate only) or a name/NORAD id (fetched → auto-refresh)
+    station: GroundStation | None = None,   # enables the sky-view panel; omitted → 3-panel view
+    *,
+    output_step: float = 10.0,         # buffer sampling cadence, seconds
+    window_s: float = 5400.0,          # buffer span ahead of now (~1 LEO orbit)
+    refresh_s: float = 1.0,            # wall-clock redraw interval
+    speed_frame: Frame = Frame.EME2000,
+) -> "matplotlib.animation.FuncAnimation":
+```
+
+Open: whether the sky panel requires a `station` (above) or is simply omitted when none is given; the default `window_s` / `output_step`; and whether to expose a time-acceleration multiplier (default real-time).
+
+### Sky view (relocated from 1.3)
+
+The geometry-only sky view — moved here from 1.3 because the live dashboard needs a live sky panel — is built in 1.4 and **reused verbatim by Feature 1.5**, so it pulls 1.5's topocentric foundation forward.
+
+**The look-angle primitive** (`core/observation.py`):
+
+```python
+@dataclass(frozen=True)
+class AzElRange:
+    azimuth_deg: float       # 0 = North, increasing clockwise toward East
+    elevation_deg: float     # 0 = horizon, +90 = zenith (negative = below horizon)
+    range_m: float           # straight-line station → satellite distance
+
+
+def look_angles(station: GroundStation, state: State) -> AzElRange: ...
+```
+
+`look_angles` is the exact analogue of `to_geodetic` (architecture §6): `AzElRange` carries **no `Frame`**, so by the explicit-frame rule (architecture §10) it may convert its input internally — callers need not pre-convert TEME states. Internally it builds an Orekit `TopocentricFrame` on the canonical WGS84 ellipsoid (`core/bodies.py`) at the station's geodetic point, so it **touches the JVM** (lazy-imports jpype in the body; *not* safe-before-init). It lives in `core/observation.py` beside `GroundStation` / `AzElRange`, reachable from both `plotting/` (the sky track) and `tracking/` (1.5's `find_passes`) without crossing the inward dependency rule (architecture §7).
+
+**The plot verb + primitive** (`plotting/trajectories.py`):
+
+```python
+def plot_sky_track(
+    trajectory: Trajectory,
+    station: GroundStation,
+    *,
+    min_elevation_deg: float = 0.0,   # horizon clip; samples below are lifted from the line
+) -> "matplotlib.figure.Figure": ...
+```
+
+A thin wrapper over a `_draw_sky_track(ax, trajectory, station, ...)` primitive (the 1.1 pattern), so the live dashboard's sky panel and the standalone verb share one drawing path. It maps each sample through `look_angles` and draws on a **matplotlib polar projection** (architecture §10): North at top, azimuth clockwise (`set_theta_zero_location('N')`, `set_theta_direction(-1)`); radius is the zenith angle, so **zenith at the centre, horizon at the rim** (elevation 90°→0° → radius 0°→90°). The sky disk is a fixed light blue; the track is a single dark-blue line (not the blue→red time gradient — an observer reads a sky track as one continuous path). Returns the native matplotlib `Figure`.
+
+**Geometry only — the 1.4 ↔ 1.5 line.** `plot_sky_track` draws *only the geometry*: no discrete passes, no eclipse/lit shading, no brightness. Those belong to 1.5's richer `plot_sky_chart` (`plotting/passes.py`), which consumes `Pass` objects and layers them on the **same** `look_angles` primitive. 1.4 ships the reusable primitive plus a thin geometry plot; 1.5 adds passes and brightness on top.
+
+**Two build-time points** (neither signature-level):
+
+- **Disjoint arcs.** Over a multi-hour span the satellite rises and sets several times. Drawn as one polyline, matplotlib would join each set to the next rise with a chord across the disk. Mask samples below `min_elevation_deg` to `NaN` (lift the pen) so each visible arc draws on its own.
+- **Never-visible span.** If no sample clears `min_elevation_deg`, draw the empty sky disk and emit a one-time `warnings.warn` rather than returning a blank figure silently.
+
+### Module placement & dependency rule
+
+- `tracking/realtime.py` — `current_position`, `current_ground_position` (the cheap primitives).
+- `tracking/live.py` — the buffer engine + the `FuncAnimation` driver. It **lazily imports `plotting/` inside the function body** (the `io/exports.py::export_all` precedent, architecture §7), so `tracking/`'s static module graph stays clean and the headless suites never pull `plotting/`; the one `tracking → plotting` edge exists only at call time, when the user has asked for a live view.
+- `core/observation.py` — `look_angles` / `AzElRange` (shared with 1.5).
+- `plotting/trajectories.py` — `plot_sky_track` + `_draw_sky_track`.
+
+### Resolved decisions for 1.4
+
+- **Scope** — cheap real-time primitives **plus** a live buffered dashboard (the richest tracking feature), not just "where is it now."
+- **Live rendering** — one backend-agnostic `matplotlib` `FuncAnimation` over a rolling `Trajectory` buffer; desktop window or in-notebook (`%matplotlib widget`); **display only, not saved**; returns the native animation object.
+- **Buffer/refresh** — sample `buffer.at(now)` per frame (Hermite lookup); refresh by re-propagation as the buffer drains; **auto-refresh the TLE when the target was fetched** (6-hour cache TTL), re-propagate only when a raw `TLE` is supplied.
+- **Panels** — ground track / altitude / speed / sky view, reusing the 1.1 `_draw_*` primitives + the new `_draw_sky_track`.
+- **Sky view relocated from 1.3** — `look_angles` + `AzElRange` (`core/observation.py`) and `plot_sky_track` / `_draw_sky_track` (`plotting/trajectories.py`) are first built here; reused verbatim by 1.5.
+- **Dependency rule** — `tracking/live.py` lazily imports `plotting/` (the `export_all` precedent); the buffer engine is headless-testable.
+
+### Still open / deferred for 1.4
+
+- Final `live_track` signature; default `window_s` / `output_step` / `refresh_s`; whether the sky panel is gated on a `station` argument.
+- A time-acceleration multiplier (fast-forward / scrub) — default is real-time; deferred.
+- Saving the animation to mp4/gif — out of scope for v1 (display only).
+- Performance: blitting / artist-data updates instead of clear-and-redraw — a later optimization.
 
 ## 1.5 Ground passes + brightness
 
-> **Status: NOT STARTED.**
+> **Status: NOT STARTED (design sketch).** The `find_passes` signature, the `Pass` type, and the data-flow live in architecture §6/§7/§8; the blurb below is a placeholder to be expanded into a full sub-design when 1.5 is scheduled. 1.5 reuses the `look_angles` primitive built in 1.4.
+
+The synthesis feature: given a TLE, a `GroundStation`, and a time window, find future **visible passes** — when the satellite is above the horizon, sunlit, and the observer is in darkness — with an estimated **visual magnitude**. It combines tracking, lighting geometry, and eclipse logic.
+
+```python
+def find_passes(tle, station, start, duration, min_elevation_deg) -> list[Pass]: ...
+```
+
+A `Pass` carries `rise` / `culmination` / `set` epochs, `max_elevation_deg`, `peak_magnitude` (None if not computed), and `sunlit_at_culmination` (architecture §6). The internal pipeline (architecture §8): propagate the TLE → find horizon crossings → check elevation → check lighting (satellite lit, observer dark, not in Earth's shadow) → compute magnitude.
+
+**Outputs — two forms, cheap and rich.**
+
+- **Pass table (cheap).** A tabular view of `list[Pass]` for quick reading — a `passes_to_dataframe(passes) -> pd.DataFrame` (pandas already a dep, mirroring `Trajectory.to_dataframe`) and/or a formatted-text table. Plus the already-anticipated `io/exports` **Pass list → ICS/CSV** export (architecture §7). Cheap formatting of an existing core type — no new dependency.
+- **Sky charts (rich).** `plot_sky_chart` (`plotting/passes.py`, matplotlib polar) layers `Pass` objects — rise/culmination/set, brightness, lit/eclipse shading — onto the **same** `look_angles` primitive built in 1.4, plus `plot_pass_timeline`.
+
+**Brightness.** Visual magnitude uses the citation-backed standard-magnitude table in `core/catalogs.py` (intrinsic brightness at 1000 km, 50% phase angle), corrected for range and phase angle in `tracking/visibility.py` (`compute_magnitude`). Satellites outside the registry need a user-supplied magnitude, or passes are returned without a magnitude estimate (architecture §3).
+
+**To flesh out when scheduled:** the horizon-crossing / culmination search algorithm, the eclipse + lighting model, the magnitude/phase-angle math and its references, and the exact sky-chart / timeline layouts.
