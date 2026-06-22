@@ -231,13 +231,25 @@ def _ensure_started() -> None:
     init()
 
 
+def _cache_dir() -> Path:
+    """The propygator on-disk cache root, ``~/.propygator/cache/`` (architecture §10).
+
+    The single source of truth for the cache location, shared by :func:`clear_cache`
+    and the TLE fetch path (``tle.sources``) so a fetched TLE written here is cleared
+    by ``clear_cache()`` by construction. Pure-Python; the directory is created lazily
+    by writers, not here. (Tests monkeypatch this one function to redirect the cache to
+    a ``tmp_path`` and never touch the real ``~/.propygator/``.)
+    """
+    return Path.home() / ".propygator" / "cache"
+
+
 def clear_cache() -> None:
     """Recursively empty ``~/.propygator/cache/``, preserving the directory.
 
     No-op if the cache directory does not exist. Selective clearing (by source,
     satellite, or age) is out of scope for v1 (architecture §10).
     """
-    cache_dir = Path.home() / ".propygator" / "cache"
+    cache_dir = _cache_dir()
     if not cache_dir.is_dir():
         logger.debug("No cache to clear at %s", cache_dir)
         return

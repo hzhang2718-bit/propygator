@@ -484,10 +484,11 @@ def export_csv(traj, path, *, columns=None) -> None: ...
 
 **CSV columns.** Default set (`columns=None`), 16 columns: `epoch_utc` (ISO), `epoch_mjd_utc`, `x/y/z_eme2000_m`, `vx/vy/vz_eme2000_mps`, `x/y/z_itrf_m`, `latitude_deg`/`longitude_deg`/`altitude_m` (geodetic, WGS84), `speed_inertial_mps` (EME2000-relative magnitude), `speed_itrf_mps` (ground-relative magnitude). `columns` is additive — a list of opt-in group tokens appended to the defaults:
 
-- Keplerian elements (a, e, i, Ω, ω, ν), computed **in EME2000** (the trajectory frame). Near-circular / near-equatorial orbits make ω, Ω, ν individually ill-conditioned (argument of latitude is the stable combination); see architecture §6.
-- Sun position / direction columns (Sun lives in `core/bodies.py`, reachable without violating the dependency rule).
+- Keplerian elements (a, e, i, Ω, ω, ν) — token `keplerian` — computed **in EME2000** (the trajectory frame). Near-circular / near-equatorial orbits make ω, Ω, ν individually ill-conditioned (argument of latitude is the stable combination); see architecture §6.
+- Mean anomaly `mean_anomaly_deg` — token `mean_anomaly` — a single column computed per row via `KeplerianElements.mean_anomaly()`. Kept **separate** from the `keplerian` token so that group's pinned six-column set (and 1.1's CSV snapshots) stay byte-stable. Frame-invariant (M depends only on e and ν), though computed in EME2000 like the other element columns for consistency.
+- Sun position / direction columns — token `sun` (Sun lives in `core/bodies.py`, reachable without violating the dependency rule).
 
-An eclipse flag is intentionally excluded — it would force `io/` to import `tracking/visibility.py` (architecture §7). Metadata goes in the CSV header as `# key: value` comment lines.
+Opt-in groups are appended in the fixed canonical order `keplerian, mean_anomaly, sun`, regardless of the order tokens are passed in `columns`, so the schema stays deterministic. An eclipse flag is intentionally excluded — it would force `io/` to import `tracking/visibility.py` (architecture §7). Metadata goes in the CSV header as `# key: value` comment lines.
 
 ### `export_all` convenience function
 
@@ -608,7 +609,7 @@ def propagate_tle(
 ) -> Trajectory:
 ```
 
-The TLE comes from `TLE.from_strings(...)`, `TLE.from_norad_id(...)`, or `fetch_tle("ISS")` — friendly names resolve through the popular-satellite registry in `core/catalogs.py`, and the 6h/24h cache TTLs apply on the fetch path (architecture §10).
+The TLE comes from `TLE.from_strings(...)`, `TLE.from_norad_id(...)`, or `fetch_tle("ISS")` — friendly names resolve through the popular-satellite registry in `core/catalogs.py`, and the 6h/24h cache TTLs apply on the fetch path (architecture §10). On the fetch path a network/HTTP **transport** failure (no network, DNS failure, connection refused, timeout, or an HTTP error status) raises `TLEFetchError` — a `PropygatorError` subclass carrying a clean message that names the NORAD id and the offline `TLE.from_strings` escape hatch, never `requests`' raw traceback (architecture §3). An id that resolves but returns no object, a malformed response block, or an unknown `source` raises `ValueError` (not-found / input conditions, not transport failures); `TLE.from_norad_id` shares this behavior since it delegates to `fetch_tle`.
 
 Notice what is absent relative to `propagate_numerical`: no `force_models`, `spacecraft`, `attitude`, or `integrator`. SGP4 is self-contained — its drag rides in the TLE's B\* term and the theory is fixed — which is what makes 1.3 the simple feature.
 
@@ -648,7 +649,7 @@ The visual and CSV products are 1.1's, reused unchanged: the stacked `plot_summa
 
 **Keplerian elements stay opt-in (1.1's convention).** An earlier draft turned the six classical elements (a, e, i, Ω, ω, ν) on by default for 1.3 because SGP4 is element-based. That is dropped: 1.3 respects 1.1's opt-in `columns=["keplerian"]` convention, so `export_csv(traj, path)` yields the identical 16 default columns for both propagators and `io/` needs no propagator-type branch. A 1.3 user who wants elements passes the token explicitly; they are **osculating** elements computed from each row's state **in EME2000** — `export_csv` converts to EME2000 for every column regardless of the trajectory's frame (architecture §6), so the elements are reported there, not in TEME. (Only i, Ω, ω are frame-sensitive; a, e, ν — and the `mean_anomaly` token below — are rotation-invariant between inertial frames, so the choice is immaterial for them.)
 
-**Mean anomaly M — a new opt-in token.** For the row→TLE path below it is convenient to have mean anomaly M alongside the true anomaly ν. M is exposed as its own additive CSV token (`columns=["mean_anomaly"]`), kept **separate** from the `keplerian` token so that token's pinned six-column set — and 1.1's CSV snapshot tests — stay byte-stable. M is cheap and already computed: `KeplerianElements.mean_anomaly()` exists (architecture §6) and the forward Kepler chain ν→E→M is closed-form (no iteration). **This token is not yet built — see "CSV export edits still needed" below.**
+**Mean anomaly M — a new opt-in token.** For the row→TLE path below it is convenient to have mean anomaly M alongside the true anomaly ν. M is exposed as its own additive CSV token (`columns=["mean_anomaly"]`), kept **separate** from the `keplerian` token so that token's pinned six-column set — and 1.1's CSV snapshot tests — stay byte-stable. M is cheap and already computed: `KeplerianElements.mean_anomaly()` exists (architecture §6) and the forward Kepler chain ν→E→M is closed-form (no iteration). The token is built and documented as a first-class CSV token in features §1.1 "CSV columns".
 
 **Row → TLE (`TLE.from_state_unfitted`).** Any row's state can be turned into a syntactically valid TLE:
 
@@ -700,17 +701,6 @@ One expected artifact: because osculating elements wobble over an orbit, emittin
 
 The source TLE lines make an SGP4 trajectory exactly reproducible. `propagator` is always `"sgp4"` — that single token also covers the auto-selected deep-space (SDP4) branch (`selectExtrapolator` switches internally past the ~225-min period cutoff), and because the TLE lines are recorded the branch is reproducible with no separate token, so no `"sdp4"` value is introduced (it stays within the architecture §6 `"numerical" | "sgp4" | "user"` set — `"user"` tags a hand-assembled trajectory and is emitted by `_default_metadata`). The `tle_line1` / `tle_line2` / `norad_id` / `tle_epoch` / `start` keys are new optional `TrajectoryMetadata` fields (architecture §6), analogous to the `spacecraft` / `attitude` / `name` keys added for 1.1. `norad_id` is stored as an `int` (mirroring `TLE.norad_id`, architecture §6); the export writer stringifies it in the CSV header like every other metadata value, so storing it as a number costs nothing at the boundary. No `force_models` / `integrator` keys — they don't apply.
 
-### CSV export edits still needed (temporary note)
-
-> **TEMPORARY — delete once built.** When `export_csv` and its additive token set were designed for 1.1 (features §1.1, "CSV columns"), a mean-anomaly column was not anticipated; the tokens that shipped are `keplerian` and `sun` only. Adding the **`mean_anomaly`** token for 1.3 is therefore a small but real change to `io/exports.py`, not a free reuse — the one place 1.3's "outputs reused unchanged" claim is not literally true. The work:
->
-> - Register `"mean_anomaly"` as a new additive group token alongside `keplerian` / `sun` — a single column (`mean_anomaly_deg`), computed per row via `KeplerianElements.mean_anomaly()` (frame-invariant: it depends only on e and ν, so the export's fixed EME2000 element frame is immaterial here).
-> - Insert `"mean_anomaly"` into `_GROUP_ORDER` between `keplerian` and `sun` (canonical appended order `keplerian, mean_anomaly, sun`) so the opt-in column block stays deterministic and 1.1's CSV snapshots are unaffected when the token is unused.
-> - Keep it **separate** from the `keplerian` token so that token's pinned six-column set — and 1.1's CSV snapshot tests — stay byte-stable.
-> - No change to the 16-column default (`columns=None`) and no propagator-type branch: the token is opt-in for both 1.1 and 1.3.
->
-> When the token lands, fold this note's content into the "CSV columns" spec (features §1.1) and delete this section.
-
 ### Accuracy caveat (docstring)
 
 SGP4 is accurate to roughly 1 km near the TLE epoch, degrading to many kilometers over days to weeks as drag and unmodeled perturbations dominate. It is not portable to a numerical propagator — B\* is a fit residual, not a physical ballistic coefficient (architecture §1.2). Propagating far from epoch, or from `Epoch.now()` against an old TLE, degrades accuracy accordingly.
@@ -722,13 +712,13 @@ Per architecture §11:
 - **SGP4 implementation-agreement.** Verify `propagate_tle` output against **published Vallado SGP4 test vectors** (the canonical *Revisiting Spacetrack Report #3* / AIAA 2006-6753 cases) to centimetre agreement at sampled times, **compared in the native TEME frame** — comparing after a TEME→EME2000 conversion injects EOP-dependent differences that would blow the centimetre budget, so the test reads the raw SGP4 output frame. Cover **both branches**: at least one near-Earth (SGP4, period < 225 min) *and* one deep-space (SDP4) vector from the same suite (e.g. a Molniya-type case such as 08195 / 04632 — verify the catalog number against the published case list), so `selectExtrapolator`'s automatic branch pick is exercised. This is *implementation-agreement* with the reference SGP4/SDP4, **not** absolute accuracy against truth (which degrades with time from epoch; see the accuracy caveat above).
 - **ISS end-to-end.** Exercise a fixed ISS TLE through `propagate_tle` → `plot_summary` / `export_all`, confirming the 1.1 output stack consumes a TEME-framed trajectory unchanged.
 - **Sample-count contract.** Assert `propagate_tle` honours the §1.1 sample-count formula exactly (`floor(duration/output_step + tol) + 1`, first sample at `start`), so the two propagators produce identically-gridded trajectories — this is the test that would catch the dependency-rule duplication/promotion decision drifting (see `docs/build-plan-feature-1.3-notes.md`).
-- **CSV snapshot.** Once the `mean_anomaly` token lands, add a CSV snapshot for a fixed ISS TLE + `columns=["keplerian", "mean_anomaly"]`, pinning the EME2000 element frame and the `keplerian, mean_anomaly, sun` column order.
+- **CSV snapshot.** A CSV snapshot for a fixed ISS TLE + `columns=["keplerian", "mean_anomaly"]` pins the EME2000 element frame and the `keplerian, mean_anomaly, sun` column order.
 
 ### Resolved decisions for 1.3
 
 - **Signature** — `duration` required, **positional-or-keyword** (aligned with 1.1); `output_step` required and keyword-only, **no default** (the former 60 s default is dropped for full 1.1 consistency and to keep the `output_step > duration` guard unambiguous); `start` defaults to `tle.epoch`. No force/spacecraft/attitude/integrator inputs.
 - **Output frame** — native TEME from the propagator; EME2000 as the default display inertial frame (TEME selectable **in the plot verbs**, not in `export_csv`); ITRF for ground-relative views. Opt-in Keplerian / `mean_anomaly` CSV columns are always computed in EME2000 (architecture §6), since only i/Ω/ω are frame-sensitive.
-- **Outputs** — 1.1's `plot_summary` / `plot_3d` / `plot_speed` / `export_all` reused unchanged; **Keplerian elements stay opt-in** (1.1's convention), with mean anomaly **M** as a new separate `mean_anomaly` token (not yet built — see the temporary CSV note).
+- **Outputs** — 1.1's `plot_summary` / `plot_3d` / `plot_speed` / `export_all` reused unchanged; **Keplerian elements stay opt-in** (1.1's convention), with mean anomaly **M** as a separate `mean_anomaly` token (features §1.1 "CSV columns").
 - **Sky view** — **moved to Feature 1.4** (§1.4). The `look_angles(station, state) -> AzElRange` primitive (`core/observation.py`) and the geometry-only sky-track plot are now first built for 1.4's live sky-view panel — still before 1.5 in the build order, so the forward-pull for 1.5 (`find_passes` / `plot_sky_chart`) is preserved. `propagate_tle`'s signature is unchanged.
 - **Terminal behavior** — no altitude-guard family and no `limits=` (SGP4 has none of numerical integration's failure modes; escape is structurally moot for a bound TLE); argument errors raise `ValueError`, and SGP4/SDP4 decay / internal failures are caught and re-raised as `TLEPropagationError` (no stop-and-report, no `termination_*` metadata). Pre-flight reuses 1.1's propagator-agnostic checks via the promoted shared `core/sampling.py` helper (positive/ordered-step checks + the shared `_MAX_OUTPUT_SAMPLES` cap), not the monolithic `_validate_inputs` in place; a far-from-epoch span emits a warn-once stale-TLE warning, never an error.
 - **Row → TLE** — `TLE.from_state_unfitted`, a format-valid (not round-trip-faithful) utility using TEME osculating elements and ν→M; `norad_id` / `bstar` are optional with placeholder defaults (a `State` carries neither); faithful TLEs are 1.2's `fit_tle`.

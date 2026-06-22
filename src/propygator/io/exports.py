@@ -1,11 +1,11 @@
 """Tabular and bundled export of a :class:`~propygator.core.states.Trajectory`.
 
 ``export_csv`` writes a wide CSV with a fixed set of 16 default columns plus
-opt-in column groups (osculating Keplerian elements, Sun position/direction),
-and a ``# key: value`` metadata header carrying the trajectory's reproducibility
-record (features.md §1.1 "Outputs"). ``export_all`` is the convenience aggregator
-that bundles the common case — a summary figure, one or more 3-D HTML views, and a
-CSV — into an output directory.
+opt-in column groups (osculating Keplerian elements, mean anomaly, Sun
+position/direction), and a ``# key: value`` metadata header carrying the
+trajectory's reproducibility record (features.md §1.1 "Outputs"). ``export_all``
+is the convenience aggregator that bundles the common case — a summary figure,
+one or more 3-D HTML views, and a CSV — into an output directory.
 
 Design notes (architecture §7):
 
@@ -105,6 +105,22 @@ def _build_keplerian_columns(eme: Trajectory) -> dict[str, np.ndarray]:
     }
 
 
+def _build_mean_anomaly_columns(eme: Trajectory) -> dict[str, np.ndarray]:
+    """Mean anomaly M per sample, in degrees, from the osculating elements.
+
+    A separate opt-in token from ``keplerian`` (so that group's pinned six-column
+    set stays byte-stable). ``eme`` is the trajectory already in EME2000 for
+    consistency with the other element columns, but M depends only on e and ν
+    (:meth:`~propygator.core.elements.KeplerianElements.mean_anomaly`), so the
+    element frame is immaterial here.
+    """
+    n = len(eme)
+    mean_anomaly = np.empty(n, dtype=np.float64)
+    for i, state in enumerate(eme):
+        mean_anomaly[i] = math.degrees(state.to_keplerian().mean_anomaly())
+    return {"mean_anomaly_deg": mean_anomaly}
+
+
 def _build_sun_columns(eme: Trajectory) -> dict[str, np.ndarray]:
     """Geocentric Sun position (EME2000) plus the unit satellite→Sun direction.
 
@@ -147,12 +163,13 @@ def _build_sun_columns(eme: Trajectory) -> dict[str, np.ndarray]:
 # builder (extensibility hook; module docstring).
 _OPTIONAL_GROUPS: dict[str, Callable[[Trajectory], dict[str, np.ndarray]]] = {
     "keplerian": _build_keplerian_columns,
+    "mean_anomaly": _build_mean_anomaly_columns,
     "sun": _build_sun_columns,
 }
 
 # Canonical order opt-in groups are appended in, regardless of the order tokens are
 # passed in ``columns`` — keeps the output schema deterministic.
-_GROUP_ORDER: tuple[str, ...] = ("keplerian", "sun")
+_GROUP_ORDER: tuple[str, ...] = ("keplerian", "mean_anomaly", "sun")
 
 
 # --- assembly ---------------------------------------------------------------
@@ -277,9 +294,11 @@ def export_csv(
     columns
         ``None`` (default) writes the 16 default columns. A list of opt-in group
         tokens appends those groups to the defaults: ``"keplerian"`` adds the six
-        osculating classical elements, ``"sun"`` adds geocentric Sun position and
-        the unit satellite→Sun direction. Groups are appended in a fixed canonical
-        order; an unknown token raises ``ValueError``.
+        osculating classical elements, ``"mean_anomaly"`` adds the mean anomaly
+        (``mean_anomaly_deg``), ``"sun"`` adds geocentric Sun position and the
+        unit satellite→Sun direction. Groups are appended in a fixed canonical
+        order (``keplerian, mean_anomaly, sun``); an unknown token raises
+        ``ValueError``.
 
     Notes
     -----

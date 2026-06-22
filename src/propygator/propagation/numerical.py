@@ -49,6 +49,7 @@ import numpy as np
 
 from .._orekit_init import _ensure_started, _orekit_version
 from ..core.frames import Frame
+from ..core.sampling import _output_offsets, _validate_sampling
 from ..core.states import Trajectory, _propygator_version
 from .attitude import LofAligned, _serialize_attitude, _to_provider
 from .force_models import ForceModelConfig, _serialize_force_models
@@ -108,17 +109,6 @@ _KNOWN_ATMOSPHERE_MODELS = ("NRLMSISE-00", "Harris-Priester", "DTM-2000")
 _OCEAN_TIDE_DEGREE = 4
 _OCEAN_TIDE_ORDER = 4
 
-# Sample-count round-off tolerance (features.md §1.1): absorbs float error so a
-# duration that is an exact multiple of output_step yields the deterministic count.
-_SAMPLE_COUNT_TOL = 1e-9
-
-# Upper bound on the output-sample count. With no cap, a tiny output_step against a
-# long duration (e.g. 1 ms over a year -> ~3e10 samples) would pre-allocate multi-GB
-# position/velocity arrays plus that many per-sample propagator evaluations and exhaust
-# memory before any useful work. 1e7 covers ~19 years at a 60 s step; beyond it,
-# raise and tell the caller to coarsen output_step.
-_MAX_OUTPUT_SAMPLES = 10_000_000
-
 # A run "terminated early" (a guard's Action.STOP fired) iff the planned end is more
 # than this many seconds past the achieved ephemeris span. A normal propagate(end)
 # lands getMaxDate() == end (durationFrom == 0), so this is the common-path test for
@@ -130,17 +120,6 @@ _MAX_OUTPUT_SAMPLES = 10_000_000
 # comment, so loosening the detector tolerance later fails fast here.
 _TERMINATION_TIME_TOL_S = 1.0e-3
 assert _TERMINATION_TIME_TOL_S >= _DETECTOR_THRESHOLD_S
-
-
-def _sample_count(duration: float, output_step: float) -> int:
-    """Number of output samples: ``floor(duration/output_step + tol) + 1``.
-
-    First sample at ``initial.epoch``, last at ``initial.epoch + (n-1)*output_step``
-    (features.md §1.1). The small relative ``tol`` makes divisible cases
-    deterministic. ``output_step <= duration`` (validated upstream) guarantees
-    ``n >= 2``.
-    """
-    return int(math.floor(duration / output_step + _SAMPLE_COUNT_TOL)) + 1
 
 
 def _realized_sample_count(
@@ -208,14 +187,15 @@ def _validate_inputs(
     output_step: float,
     integrator: IntegratorConfig,
     force_models: ForceModelConfig,
-) -> None:
-    """Validate everything checkable before integration (features.md §1.1).
+) -> int:
+    """Validate everything checkable before integration and return the sample count.
 
     Pure-Python (no JVM): the inertial-frame rule, the positive/ordered duration
     and output step, the integrator type name (+ the ``ClassicalRK4`` fixed-step
     coupling), and the gravity-field name. Each raises ``ValueError`` with an
     actionable message; the ``State`` itself already guarantees finite p/v
-    (architecture §6).
+    (architecture §6). Returns the planned output-sample count from the shared
+    :func:`_validate_sampling` (so the caller need not recompute it).
     """
     # Inertial-frame rule: Newtonian integration is only well-posed in an inertial
     # frame, and EME2000 (alias J2000) is the only inertial frame in the v1 set.
@@ -225,17 +205,9 @@ def _validate_inputs(
             f"J2000), got {initial.frame.name}; convert first with "
             "initial.to_frame(Frame.EME2000). The output Trajectory is EME2000."
         )
-    if not math.isfinite(duration) or duration <= 0.0:
-        raise ValueError(f"duration must be finite and > 0 seconds, got {duration!r}")
-    if not math.isfinite(output_step) or output_step <= 0.0:
-        raise ValueError(
-            f"output_step must be finite and > 0 seconds, got {output_step!r}"
-        )
-    if output_step > duration:
-        raise ValueError(
-            f"output_step must be <= duration; got output_step={output_step!r} > "
-            f"duration={duration!r}"
-        )
+    # Positive/ordered duration & output_step plus the sample-count cap — the
+    # propagator-agnostic sampling pre-flight, shared with propagate_tle.
+    n_samples = _validate_sampling(duration, output_step)
     if integrator.type not in _KNOWN_INTEGRATOR_TYPES:
         raise ValueError(
             f"unknown integrator type {integrator.type!r}; known types: "
@@ -266,16 +238,7 @@ def _validate_inputs(
             f"unknown atmosphere_model {force_models.atmosphere_model!r}; known "
             f"models: {list(_KNOWN_ATMOSPHERE_MODELS)}"
         )
-    # Guard against an accidental enormous sample count (tiny output_step over a long
-    # duration) that would exhaust memory before any integration runs.
-    n_samples = _sample_count(duration, output_step)
-    if n_samples > _MAX_OUTPUT_SAMPLES:
-        raise ValueError(
-            f"duration/output_step requests {n_samples} output samples, exceeding the "
-            f"{_MAX_OUTPUT_SAMPLES} cap; increase output_step or shorten duration "
-            "(each sample allocates a position+velocity row and one propagator "
-            "evaluation, so a much larger count would exhaust memory)."
-        )
+    return n_samples
 
 
 def _resolve_gravity_provider(
@@ -919,15 +882,17 @@ def propagate_numerical(
     spacecraft = spacecraft if spacecraft is not None else SpacecraftConfig()
     integrator = integrator if integrator is not None else IntegratorConfig.default()
 
-    # All pre-integration validation up front (pure-Python).
-    _validate_inputs(initial, duration, output_step, integrator, force_models)
+    # All pre-integration validation up front (pure-Python); also yields the
+    # planned output-sample count (shared cap helper) so it isn't recomputed.
+    n_samples = _validate_inputs(
+        initial, duration, output_step, integrator, force_models
+    )
 
     # Resolve the attitude actually wired (pure-Python): None -> LofAligned, and a
     # non-default attitude on a sphere emits the one-time consistency warning + falls
     # back to LofAligned. Done before the JVM section so the warning fires up front.
     attitude_config = _resolve_attitude(attitude, spacecraft.geometry)
 
-    n_samples = _sample_count(duration, output_step)
     degree = force_models.gravity_degree
     order = force_models.gravity_order
     logger.info(
@@ -1060,7 +1025,7 @@ def propagate_numerical(
 
     # Sample the (possibly partial) ephemeris at exactly output_step. The Orekit lookup
     # date and the propygator Epoch share the same offset, so they denote one instant.
-    offsets = [k * output_step for k in range(realized)]
+    offsets = _output_offsets(realized, output_step)
     # A terminal stop inside the first output_step clamps to one on-grid sample
     # (the start). Append the achieved-span endpoint so the partial Trajectory keeps
     # the >= 2 samples every downstream verb (at/plot/export) needs — the floor a

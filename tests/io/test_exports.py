@@ -55,6 +55,7 @@ KEPLERIAN_COLS = [
     "arg_perigee_deg",
     "true_anomaly_deg",
 ]
+MEAN_ANOMALY_COLS = ["mean_anomaly_deg"]
 SUN_COLS = [
     "sun_x_eme2000_m",
     "sun_y_eme2000_m",
@@ -236,6 +237,61 @@ def test_sun_opt_in_appends_columns(tmp_path):
         axis=1,
     )
     np.testing.assert_allclose(dir_norm, 1.0, atol=1e-12)
+
+
+def test_mean_anomaly_opt_in_appends_column(tmp_path):
+    traj = _circular_trajectory()
+    out = tmp_path / "traj.csv"
+    export_csv(traj, out, columns=["keplerian", "mean_anomaly"])
+    df = _read(out)
+
+    # mean_anomaly is a single column, appended after the keplerian block.
+    assert list(df.columns) == EXPECTED_DEFAULT + KEPLERIAN_COLS + MEAN_ANOMALY_COLS
+    # Each row equals an independently-computed M (degrees) from the EME2000
+    # osculating elements; M depends only on e and ν, so this is frame-stable. The
+    # recompute also uses math.degrees, so a missing degree-conversion in the builder
+    # (radians vs degrees) would surface as a mismatch here.
+    eme = traj.to_frame(Frame.EME2000)
+    expected = np.array([math.degrees(s.to_keplerian().mean_anomaly()) for s in eme])
+    np.testing.assert_allclose(df["mean_anomaly_deg"].to_numpy(), expected, rtol=1e-9)
+    # Near-circular orbit (e ~ 0): M ~ ν, so the column reads as a degree anomaly.
+    np.testing.assert_allclose(
+        df["mean_anomaly_deg"].to_numpy(), df["true_anomaly_deg"].to_numpy(), atol=0.5
+    )
+
+
+def test_mean_anomaly_canonical_order_between_keplerian_and_sun(tmp_path):
+    traj = _circular_trajectory()
+    out = tmp_path / "traj.csv"
+    # Tokens given out of order: mean_anomaly must land between keplerian and sun.
+    export_csv(traj, out, columns=["sun", "mean_anomaly", "keplerian"])
+    df = _read(out)
+    assert (
+        list(df.columns)
+        == EXPECTED_DEFAULT + KEPLERIAN_COLS + MEAN_ANOMALY_COLS + SUN_COLS
+    )
+
+
+def test_mean_anomaly_token_leaves_other_groups_byte_stable(tmp_path):
+    """Adding mean_anomaly must not perturb the default-16 or keplerian columns."""
+    traj = _circular_trajectory()
+    kep_only = tmp_path / "kep_only.csv"
+    kep_plus_ma = tmp_path / "kep_plus_ma.csv"
+    export_csv(traj, kep_only, columns=["keplerian"])
+    export_csv(traj, kep_plus_ma, columns=["keplerian", "mean_anomaly"])
+
+    df_kep = _read(kep_only)
+    df_both = _read(kep_plus_ma)
+    # The keplerian token's six-column set is unchanged when mean_anomaly is added.
+    assert list(df_kep.columns) == EXPECTED_DEFAULT + KEPLERIAN_COLS
+    # The shared columns carry byte-identical values (schema + data unperturbed).
+    for col in EXPECTED_DEFAULT + KEPLERIAN_COLS:
+        if col == "epoch_utc":
+            assert (df_kep[col] == df_both[col]).all()
+        else:
+            np.testing.assert_array_equal(
+                df_kep[col].to_numpy(), df_both[col].to_numpy()
+            )
 
 
 def test_group_order_is_canonical_regardless_of_token_order(tmp_path):

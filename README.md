@@ -5,11 +5,11 @@ A Python library for orbital simulation and satellite tracking, built on [Orekit
 [![CI](https://github.com/hzhang2718-bit/propygator/actions/workflows/ci.yml/badge.svg)](https://github.com/hzhang2718-bit/propygator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Status: under construction.** The **numerical propagator (Feature 1.1)** is
-> implemented — propagate a state vector with configurable force models and produce
-> the full plot + CSV output surface (quick example below). TLE propagation,
-> tracking, and pass prediction (Features 1.3–1.5) are next; their APIs in the
-> "Coming next" section are the *target* surface and are not implemented yet. See
+> **Status: under construction.** The **numerical propagator (Feature 1.1)** and the
+> **TLE propagator (Feature 1.3)** are implemented — propagate a state vector or a TLE
+> and produce the full plot + CSV output surface (examples below). Real-time tracking
+> and pass prediction (Features 1.4–1.5) are next; their APIs in the "Coming next"
+> section are the *target* surface and are not implemented yet. See
 > [`docs/architecture.md`](docs/architecture.md) for the full design.
 
 ## Install
@@ -86,18 +86,38 @@ into submodules for fine control (same pattern as NumPy or pandas). A fuller
 walkthrough lives in
 [`notebooks/02_numerical_propagation.ipynb`](notebooks/02_numerical_propagation.ipynb).
 
-### Coming next (Features 1.3–1.5)
+### TLE propagation (Feature 1.3)
 
-TLE propagation, real-time tracking, and pass prediction are designed but **not yet
-implemented** — this is the target surface they will expose:
+Fetch a TLE by name (CelesTrak, with an on-disk cache), propagate it with SGP4/SDP4,
+and run the same output stack. The result is a `Trajectory` in TEME — `.to_frame(...)`
+to convert, or let the plot verbs default to EME2000:
 
 ```python
 import propygator as pgr
 
-iss = pgr.fetch_tle("ISS")                       # TLE source (1.3)
+# Fetch by friendly name (or NORAD id); or build offline from pasted lines with
+# pgr.TLE.from_strings(line1, line2).
+iss = pgr.fetch_tle("ISS")                        # CelesTrak + 24h cache; name set
+traj = pgr.propagate_tle(iss, duration=86400, output_step=60)   # SGP4, native TEME
+print(traj.frame, len(traj), "samples")           # Frame.TEME, ~1441 samples
+
+pgr.plot_summary(traj)                             # reuses 1.1's plotting stack
+pgr.export_csv(traj, "iss.csv", columns=["keplerian", "mean_anomaly"])
+
+# Turn any row's state into a format-valid (not round-trip-faithful) TLE.
+back = pgr.TLE.from_state_unfitted(traj[0], norad_id=25544)
+```
+
+### Coming next (Features 1.4–1.5)
+
+Real-time tracking and pass prediction are designed but **not yet implemented** —
+this is the target surface they will expose:
+
+```python
+import propygator as pgr
+
+iss = pgr.fetch_tle("ISS")
 print(pgr.current_ground_position(iss))          # live lat/lon/alt (1.4)
-traj = pgr.propagate_tle(iss, duration=86400, output_step=60)   # SGP4 (1.3)
-pgr.plot_ground_track(traj).show()               # reuses 1.1's plotting
 
 durham = pgr.GroundStation("Durham", 35.99, -78.90, altitude_m=130)
 passes = pgr.find_passes(                         # visible passes (1.5)
@@ -113,7 +133,8 @@ v1 feature set (✅ = implemented):
 
 - ✅ **Numerical propagation** — high-fidelity orbit propagation from an initial
   state vector with configurable force models, plus the plot + CSV output surface.
-- **TLE propagation** — SGP4 propagation of TLEs.
+- ✅ **TLE propagation** — SGP4/SDP4 propagation of TLEs (`fetch_tle` /
+  `propagate_tle`), reusing the same plot + CSV output surface.
 - **TLE fitting** — least-squares fit of a TLE against a reference trajectory.
 - **Real-time tracking** — current position, ground track, and altitude for a TLE.
 - **Ground passes + brightness** — visible passes from a ground station, with
@@ -122,8 +143,16 @@ v1 feature set (✅ = implemented):
 ## Notebooks
 
 Tutorial and demo notebooks live in [`notebooks/`](notebooks/), numbered for
-ordering. Rendered HTML versions will be posted on the projects page _(link to be
-added)_.
+ordering:
+
+- [`01_intro.ipynb`](notebooks/01_intro.ipynb) — the five-minute on-ramp.
+- [`02_numerical_propagation.ipynb`](notebooks/02_numerical_propagation.ipynb) —
+  the full numerical propagator (force models, spacecraft, attitude, guards, exports).
+- [`03_demo.ipynb`](notebooks/03_demo.ipynb) — four contrasting orbits, end to end.
+- [`04_tle_propagation.ipynb`](notebooks/04_tle_propagation.ipynb) — fetch and
+  propagate a TLE with SGP4/SDP4, reusing the same output surface.
+
+Rendered HTML versions will be posted on the projects page _(link to be added)_.
 
 ## Architecture
 

@@ -152,6 +152,30 @@ def test_frac_invariant_holds_after_shift():
         assert 0.0 <= e.shifted_by(delta)._frac_seconds < 1.0
 
 
+# --- seconds_since (signed Epoch difference) -------------------------------
+
+
+def test_seconds_since_inverts_shifted_by():
+    """seconds_since is the inverse of shifted_by: it recovers the shift."""
+    e = Epoch.from_iso("2024-01-01T00:00:00", scale=TimeScale.UTC)
+    for delta in (0.0, 1.75, -0.5, 86400.0, -1234.567, 30.0 * 86400):
+        assert e.shifted_by(delta).seconds_since(e) == pytest.approx(delta)
+
+
+def test_seconds_since_is_antisymmetric():
+    a = Epoch.from_iso("2026-06-20T09:57:02", scale=TimeScale.UTC)
+    b = a.shifted_by(3600.25)
+    assert a.seconds_since(b) == pytest.approx(-b.seconds_since(a))
+    assert a.seconds_since(a) == 0.0
+
+
+def test_seconds_since_is_scale_independent():
+    """The same instant in two presentation scales differs by zero seconds."""
+    e_utc = Epoch.from_iso("2024-01-01T00:00:00", scale=TimeScale.UTC)
+    e_tt = e_utc.in_scale(TimeScale.TT)
+    assert e_tt.seconds_since(e_utc) == 0.0
+
+
 # --- scale conversions vs. known offsets -----------------------------------
 
 

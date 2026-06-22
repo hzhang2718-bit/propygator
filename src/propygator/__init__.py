@@ -11,8 +11,8 @@ The Feature 1.1 surface is re-exported here: the data-model types, the
 ``AltitudeLimits``, the attitude family), the ``plot_*`` functions, and
 ``export_csv`` / ``export_all``.
 ``IncidenceVariableCd`` (the deferred Tier-B skeleton) stays reachable via
-``propygator.propagation``. Later features (1.3 TLE propagation onward) add more
-verbs.
+``propygator.propagation``. Feature 1.3 adds the ``TLE`` type, the ``propagate_tle``
+verb, and the CelesTrak ``fetch_tle`` path (``TLE.from_norad_id`` rides on it).
 """
 
 import logging
@@ -25,12 +25,14 @@ from .core.exceptions import (
     OrekitDataMissingError,
     PropagationError,
     PropygatorError,
+    TLEFetchError,
     TLEPropagationError,
 )
 from .core.frames import Frame
 from .core.observation import GeodeticPosition, GroundStation, Pass
 from .core.states import Orientation, State, Trajectory, _propygator_version
 from .core.time import Epoch, TimeScale
+from .core.tle import TLE
 from .io import export_all, export_csv
 from .plotting import (
     plot_3d,
@@ -56,6 +58,7 @@ from .propagation import (
     VariableCd,
     propagate_numerical,
 )
+from .tle import fetch_tle, propagate_tle
 
 # Single-sourced via core.states._propygator_version (importlib.metadata), which
 # returns "unknown" when running from a source tree without distribution metadata
@@ -75,11 +78,13 @@ __all__ = [
     "PropagationError",
     "NumericalPropagationError",
     "TLEPropagationError",
+    "TLEFetchError",
     "Epoch",
     "TimeScale",
     "Frame",
     "State",
     "Trajectory",
+    "TLE",
     "KeplerianElements",
     "Orientation",
     "GroundStation",
@@ -109,4 +114,7 @@ __all__ = [
     "plot_speed",
     "export_csv",
     "export_all",
+    # Feature 1.3 — TLE propagator
+    "propagate_tle",
+    "fetch_tle",
 ]

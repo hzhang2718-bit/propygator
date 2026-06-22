@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from propygator import (
+    TLE,
     Epoch,
     Frame,
     KeplerianElements,
@@ -591,3 +592,16 @@ def test_epoch_from_orekit_default_scale_is_utc():
 
     epoch = Epoch.from_iso("2024-03-01T06:00:00", scale=TimeScale.UTC)
     assert _epoch_from_orekit(epoch.to_orekit()).scale is TimeScale.UTC
+
+
+# --- TLE.to_orekit() --------------------------------------------------------
+
+_ISS_LINE1 = "1 25544U 98067A   26171.41461525  .00008813  00000+0  16600-3 0  9990"
+_ISS_LINE2 = "2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088572250"
+
+
+def test_tle_to_orekit_round_trips_lines():
+    orekit_tle = TLE.from_strings(_ISS_LINE1, _ISS_LINE2).to_orekit()
+    # Orekit echoes back the exact input lines (correct fixed-column formatting).
+    assert orekit_tle.getLine1() == _ISS_LINE1
+    assert orekit_tle.getLine2() == _ISS_LINE2

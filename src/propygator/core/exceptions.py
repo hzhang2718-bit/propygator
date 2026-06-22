@@ -44,6 +44,24 @@ class JVMAlreadyStartedError(PropygatorError):
     """
 
 
+class TLEFetchError(PropygatorError):
+    """Raised when fetching a TLE from a remote source (CelesTrak) fails.
+
+    Wraps the underlying transport failure — no route / DNS failure / connection
+    refused / timeout (``requests`` ``ConnectionError`` / ``Timeout``) or an HTTP
+    error status (``raise_for_status``) — as a clean, actionable message string
+    rather than letting ``requests``' deep urllib3 traceback surface (architecture
+    §3, the same principle as :class:`OrekitDataMissingError`). The message names the
+    NORAD id and the offline escape hatch — build the TLE directly from saved lines
+    via :meth:`TLE.from_strings` — and the originating ``requests`` traceback is
+    suppressed (``raise ... from None``).
+
+    Not raised for a *successful* fetch that simply returns no object for the
+    requested id, a malformed response body, or an unknown ``source`` — those are
+    not-found / input conditions and raise ``ValueError`` instead.
+    """
+
+
 class PropagationError(PropygatorError):
     """Base class for a propagation that fails inside Orekit.
 

@@ -320,6 +320,23 @@ class Epoch:
         )
         return replace(self, _int_seconds=new_int, _frac_seconds=new_frac)
 
+    def seconds_since(self, other: "Epoch") -> float:
+        """Signed seconds from ``other`` to ``self`` (``self`` minus ``other``).
+
+        The inverse of :meth:`shifted_by`: ``a.shifted_by(dt).seconds_since(a)``
+        recovers ``dt`` to floating-point precision (not bit-exact — the renormalized
+        two-part sum need not round-trip ``dt`` identically).
+        Computed from the two-part TAI-since-J2000 count, so it is **scale-independent**
+        — the presentation ``scale`` never enters the stored instant (architecture §6),
+        and the difference is correct even across differently-tagged epochs. Positive
+        when ``self`` is later than ``other``, mirroring Orekit's ``durationFrom``
+        direction. Pure-Python / safe before init (Feature 1.3's stale-TLE pre-flight
+        uses it before the JVM starts).
+        """
+        return (self._int_seconds - other._int_seconds) + (
+            self._frac_seconds - other._frac_seconds
+        )
+
     # --- output ------------------------------------------------------------
 
     def to_iso(self) -> str:

@@ -24,6 +24,7 @@ from propygator import (
     TimeScale,
     Trajectory,
 )
+from propygator.core.sampling import _sample_count
 from propygator.propagation import (
     ForceModelConfig,
     IntegratorConfig,
@@ -32,7 +33,6 @@ from propygator.propagation import (
     VariableCd,
     propagate_numerical,
 )
-from propygator.propagation.numerical import _sample_count
 
 # Drag-only force config (no third body / SRP) so the drag-regime signal is isolated.
 _DRAG_ONLY = ForceModelConfig(

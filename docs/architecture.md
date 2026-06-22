@@ -98,6 +98,8 @@ For dependency updates after the initial install, use `conda env update -f envir
 - **Direct user input** — always available, takes priority.
 - **Space-Track** — **deferred (not wired in v1).** A broader-coverage source requiring an account (env vars `SPACETRACK_USERNAME` / `SPACETRACK_PASSWORD`); the `fetch_tle(source=...)` parameter and a future `source='auto'` are designed to admit it, but v1 fetches CelesTrak only.
 
+A remote fetch that fails in transport — no network / DNS failure / connection refused / timeout, or an HTTP error status — raises `TLEFetchError` (a `PropygatorError` subclass), carrying a clean, actionable message that names the NORAD id and the offline `TLE.from_strings` escape hatch rather than letting `requests`' raw urllib3 traceback surface (the no-raw-trace rule, the same principle as `OrekitDataMissingError`). A *successful* fetch that simply finds no object for the requested id, a malformed response body, or an unknown `source` raises `ValueError` instead — those are not-found / input conditions, not transport failures.
+
 A built-in registry of "popular" satellites (ISS, Hubble, GPS, NOAA, etc.) maps friendly names to NORAD IDs. The same registry carries a curated standard-magnitude table (intrinsic brightness at 1000 km range, 50% phase angle) used by feature 1.5. For satellites outside the registry, users supply magnitude explicitly or pass requests are returned without magnitude estimates.
 
 The registry and magnitude table live in `core/catalogs.py` (see §7) because they are reference data, not I/O. Each magnitude entry must carry an in-source citation for its origin (e.g. Mike McCants's `mcnames.zip` / `qsmag` standard-magnitude file, Heavens-Above, or per-satellite optical-observation references) so the table is auditable and extensible. Untraceable "looks about right" values are not acceptable.
@@ -661,6 +663,13 @@ src/propygator/
 │   │                    + to_geodetic(state) -> GeodeticPosition
 │   ├── states.py        The State class, conversions to/from Orekit types
 │   ├── elements.py      KeplerianElements, conversions to/from State
+│   ├── tle.py           The TLE type (two-line element set): pure-Python parse,
+│   │                    mod-10 checksum, and .epoch / .norad_id accessors (all
+│   │                    safe before init), plus the JVM-touching to_orekit() and
+│   │                    the JVM/network-touching from_state_unfitted /
+│   │                    from_norad_id constructors. Holds the TLE parse/checksum
+│   │                    directly (no separate tle/parsing.py — features §1.3
+│   │                    Decision a). See §6.
 │   ├── sampling.py      Propagator-agnostic output-sample grid: _sample_count,
 │   │                    the epoch-grid generator, the _MAX_OUTPUT_SAMPLES cap,
 │   │                    and the shared pre-flight checks (duration/output_step
@@ -721,12 +730,15 @@ src/propygator/
 │   ├── fitter.py        fit_tle(reference, fitting_span, ...)
 │   │                    Accepts State (then propagates internally) or
 │   │                    Trajectory (used directly). See §8.
-│   ├── sources.py       fetch_tle, fetch_celestrak (fetch_spacetrack deferred)
-│   │                    Caches to ~/.propygator/cache/
-│   │                    fetch_tle(name_or_id, source='celestrak')
-│   │                    (v1: CelesTrak only; 'auto'/Space-Track deferred)
-│   │                    Two TTLs: 6h (realtime workflows), 24h (general).
-│   └── parsing.py       Validation, checksum, formatting
+│   └── sources.py       fetch_tle, fetch_celestrak (fetch_spacetrack deferred)
+│                        Caches to ~/.propygator/cache/
+│                        fetch_tle(name_or_id, source='celestrak')
+│                        (v1: CelesTrak only; 'auto'/Space-Track deferred)
+│                        Two TTLs: 6h (realtime workflows), 24h (general).
+│                        Transport failures (no network / DNS / timeout / HTTP
+│                        error) raise TLEFetchError (architecture §3).
+│                        (No tle/parsing.py — the TLE parse/checksum lives on the
+│                        TLE type in core/tle.py; features §1.3 Decision a.)
 │
 ├── tracking/
 │   ├── realtime.py      current_position(tle) -> State
@@ -973,11 +985,11 @@ Three init paths:
 - All `Frame` enum access *except* `to_orekit()`.
 - `State.__init__` and its validation (no Orekit calls in `__post_init__`).
 - `Trajectory.from_states` / `from_arrays` shape and dtype validation.
-- `TLE.from_strings` parsing and checksum validation.
+- `TLE.from_strings` parsing and checksum validation, bare `TLE(...)` construction, and the `.epoch` / `.norad_id` accessors (all pure-Python).
 - `GroundStation` and `Pass` construction.
 - VariableCd table construction and validation (the Orekit DragSensitive it lowers to is built inside propagate_numerical, not at config time).
 
-JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `current_position`, `current_ground_position`, `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
+JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `TLE.from_state_unfitted` (it lowers the state to Orekit's TLE formatter), `current_position`, `current_ground_position`, `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). `TLE.from_norad_id` / `fetch_tle` are **network-touching** (not JVM-touching) but likewise sit outside the safe-before-init surface. Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
 
 ### Orekit types stay internal
 

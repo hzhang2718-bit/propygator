@@ -7,15 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - DATE
+## [0.3.0] - 2026-06-22
 
 ### Added
+
+- TLE propagation feature using Orekit's SGP4/SDP4 algorithm. Trajectories from TLE
+  propagations are compatible to be plotted in the same way as numerical integrator
+  results.
+- Mean anomaly added as an option to the exported CSV.
+- Data-fetching capabilities from CelesTrak, complemented with a list of popular
+  satellites whose TLE can be fetched from name.
+- New Jupyter notebook on the TLE propagator feature.
 
 ### Changed
 
 - PropagationError rewired to account for numerical integration errors and TLE propagation
   errors separately. Separate NumericalPropagationError and TLEPropagationError now in
   place.
+- Propagation input checks are promoted into core with generalized error messages.
 
 ## [0.2.0] - 2026-06-19
 
@@ -29,8 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Plot end markers are updated. For ground track, the end marker is now a
   directed triangle instead of star. For 3D plots, the end marker is now
   a directed cone instead of diamond.
-- Propagation step cap error message was generalized to account for its joint use in TLE
-  propagations.
 
 ## [0.1.0] - 2026-06-17
 
