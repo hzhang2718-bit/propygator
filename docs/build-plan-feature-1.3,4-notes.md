@@ -251,3 +251,43 @@ codebase already chose these patterns elsewhere):
   (`tests/propagation/test_numerical.py:174`, `match="output samples"`) stays green;
   add the analogous cap test on the `propagate_tle` path so both propagators exercise
   the shared raise.
+
+## Feature 1.4 build prerequisites (surfaced by the 2026-06-22 §1.4 audit)
+
+These are concrete pieces of code that **do not exist yet** and that the Feature 1.4
+design (features.md §1.4) silently assumes. Like the `Epoch`-difference helper and the
+realtime-TTL plumbing already flagged above, none are blockers — but each is a change to
+*already-shipped* code (1.1 / 1.3) that the 1.4 build plan should sequence as its own
+early step, not discover mid-feature.
+
+- **`StaleTLEWarning(UserWarning)` category — modifies shipped 1.3.** The live engine
+  suppresses the *per-rebuild* repeat of `propagate_tle`'s stale-TLE warning surgically
+  by filtering on a dedicated `StaleTLEWarning(UserWarning)` category (features §1.4
+  "Live dashboard"). Shipped 1.3 raises a **bare** `warnings.warn(...)` — no category, so
+  it is a plain `UserWarning` (`tle/propagator.py:105`). Build step: define
+  `StaleTLEWarning(UserWarning)` (beside the other warning/exception types) and pass
+  `category=StaleTLEWarning` at that warn site. The change is additive and
+  backward-compatible (a `UserWarning` subclass, so existing `UserWarning` filters still
+  match it). Without it the engine's only options are swallowing **all** `UserWarning`s
+  for the session (the wrong instrument — though a genuine decay raises
+  `TLEPropagationError`, not a warning, so it surfaces regardless) or letting the
+  per-rebuild nag through (the message embeds the age in days, so Python's warning dedup
+  does not collapse the repeats). Sequence it as an early prerequisite chunk, peer to the
+  realtime-TTL plumbing below.
+- **Public `Trajectory` span accessor (`start_epoch` / `end_epoch`) — small 1.1 API
+  addition.** The live engine's per-frame `buffer.at(min(now, ...))` clamp (features §1.4
+  "Buffer engine") must clamp to the buffer's **realized** last sample. Today `Trajectory`
+  exposes its span endpoints only privately (`_epoch_at(0)` / `_epoch_at(-1)`,
+  `core/states.py`). The design clamps to `buffer.end_epoch`, the single source of truth —
+  the very endpoint `Trajectory.at` already bounds-checks against — instead of the earlier
+  plan of re-deriving the `floor`-with-tolerance sample-grid formula inside `live.py`
+  (which would couple the engine to `core/sampling.py`'s exact rounding and, on any drift,
+  clamp to a still-out-of-span epoch and re-introduce the crash the clamp exists to
+  prevent). Build step: add public `start_epoch` / `end_epoch` (thin read-only wrappers
+  over `_epoch_at`, no JVM). Independently useful — 1.5 walks dense trajectories too.
+- **Realtime TTL plumbing — already flagged, restated here so the 1.4 prerequisites sit
+  together.** `fetch_tle` must be able to select the 6 h `_TTL_REALTIME_S` for the
+  live / realtime path; today it always uses the 24 h general TTL and `_TTL_REALTIME_S`
+  is unreachable through it. Either add an internal realtime / `ttl_s` selector to
+  `fetch_tle` or have the live / realtime path call `fetch_celestrak(ttl_s=_TTL_REALTIME_S)`
+  directly (features §1.4 *Live dashboard*; architecture §10).

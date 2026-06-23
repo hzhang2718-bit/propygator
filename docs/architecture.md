@@ -610,6 +610,8 @@ def look_angles(station: GroundStation, state: State) -> AzElRange: ...
 
 Introduced for Feature 1.4's live sky view (features §1.4) but shared verbatim with Feature 1.5's pass finder, so building it in 1.4 brings 1.5's topocentric foundation forward.
 
+Feature 1.4 adds three siblings in the same module, sharing one topocentric kernel: `look_angles_track(station, trajectory)` — the batched analogue of `geodetic_track`, returning parallel az/el/range arrays (but **not** memoized on the `Trajectory`, since it is station-keyed) — and `sun_look_angles(station, epoch)` / `moon_look_angles(station, epoch)`, the same kernel projecting the Sun/Moon for the live sky panel's tint/markers and for 1.5's observer-darkness gate. All three are JVM-touching like `look_angles` (already on the §10 JVM-startup list); only the `AzElRange` value type is safe-before-init (features §1.4).
+
 ### `Pass`
 
 Output of pass prediction.
@@ -637,8 +639,10 @@ src/propygator/
 |       GeodeticPosition, AzElRange, ForceModelConfig, SpacecraftConfig,
 |       SpacecraftGeometry, VariableCd, IntegratorConfig, AltitudeLimits,
 |       the attitude family, propagate_numerical, propagate_tle, fit_tle,
-|       fetch_tle, current_position, current_ground_position, find_passes,
-|       look_angles, the plot_*/export* functions, init, clear_cache, and
+|       fetch_tle, current_state, current_ground_position, find_passes,
+|       look_angles, sun_look_angles, moon_look_angles (look_angles_track,
+|       the batched array form, stays in propygator.core.observation),
+|       the plot_*/export* functions, init, clear_cache, and
 |       the exception types. (IncidenceVariableCd, the deferred Tier-B drag
 |       table, is intentionally NOT top-level — reach it via
 |       propygator.propagation.) Verbs beyond Feature 1.1 are added to this
@@ -682,7 +686,9 @@ src/propygator/
 │   ├── bodies.py        Earth model (canonical instance), Sun, Moon
 │   ├── observation.py   GroundStation, Pass, GeodeticPosition, AzElRange,
 │   │                    look_angles(station, state) -> AzElRange (topocentric
-│   │                    az/el/range; JVM-touching, shared with find_passes).
+│   │                    az/el/range; JVM-touching, shared with find_passes; Feature 1.4 also adds
+│   │                    look_angles_track / sun_look_angles / moon_look_angles
+│   │                    to this one shared kernel).
 │   │                    In core/ so io/ can import them without violating
 │   │                    the "io depends only on core" rule (§7 dep rule).
 │   └── catalogs.py      Popular satellite registry (friendly name → NORAD ID)
@@ -741,7 +747,7 @@ src/propygator/
 │                        TLE type in core/tle.py; features §1.3 Decision a.)
 │
 ├── tracking/
-│   ├── realtime.py      current_position(tle) -> State
+│   ├── realtime.py      current_state(tle) -> State
 │   │                    Returns the satellite state in TEME (the natural
 │   │                    SGP4 output frame). Users wanting J2000 or ITRF
 │   │                    call .to_frame(...) on the result.
@@ -749,12 +755,12 @@ src/propygator/
 │   │                    Internally TEME→ITRF→geodetic; the user receives
 │   │                    lat/lon/alt directly, no frame to convert.
 │   ├── live.py          live_track(...) — the live dashboard (features §1.4).
-│   │                    A rolling Trajectory buffer (propagate_tle; auto-
-│   │                    refreshes the TLE when fetched) drives a matplotlib
+│   │                    A rolling Trajectory buffer centred on now (propagate_tle;
+│   │                    auto-refreshes the TLE when fetched) drives a matplotlib
 │   │                    FuncAnimation over the 1.1 _draw_* primitives +
-│   │                    _draw_sky_track. Lazily imports plotting/ (the
-│   │                    export_all precedent, dep rule below). Live display
-│   │                    only; not saved.
+│   │                    _draw_sky_track (sky panel only with a GroundStation).
+│   │                    Lazily imports plotting/ (the export_all precedent,
+│   │                    dep rule below). Live display only; not saved.
 │   ├── passes.py        find_passes(tle, station, start, duration,
 │   │                                min_elevation_deg)
 │   └── visibility.py    Eclipse check, sun angle, phase angle
@@ -895,7 +901,7 @@ User → TLE  (via fetch_tle / fetch_celestrak / direct input)
 
 ```
 User → TLE
-     → tracking.realtime.current_position()
+     → tracking.realtime.current_state()
      → State  (+ derived lat/lon/alt)
 ```
 
@@ -904,10 +910,12 @@ Live dashboard:
 ```
 User → TLE or fetched name (+ optional GroundStation)
      → tracking.live.live_track()
-            maintains a rolling Trajectory buffer (propagate_tle), samples
-            buffer.at(now) per frame, redraws ground-track / altitude / speed /
-            sky panels via the 1.1 _draw_* primitives + _draw_sky_track, and
-            refreshes (re-propagate; re-fetch if fetched) as the buffer drains
+            maintains a rolling Trajectory buffer centred on now (propagate_tle;
+            trailing + leading path), samples buffer.at(now) per frame, redraws
+            ground-track / altitude / speed — plus a sky panel only when a
+            GroundStation is given — via the 1.1 _draw_* primitives +
+            _draw_sky_track, and refreshes (re-propagate; re-fetch if fetched)
+            as the buffer drains
      → matplotlib FuncAnimation  (desktop window or %matplotlib widget; live only)
 ```
 
@@ -986,10 +994,10 @@ Three init paths:
 - `State.__init__` and its validation (no Orekit calls in `__post_init__`).
 - `Trajectory.from_states` / `from_arrays` shape and dtype validation.
 - `TLE.from_strings` parsing and checksum validation, bare `TLE(...)` construction, and the `.epoch` / `.norad_id` accessors (all pure-Python).
-- `GroundStation` and `Pass` construction.
+- `GroundStation`, `Pass`, and `AzElRange` construction (the value types are pure-Python; only the `look_angles` / `look_angles_track` *calls* start the JVM — see below).
 - VariableCd table construction and validation (the Orekit DragSensitive it lowers to is built inside propagate_numerical, not at config time).
 
-JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `TLE.from_state_unfitted` (it lowers the state to Orekit's TLE formatter), `current_position`, `current_ground_position`, `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). `TLE.from_norad_id` / `fetch_tle` are **network-touching** (not JVM-touching) but likewise sit outside the safe-before-init surface. Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
+JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `TLE.from_state_unfitted` (it lowers the state to Orekit's TLE formatter), `current_state`, `current_ground_position`, `look_angles` / `look_angles_track` / `sun_look_angles` / `moon_look_angles` (they build an Orekit `TopocentricFrame`), `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). `TLE.from_norad_id` / `fetch_tle` are **network-touching** (not JVM-touching) but likewise sit outside the safe-before-init surface. Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
 
 ### Orekit types stay internal
 
@@ -1004,7 +1012,7 @@ Private cached references to Orekit objects (e.g. the `Ephemeris` cached on a `T
 
 ### Frame conversions are explicit
 
-No automatic conversions on `State`-returning paths. TLE propagation returns TEME; numerical propagation returns whatever frame the initial state was in (always EME2000); `current_position(tle)` returns TEME. Users explicitly call `.to_frame(...)` to convert. Verbose, but it prevents silent frame-mismatch bugs.
+No automatic conversions on `State`-returning paths. TLE propagation returns TEME; numerical propagation returns whatever frame the initial state was in (always EME2000); `current_state(tle)` returns TEME. Users explicitly call `.to_frame(...)` to convert. Verbose, but it prevents silent frame-mismatch bugs.
 
 The rule applies specifically to functions that return `State` or `Trajectory` — types that carry a `Frame`. Functions returning derived non-`State` types (`GeodeticPosition`, `Pass`, scalar magnitudes) may convert internally because the result does not carry a frame and so no frame ambiguity escapes the function. For example:
 
@@ -1030,7 +1038,7 @@ TLE fetches and force model loading cache to `~/.propygator/cache/`. Per-call `u
 
 Two TTLs serve different workflows:
 
-- **Realtime workflows** (`current_position`, `current_ground_position`): **6-hour TTL**. CelesTrak typically refreshes popular satellites several times per day, so a 6-hour TTL catches updates within roughly half a refresh cycle while avoiding pointless refetches of identical TLEs.
+- **Realtime workflows** (`current_state`, `current_ground_position`): **6-hour TTL**. CelesTrak typically refreshes popular satellites several times per day, so a 6-hour TTL catches updates within roughly half a refresh cycle while avoiding pointless refetches of identical TLEs. **(Feature 1.4 plumbing note.)** `current_state` / `current_ground_position` take a `TLE` directly and do **not** fetch, so this 6-hour TTL is realized only on the *fetch* that produced the TLE — and the shipped `fetch_tle` always uses the 24-hour general TTL (`_TTL_REALTIME_S` exists in `tle/sources.py` but is unreachable through it). Feature 1.4 must surface the realtime TTL: add an internal realtime/`ttl_s` selector to `fetch_tle`, or have the live/realtime path call `fetch_celestrak(ttl_s=_TTL_REALTIME_S)` directly.
 - **General fetches** (`fetch_celestrak`): **24-hour TTL**. Notebook re-runs within a day hit the cache; daily re-issues are picked up automatically. (Space-Track's `fetch_spacetrack` is deferred — §3.)
 
 Note that the cache lives on the *fetch* path, not on `propagate_tle` (which takes a `TLE` directly). The TTL governs how often we re-hit the network, not the freshness of the underlying TLE epoch.
@@ -1093,7 +1101,7 @@ Never commit. Use environment variables (`SPACETRACK_USERNAME`, `SPACETRACK_PASS
 
 A small dedicated test set guards against silent breakage when conda dependencies update (especially around the NumPy ↔ JPype ↔ Orekit boundary):
 
-- **(a) Smoke import** — `import propygator`, fetch a known TLE, materialize a `State` from `current_position`. Catches "imports but the JPype/NumPy boundary is broken" failures.
+- **(a) Smoke import** — `import propygator`, fetch a known TLE, materialize a `State` from `current_state`. Catches "imports but the JPype/NumPy boundary is broken" failures.
 - **(b) Numerical round-trip** — propagate a known *point-mass* (Keplerian) orbit over exactly one Keplerian period and assert it returns to the initial state at machine-precision levels (10⁻⁸ relative or better). A closed two-body orbit is exactly periodic, so this **one-period closure** is a genuine there-and-back round-trip that stays inside the v1 forward-only contract — backward propagation is unsupported (`duration > 0`; features §1.1), so the literal "forward then backward" of the original design is realized this way. Catches "imports work but math is wrong" failures (e.g. silent dtype promotion changes in NumPy).
 - **(c) Bulk-array round-trip** — construct a `Trajectory` with ~10⁵ samples, run `to_frame()`, run `to_dataframe()`, export to CSV, reload, compare. Catches dtype/promotion bugs in the vectorized paths. Explicitly assert `float64` for `positions`/`velocities` and `int64` for `_epochs_int` on the reloaded trajectory — NumPy 2.x changed some default-integer behaviour across point releases (e.g. earlier 2.x had platform-dependent int defaults on Windows; resolved by 2.1), and the test should be sensitive to dtype regressions even though Windows is not a supported platform.
 
@@ -1107,7 +1115,7 @@ Suggested implementation sequence:
 
 1. **1.1 Numerical propagator** — core types, force model config, basic plotting
 2. **1.3 TLE propagator** — shares plotting infrastructure with 1.1
-3. **1.4 Real-time tracker** — the realtime primitives (`current_position` / `current_ground_position`) are cheap once 1.3 works, but 1.4 now also carries the **live buffered dashboard** (ground track / altitude / speed / sky view), making it the richest tracking feature. It first builds the `look_angles` primitive + `_draw_sky_track` (moved out of 1.3), so it still pulls Feature 1.5's topocentric foundation forward.
+3. **1.4 Real-time tracker** — the realtime primitives (`current_state` / `current_ground_position`) are cheap once 1.3 works, but 1.4 now also carries the **live buffered dashboard** (ground track / altitude / speed / sky view), making it the richest tracking feature. It first builds the `look_angles` primitive + `_draw_sky_track` (moved out of 1.3), so it still pulls Feature 1.5's topocentric foundation forward.
 4. **1.5 Ground passes + brightness** — builds on 1.4 and visibility; reuses 1.4's `look_angles`. Adds a pass table plus the richer sky/timeline charts.
 5. **1.2 TLE fitter** — hardest; lean on Orekit's built-in fitting machinery. Treated as a plus rather than a blocker.
 
@@ -1141,12 +1149,12 @@ drag-validity/altitude-guards and ECEF-nadir/direction-markers addenda.
 - **Package name** — renamed from `orbitkit` to `propygator` before build to avoid acoustic/visual collision with `orekit`. Documented import alias is `pgr` (`import propygator as pgr`); shown throughout the §9 examples.
 - **Attitude family** — Native-provider-backed modes: `Inertial` (`FrameAlignedProvider`), `SunPointing` (`CelestialBodyPointed` or `AlignedAndConstrained`), `NadirPointing` and `InPlaneTracking` (`AlignedAndConstrained`), plus `LofAligned`/`LofOffset` (`LofOffset`). `CustomAttitude` (user law returning `propygator.Orientation`) is the only non-native escape hatch. `NadirPointing` is exact only for circular orbits (nadir primary, velocity secondary, for eccentric). `NadirPointing` wires **both** `velocity_reference` options: `inertial` via Orekit's `PredefinedTarget.VELOCITY`, and `ecef` (ground-track velocity yaw) via a custom `@JImplements TargetProvider` in the same `AlignedAndConstrained` secondary slot (ECEF-nadir & direction-markers addendum; see the §13 deferral note below).
 - **Sky view relocated 1.3 → 1.4.** The geometry-only sky-track plot and the `look_angles(station, state) -> AzElRange` primitive (`core/observation.py`) it rides on were originally scheduled in Feature 1.3 to pull Feature 1.5's foundation forward. They moved to Feature 1.4: the live tracker needs a live sky-view panel, so the primitive is first built there — still before 1.5 in the build order, so the forward-pull is preserved. 1.3 reverts to pure SGP4 propagation reusing 1.1's outputs. (features §1.3 / §1.4.)
-- **1.4 expanded to a live dashboard.** Beyond the `current_position` / `current_ground_position` primitives, 1.4 now ships a live, buffered matplotlib view (ground track, altitude, speed, sky view) driven by `FuncAnimation` over a rolling `Trajectory` buffer that re-propagates and **auto-refreshes a fetched TLE** (6-hour cache TTL). Backend-agnostic (desktop window or in-notebook `%matplotlib widget`), **live display only — not saved** (no animation-writer dependency; not snapshot-tested). The driver (`tracking/live.py`) lazily imports `plotting/` (the `export_all` precedent), keeping the static dependency graph clean. (features §1.4.)
+- **1.4 expanded to a live dashboard.** Beyond the `current_state` / `current_ground_position` primitives, 1.4 now ships a live, buffered matplotlib view (ground track, altitude, speed, sky view) driven by `FuncAnimation` over a rolling `Trajectory` buffer that re-propagates and **auto-refreshes a fetched TLE** (6-hour cache TTL). Backend-agnostic (desktop window or in-notebook `%matplotlib widget`), **live display only — not saved** (no animation-writer dependency; not snapshot-tested). The driver (`tracking/live.py`) lazily imports `plotting/` (the `export_all` precedent), keeping the static dependency graph clean. (features §1.4.)
 - **1.5 pass table.** Alongside the polar sky charts, 1.5 offers a tabular view of `list[Pass]` (a `passes_to_dataframe` DataFrame and/or formatted text), plus the already-anticipated `io/exports` Pass-list → ICS/CSV export. Cheap formatting of an existing core type; no new dependency. (features §1.5.)
+- **`tracking/` is its own top-level package** (not folded into `tle/`) — the former §13 "Still open" question, resolved by the Feature 1.4 design now that the import shapes are on the page (as the deferral anticipated). `tracking/` holds `realtime.py` (`current_state` / `current_ground_position`), `live.py` (the live dashboard, which lazily imports `plotting/`), and — with 1.5 — `passes.py` (`find_passes`) and `visibility.py` (`compute_magnitude`). These are observer / real-time / visibility concerns that *consume* `tle/`'s `propagate_tle` + the `TLE` type but don't belong inside it: `tracking/` legitimately depends on `propagation/`, `tle/`, and `core/` (and, lazily, `plotting/`), so folding it into `tle/` would mix SGP4 propagation with observer geometry and drag a plotting edge into `tle/`. Kept separate. (features §1.4 / §1.5; §7 dependency rule.)
 
 ### Still open
 
-- Whether `tracking/` should be a separate top-level package or fold into `tle/`. Defer until code is on the page; the right answer will be obvious from import shapes.
 - Whether `core/` should be split finer (e.g., separate `time/` and `frames/` packages) or kept compact. Same deferral logic — premature to decide.
 
 ### Deferred sub-designs (not blockers)

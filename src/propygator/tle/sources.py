@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 _CELESTRAK_GP_URL = "https://celestrak.org/NORAD/elements/gp.php"
 
 # Cache TTLs in seconds (architecture §10). The general path uses 24 h; the 6 h
-# realtime TTL is reserved for Feature 1.4 (current_position / live tracking), which
+# realtime TTL is reserved for Feature 1.4 (current_state / live tracking), which
 # passes it to fetch_celestrak explicitly — 1.3 never uses it.
 _TTL_GENERAL_S = 24 * 3600.0
 _TTL_REALTIME_S = 6 * 3600.0
