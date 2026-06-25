@@ -201,6 +201,63 @@ def test_draw_primitives_supplied_axes_no_xlabel() -> None:
         plt.close(fig)
 
 
+# --- _draw_speed precomputed-array seam (Feature 1.4, chunk 6) --------------
+
+
+def test_draw_speed_precomputed_array_plots_directly_with_legend() -> None:
+    """A supplied ``speeds_kms`` array is drawn verbatim (no ``to_frame``), with the
+    caller's colour/label and a legend in place of the single-frame title."""
+    traj = _circular_trajectory()
+    speeds = np.linspace(7.0, 8.0, len(traj))
+    fig, ax = plt.subplots()
+    try:
+        _draw_speed(ax, traj, speeds_kms=speeds, color="tab:red", label="inertial")
+        (line,) = ax.lines
+        # Plotted verbatim against elapsed hours — no frame conversion.
+        np.testing.assert_array_equal(line.get_ydata(), speeds)
+        np.testing.assert_allclose(line.get_xdata(), _elapsed_hours(traj))
+        assert mcolors.to_hex(line.get_color()) == mcolors.to_hex("tab:red")
+        assert ax.get_ylabel() == "Speed (km/s)"
+        # Legend instead of a frame-naming title.
+        assert ax.get_title() == ""
+        legend = ax.get_legend()
+        assert legend is not None
+        assert [t.get_text() for t in legend.get_texts()] == ["inertial"]
+    finally:
+        plt.close(fig)
+
+
+def test_draw_speed_two_frames_share_one_axis() -> None:
+    """Two precomputed curves co-plot on one axis with a two-entry legend — the
+    dashboard's inertial + ITRF speed overlay."""
+    traj = _circular_trajectory()
+    inertial = np.full(len(traj), 7.5)
+    ground = np.full(len(traj), 7.0)
+    fig, ax = plt.subplots()
+    try:
+        _draw_speed(ax, traj, speeds_kms=inertial, color="tab:blue", label="EME2000")
+        _draw_speed(ax, traj, speeds_kms=ground, color="tab:orange", label="ITRF")
+        assert len(ax.lines) == 2
+        assert [t.get_text() for t in ax.get_legend().get_texts()] == [
+            "EME2000",
+            "ITRF",
+        ]
+        assert ax.get_title() == ""
+    finally:
+        plt.close(fig)
+
+
+def test_draw_speed_requires_frame_or_array() -> None:
+    """With neither a frame nor a precomputed array there is nothing to draw."""
+    traj = _circular_trajectory()
+    fig, ax = plt.subplots()
+    try:
+        with pytest.raises(ValueError, match="either"):
+            _draw_speed(ax, traj)
+    finally:
+        plt.close(fig)
+
+
 # --- metadata + smoke ------------------------------------------------------
 
 

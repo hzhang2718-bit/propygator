@@ -30,6 +30,8 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
 
     import plotly.graph_objects as go
+    from matplotlib.lines import Line2D
+    from matplotlib.markers import MarkerStyle
 
     from ..core.frames import Frame
     from ..core.states import Trajectory
@@ -123,6 +125,50 @@ MARKER_END: dict[str, Any] = {
 }
 
 
+def _marker_legend_handle(
+    style: dict[str, Any], label: str, *, marker: str | None = None
+) -> "Line2D":
+    """Build an upright ``Line2D`` legend handle mirroring a scatter marker-style dict.
+
+    One home for the ``c``/``edgecolors`` → ``markerfacecolor``/``markeredgecolor``
+    mapping and the points²→points (``√s``) size conversion (``scatter`` sizes in
+    points², ``Line2D`` markersize in points), shared by ``_draw_ground_track`` (its
+    start/end keys) and the live dashboard's ground-track + sky legends.
+
+    ``marker`` overrides ``style["marker"]`` — for the direction-glyph dicts (e.g.
+    :data:`MARKER_END`) that deliberately omit a ``"marker"`` key and pass a rotated
+    ``MarkerStyle`` to ``scatter`` instead. Legend keys are upright on purpose: a
+    data-rotated handle is just noise in a box with no track to read it against.
+    """
+    from matplotlib.lines import Line2D
+
+    return Line2D(
+        [],
+        [],
+        linestyle="none",
+        marker=marker if marker is not None else style["marker"],
+        markerfacecolor=style["c"],
+        markeredgecolor=style["edgecolors"],
+        markersize=float(style["s"]) ** 0.5,
+        label=label,
+    )
+
+
+def _heading_marker(heading_deg: float) -> "MarkerStyle":
+    """A ``^`` triangle ``MarkerStyle`` rotated to point along a track heading.
+
+    ``"^"`` points north (+y, 90°), so the ``heading - 90`` offset aims its apex along
+    the local heading. The rotation is per-sample data, so the glyph is built at draw
+    time, not in a static marker-style dict (so :data:`MARKER_END` carries no
+    ``"marker"`` key). Shared by ``_draw_ground_track``'s end glyph and the dashboard's
+    sliding sub-satellite marker, so the load-bearing ``-90`` lives in one place.
+    """
+    from matplotlib.markers import MarkerStyle
+    from matplotlib.transforms import Affine2D
+
+    return MarkerStyle("^").transformed(Affine2D().rotate_deg(heading_deg - 90.0))
+
+
 # --- default figure sizes ---------------------------------------------------
 
 #: One time-series panel (``plot_altitude`` / a single ``plot_speed`` panel), inches.
@@ -131,6 +177,9 @@ FIGSIZE_TIMESERIES = (9.0, 3.2)
 FIGSIZE_GROUND_TRACK = (9.0, 4.5)
 #: The stacked ``plot_summary`` composite, inches.
 FIGSIZE_SUMMARY = (9.0, 10.0)
+#: The polar sky-track view (``plot_sky_track``), inches — square so the sky disk
+#: renders round.
+FIGSIZE_SKY = (6.0, 6.0)
 #: The Plotly ``plot_3d`` view, *pixels* (Plotly sizes in px, not inches).
 FIGSIZE_3D_PX = (800, 700)
 

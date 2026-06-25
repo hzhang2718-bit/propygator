@@ -80,19 +80,51 @@ def _draw_altitude(ax: Axes, traj: Trajectory) -> None:
     ax.set_ylabel("Altitude (km)")
 
 
-def _draw_speed(ax: Axes, traj: Trajectory, *, frame: Frame) -> None:
-    """Draw speed magnitude (km/s) in ``frame`` vs elapsed hours onto ``ax``.
+def _draw_speed(
+    ax: Axes,
+    traj: Trajectory,
+    *,
+    frame: Frame | None = None,
+    speeds_kms: np.ndarray | None = None,
+    color: str | None = None,
+    label: str | None = None,
+) -> None:
+    """Draw speed magnitude (km/s) vs elapsed hours onto ``ax``.
 
-    Speed is ``‖velocity‖`` after expressing the trajectory in ``frame``: inertial
-    (EME2000/TEME) gives the orbital speed; ITRF gives the **ground-relative** speed
-    (relative to the rotating Earth). Sets the y-axis label and a frame-naming title;
-    the caller owns the x-axis label and the figure.
+    Two modes share one axis-drawing path:
+
+    - **Default (``speeds_kms=None``)** — compute ``‖velocity‖`` after expressing the
+      trajectory in ``frame``: inertial (EME2000/TEME) gives the orbital speed; ITRF
+      gives the **ground-relative** speed (relative to the rotating Earth). Sets the
+      y-axis label and a frame-naming *title*. This path is byte-identical to the
+      shipped 1.1 behaviour, so the standalone ``plot_speed`` / ``plot_summary`` outputs
+      and their snapshot tests are unchanged.
+    - **Precomputed seam (``speeds_kms`` supplied)** — the live dashboard's hook: plot
+      the caller's speed-magnitude array *directly* (no ``to_frame`` crossing), with the
+      caller's ``color`` / ``label`` and a *legend* in place of the single-frame title,
+      so two frames (inertial + ITRF) can share one axis cheaply and the per-frame
+      redraw never re-runs an O(N) JVM loop (features.md §1.4 "Per-frame work").
+      ``frame`` is ignored here — it drives neither the conversion nor the title.
+
+    Either way, the caller owns the x-axis label and the figure.
     """
-    in_frame = traj.to_frame(frame)
-    speed_kms = np.linalg.norm(in_frame.velocities, axis=1) / 1000.0
-    ax.plot(_elapsed_hours(traj), speed_kms, color=TIMESERIES_COLOR)
+    if speeds_kms is None:
+        if frame is None:
+            raise ValueError(
+                "_draw_speed needs either `frame` (to compute the speed) or a "
+                "precomputed `speeds_kms` array"
+            )
+        in_frame = traj.to_frame(frame)
+        speed_kms = np.linalg.norm(in_frame.velocities, axis=1) / 1000.0
+        ax.plot(_elapsed_hours(traj), speed_kms, color=TIMESERIES_COLOR)
+        ax.set_ylabel("Speed (km/s)")
+        ax.set_title(f"{_speed_descriptor(frame)} speed — {frame.value}")
+        return
+
+    ax.plot(_elapsed_hours(traj), speeds_kms, color=color, label=label)
     ax.set_ylabel("Speed (km/s)")
-    ax.set_title(f"{_speed_descriptor(frame)} speed — {frame.value}")
+    if label is not None:
+        ax.legend()
 
 
 def _suptitle_from_metadata(fig: Figure, traj: Trajectory) -> None:

@@ -10,7 +10,14 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from propygator import Epoch, GeodeticPosition, GroundStation, Pass, TimeScale
+from propygator import (
+    AzElRange,
+    Epoch,
+    GeodeticPosition,
+    GroundStation,
+    Pass,
+    TimeScale,
+)
 
 
 def test_no_jvm_started():
@@ -86,6 +93,47 @@ def test_geodetic_position_frozen():
     gp = GeodeticPosition(0.0, 0.0, 0.0)
     with pytest.raises(FrozenInstanceError):
         gp.altitude_m = 5.0
+
+
+# --- AzElRange -------------------------------------------------------------
+
+
+def test_azelrange_valid_and_access():
+    ae = AzElRange(azimuth_deg=123.5, elevation_deg=42.0, range_m=1_234_567.0)
+    assert ae.azimuth_deg == 123.5
+    assert ae.elevation_deg == 42.0
+    assert ae.range_m == 1_234_567.0
+
+
+def test_azelrange_allows_negative_elevation():
+    # Below the horizon is a legitimate look angle (the value type does not
+    # clip it; the sky plot masks below-horizon samples downstream).
+    ae = AzElRange(azimuth_deg=0.0, elevation_deg=-30.0, range_m=5.0e6)
+    assert ae.elevation_deg == -30.0
+
+
+def test_azelrange_frozen():
+    ae = AzElRange(10.0, 20.0, 30.0)
+    with pytest.raises(FrozenInstanceError):
+        ae.elevation_deg = 25.0
+
+
+@pytest.mark.parametrize("az", [float("nan"), float("inf"), float("-inf")])
+def test_azelrange_bad_azimuth(az):
+    with pytest.raises(ValueError):
+        AzElRange(az, 0.0, 0.0)
+
+
+@pytest.mark.parametrize("el", [float("nan"), float("inf"), float("-inf")])
+def test_azelrange_bad_elevation(el):
+    with pytest.raises(ValueError):
+        AzElRange(0.0, el, 0.0)
+
+
+@pytest.mark.parametrize("rng", [float("nan"), float("inf"), -1.0, -1.0e-9])
+def test_azelrange_bad_range(rng):
+    with pytest.raises(ValueError):
+        AzElRange(0.0, 0.0, rng)
 
 
 # --- Pass ------------------------------------------------------------------

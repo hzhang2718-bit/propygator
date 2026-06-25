@@ -129,6 +129,38 @@ def test_track_heading_deg_degenerate_points_north() -> None:
     ) == pytest.approx(90.0)
 
 
+# --- _track_heading_deg at_index seam (Feature 1.4, chunk 6) ----------------
+
+
+def test_track_heading_deg_at_index_selects_bracketing_segment() -> None:
+    # Three segments with distinct headings: 45°, atan2(2,1)≈63.43°, 0°.
+    lon = np.array([0.0, 1.0, 2.0, 3.0])
+    lat = np.array([0.0, 1.0, 3.0, 3.0])
+    assert _track_heading_deg(lon, lat, at_index=0) == pytest.approx(45.0)
+    assert _track_heading_deg(lon, lat, at_index=1) == pytest.approx(
+        math.degrees(math.atan2(2.0, 1.0))
+    )
+    assert _track_heading_deg(lon, lat, at_index=2) == pytest.approx(0.0)
+    # The last sample (and any out-of-range index) clamps to the final segment.
+    assert _track_heading_deg(lon, lat, at_index=3) == pytest.approx(0.0)
+    assert _track_heading_deg(lon, lat, at_index=99) == pytest.approx(0.0)
+
+
+def test_track_heading_deg_at_index_skips_invalid_with_backward_tiebreak() -> None:
+    # Middle segment is degenerate (coincident); bracketing index 1 falls back to the
+    # nearest valid segment — backward on a tie -> segment 0 (0°), not segment 2 (45°).
+    lon = np.array([0.0, 1.0, 1.0, 2.0])
+    lat = np.array([0.0, 0.0, 0.0, 1.0])
+    assert _track_heading_deg(lon, lat, at_index=1) == pytest.approx(0.0)
+
+
+def test_track_heading_deg_at_index_none_matches_last_segment() -> None:
+    # at_index=None reproduces the legacy last-valid-segment behaviour exactly.
+    lon = np.array([0.0, 1.0, 2.0, 3.0])
+    lat = np.array([0.0, 1.0, 3.0, 3.0])
+    assert _track_heading_deg(lon, lat, at_index=None) == _track_heading_deg(lon, lat)
+
+
 # --- plot_ground_track structure -------------------------------------------
 
 
@@ -302,6 +334,90 @@ def test_primitive_returns_mappable_only_when_coloured() -> None:
         )
     finally:
         plt.close(fig2)
+
+
+# --- _draw_ground_track endpoint seams (Feature 1.4, chunk 6) ---------------
+
+
+def test_ground_track_endpoint_labels_relabel_legend() -> None:
+    """``endpoint_labels`` relabels the start/end legend keys; both markers stay."""
+    traj = _inclined_trajectory()
+    fig, ax = plt.subplots()
+    try:
+        _draw_ground_track(
+            ax,
+            traj,
+            show_map_overlay=False,
+            endpoint_labels=("past edge", "future edge"),
+        )
+        leg = ax.get_legend()
+        assert [t.get_text() for t in leg.get_texts()] == ["past edge", "future edge"]
+        assert len(_scatter_collections(ax)) == 2
+    finally:
+        plt.close(fig)
+
+
+def test_ground_track_suppress_end_marker() -> None:
+    """``suppress_end_marker`` drops the end triangle and its legend key."""
+    traj = _inclined_trajectory()
+    fig, ax = plt.subplots()
+    try:
+        _draw_ground_track(ax, traj, show_map_overlay=False, suppress_end_marker=True)
+        assert len(_scatter_collections(ax)) == 1  # start marker only
+        leg = ax.get_legend()
+        assert [t.get_text() for t in leg.get_texts()] == ["start"]
+    finally:
+        plt.close(fig)
+
+
+def test_ground_track_relabel_and_suppress_combined() -> None:
+    """Relabel + suppress together: only the start (relabelled) key survives."""
+    traj = _inclined_trajectory()
+    fig, ax = plt.subplots()
+    try:
+        _draw_ground_track(
+            ax,
+            traj,
+            show_map_overlay=False,
+            endpoint_labels=("past edge", "future edge"),
+            suppress_end_marker=True,
+        )
+        assert len(_scatter_collections(ax)) == 1
+        leg = ax.get_legend()
+        assert [t.get_text() for t in leg.get_texts()] == ["past edge"]
+    finally:
+        plt.close(fig)
+
+
+def test_ground_track_extra_legend_handles_appended() -> None:
+    """``extra_legend_handles`` are appended after the built-in keys, in order."""
+    from matplotlib.lines import Line2D
+
+    traj = _inclined_trajectory()
+    fig, ax = plt.subplots()
+    try:
+        extra = [
+            Line2D([], [], linestyle="none", marker="^", label="current position"),
+            Line2D([], [], linestyle="none", marker="*", label="ground station"),
+        ]
+        _draw_ground_track(
+            ax,
+            traj,
+            show_map_overlay=False,
+            suppress_end_marker=True,
+            extra_legend_handles=extra,
+        )
+        leg = ax.get_legend()
+        # Built-in start key first, then the extras in the given order.
+        assert [t.get_text() for t in leg.get_texts()] == [
+            "start",
+            "current position",
+            "ground station",
+        ]
+        # The proxies are legend-only: the on-map scatter count is unchanged (start).
+        assert len(_scatter_collections(ax)) == 1
+    finally:
+        plt.close(fig)
 
 
 # --- metadata + smoke ------------------------------------------------------

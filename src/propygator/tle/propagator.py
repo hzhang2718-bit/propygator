@@ -35,9 +35,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .._orekit_init import _ensure_started, _orekit_version
+from ..core.exceptions import StaleTLEWarning
 from ..core.frames import Frame
 from ..core.sampling import _output_offsets, _validate_sampling
-from ..core.states import Trajectory, _propygator_version
+from ..core.states import State, Trajectory, _propygator_version, _vector3d_to_array
 from ..core.time import TimeScale
 
 if TYPE_CHECKING:
@@ -107,6 +108,11 @@ def propagate_tle(
             f"({tle_epoch.in_scale(TimeScale.UTC).to_iso()}Z); SGP4/SDP4 accuracy "
             "degrades with time from epoch (roughly 1 km near epoch to many km over "
             "days to weeks). Use a TLE closer to the propagation span for accuracy.",
+            # A dedicated UserWarning subclass (features.md §1.4) so Feature 1.4's live
+            # engine can suppress the per-rebuild repeat of *this* warning surgically
+            # without swallowing all UserWarnings; backward-compatible for plain
+            # UserWarning filters.
+            category=StaleTLEWarning,
             # warn -> propagate_tle -> user: stacklevel 2 surfaces the warning at the
             # caller's propagate_tle(...) line, not this internal frame.
             stacklevel=2,
@@ -237,3 +243,58 @@ def _build_sgp4_metadata(
     if name is not None:
         metadata["name"] = name
     return metadata
+
+
+def _tle_state_at(tle: "TLE", epoch: "Epoch") -> State:
+    """Evaluate a TLE at a single ``epoch`` to a TEME :class:`State` (features.md §1.4).
+
+    The single-shot counterpart to :func:`propagate_tle` behind Feature 1.4's realtime
+    primitives (``current_state`` / ``current_ground_position``). It builds its **own**
+    ``TLEPropagator`` for one point rather than reusing ``propagate_tle``'s
+    hoisted-propagator sample loop, so that loop stays untouched (features.md §1.4
+    "Real-time primitives") — and no throwaway ``Trajectory`` / ``Ephemeris`` is built
+    for a single instant.
+
+    Returns the state in :data:`Frame.TEME`, the native SGP4 frame — no silent
+    conversion (architecture §10); call ``.to_frame(...)`` to convert. JVM-touching
+    (lazy import behind ``_ensure_started()``, the ``propagate_tle`` idiom).
+
+    Decay handling mirrors :func:`propagate_tle`: if SGP4/SDP4 leaves its validity
+    envelope during the evaluation it surfaces as a clean :class:`TLEPropagationError`
+    — whether Orekit signals that by raising (out-of-range eccentricity) or by returning
+    a non-finite PV (a sub-surface decay) — never a raw Java trace (architecture §3) or
+    the generic finiteness ``ValueError`` :class:`State` would otherwise raise, so
+    ``current_state`` / ``current_ground_position`` fail cleanly on a decayed TLE. In
+    normal realtime use a current TLE evaluated at ``now`` is well inside the envelope,
+    so this is an edge-case guard.
+    """
+    _ensure_started()
+    import jpype
+    from org.orekit.propagation.analytical.tle import TLEPropagator
+
+    from ..core.exceptions import TLEPropagationError
+
+    propagator = TLEPropagator.selectExtrapolator(tle.to_orekit())
+    try:
+        pv = propagator.propagate(epoch.to_orekit()).getPVCoordinates(
+            Frame.TEME.to_orekit()
+        )
+    except jpype.JException as exc:  # type: ignore[attr-defined]
+        # SGP4/SDP4 left its validity envelope (decay / out-of-range eccentricity);
+        # surface the Java message as a clean TLEPropagationError (no raw trace,
+        # architecture §3), mirroring propagate_tle's catch.
+        raise TLEPropagationError(
+            f"TLE propagation failed: {exc.getMessage()}"
+        ) from None
+
+    position = _vector3d_to_array(pv.getPosition())
+    velocity = _vector3d_to_array(pv.getVelocity())
+    # A sub-surface decay can yield a non-finite PV without throwing; surface that as
+    # the same TLEPropagationError rather than the generic finiteness ValueError State
+    # would raise (the exact finiteness idiom propagate_tle uses).
+    if not (np.isfinite(position).all() and np.isfinite(velocity).all()):
+        raise TLEPropagationError(
+            "TLE propagation failed: the propagator produced a non-finite state; "
+            "the orbit has likely decayed (left the SGP4/SDP4 validity envelope)."
+        )
+    return State(epoch, position, velocity, Frame.TEME)

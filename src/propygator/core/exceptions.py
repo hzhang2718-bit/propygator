@@ -112,3 +112,21 @@ class TLEPropagationError(PropagationError):
     approaches decay, so 1.3 does not stop-and-report a partial — a decay raises
     cleanly rather than implying an accuracy that is not there (features.md §1.3).
     """
+
+
+class StaleTLEWarning(UserWarning):
+    """The category of :func:`propagate_tle`'s stale-TLE warning (features.md §1.4).
+
+    Emitted (warn-once, never raised) when a propagated span reaches more than the
+    stale threshold from the TLE epoch, where SGP4/SDP4 accuracy has materially
+    degraded. A ``UserWarning`` subclass — **not** a :class:`PropygatorError` (it is a
+    warning, not an error) — so the change is additive and backward-compatible: any
+    existing ``UserWarning`` filter still matches it.
+
+    The dedicated category exists so Feature 1.4's live dashboard can suppress the
+    *per-rebuild* repeat of this warning **surgically** — the engine re-invokes
+    ``propagate_tle`` on every buffer rebuild, and the message embeds the age in days
+    so Python's warning dedup does not collapse the repeats. Filtering on this category
+    silences only the stale nag for the session, not every ``UserWarning``, and a
+    genuine decay still surfaces as :class:`TLEPropagationError` regardless.
+    """

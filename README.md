@@ -108,17 +108,39 @@ pgr.export_csv(traj, "iss.csv", columns=["keplerian", "mean_anomaly"])
 back = pgr.TLE.from_state_unfitted(traj[0], norad_id=25544)
 ```
 
-### Coming next (Features 1.4–1.5)
+### Real-time tracking (Feature 1.4)
 
-Real-time tracking and pass prediction are designed but **not yet implemented** —
-this is the target surface they will expose:
+Answer "where is it *now*, and show me." Cheap one-shot queries, an observer sky
+view, and a live, self-updating dashboard — all composed over `propagate_tle`:
 
 ```python
 import propygator as pgr
 
 iss = pgr.fetch_tle("ISS")
-print(pgr.current_ground_position(iss))          # live lat/lon/alt (1.4)
+print(pgr.current_ground_position(iss))           # live lat/lon/alt (no frame)
+st = pgr.current_state(iss)                        # State in TEME (SGP4-native)
 
+durham = pgr.GroundStation("Durham", 35.99, -78.90, altitude_m=130)
+traj = pgr.propagate_tle(iss, duration=86400, output_step=60)
+print(pgr.look_angles(durham, traj[0]))           # AzElRange (az / el / range)
+pgr.plot_sky_track(traj, durham)                  # geometry-only polar sky view
+
+# Live dashboard — keep the returned reference, under a GUI / %matplotlib widget backend.
+anim = pgr.live_track("ISS", durham)              # 4-panel; pgr.live_track("ISS") for 3
+```
+
+A walkthrough lives in
+[`notebooks/05_realtime_tracking.ipynb`](notebooks/05_realtime_tracking.ipynb).
+
+### Coming next (Feature 1.5)
+
+Pass prediction is designed but **not yet implemented** — this is the target
+surface it will expose:
+
+```python
+import propygator as pgr
+
+iss = pgr.fetch_tle("ISS")
 durham = pgr.GroundStation("Durham", 35.99, -78.90, altitude_m=130)
 passes = pgr.find_passes(                         # visible passes (1.5)
     iss, durham, start=pgr.Epoch.now(), duration=86400, min_elevation_deg=20
@@ -135,8 +157,10 @@ v1 feature set (✅ = implemented):
   state vector with configurable force models, plus the plot + CSV output surface.
 - ✅ **TLE propagation** — SGP4/SDP4 propagation of TLEs (`fetch_tle` /
   `propagate_tle`), reusing the same plot + CSV output surface.
+- ✅ **Real-time tracking** — current position (`current_state` /
+  `current_ground_position`), an observer sky view (`look_angles` /
+  `plot_sky_track`), and a live, self-updating dashboard (`live_track`).
 - **TLE fitting** — least-squares fit of a TLE against a reference trajectory.
-- **Real-time tracking** — current position, ground track, and altitude for a TLE.
 - **Ground passes + brightness** — visible passes from a ground station, with
   estimated visual magnitude.
 
@@ -151,6 +175,8 @@ ordering:
 - [`03_demo.ipynb`](notebooks/03_demo.ipynb) — four contrasting orbits, end to end.
 - [`04_tle_propagation.ipynb`](notebooks/04_tle_propagation.ipynb) — fetch and
   propagate a TLE with SGP4/SDP4, reusing the same output surface.
+- [`05_realtime_tracking.ipynb`](notebooks/05_realtime_tracking.ipynb) — real-time
+  primitives, the observer sky view, and the live tracking dashboard.
 
 Rendered HTML versions will be posted on the projects page _(link to be added)_.
 

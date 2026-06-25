@@ -16,12 +16,13 @@ never by mutating global ``rcParams`` on import.
 
 from .composite import plot_summary
 from .timeseries import plot_altitude, plot_speed
-from .trajectories import plot_3d, plot_ground_track
+from .trajectories import plot_3d, plot_ground_track, plot_sky_track
 
 __all__ = [
     "plot_3d",
     "plot_altitude",
     "plot_ground_track",
+    "plot_sky_track",
     "plot_speed",
     "plot_summary",
 ]

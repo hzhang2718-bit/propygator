@@ -549,6 +549,26 @@ class Trajectory:
             int(self._epochs_int[i]), float(self._epochs_frac[i]), self.epoch_scale
         )
 
+    @property
+    def start_epoch(self) -> Epoch:
+        """The first sample's :class:`Epoch` — the start of the realized span.
+
+        Pure-Python (no JVM). This is the lower bound :meth:`at` bounds-checks
+        against; together with :attr:`end_epoch` it is the single source of truth for
+        the realized span (e.g. Feature 1.4's live engine clamps ``buffer.at(...)`` to
+        ``end_epoch`` rather than re-deriving the sample grid).
+        """
+        return self._epoch_at(0)
+
+    @property
+    def end_epoch(self) -> Epoch:
+        """The last sample's :class:`Epoch` — the end of the realized span.
+
+        Pure-Python (no JVM). The upper bound :meth:`at` bounds-checks against; see
+        :attr:`start_epoch`.
+        """
+        return self._epoch_at(-1)
+
     def __getitem__(self, index: int) -> State:
         """Materialize sample ``index`` as a :class:`State` with its own arrays."""
         if isinstance(index, slice):

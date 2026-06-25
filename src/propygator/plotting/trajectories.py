@@ -18,6 +18,15 @@ The ground-track drawing logic lives in the ``_draw_ground_track(ax, ...)`` prim
 *returns the colorbar mappable* so the wrapper (and the chunk-11d composite) decide
 colorbar placement. ``plot_ground_track`` is the thin public wrapper.
 
+``plot_sky_track`` (matplotlib polar, Feature 1.4) draws the observer's sky view: the
+satellite's azimuth/elevation path as seen from a ``GroundStation``, on a polar disk
+with the zenith at the centre and the horizon at the rim. It follows the same
+primitive/wrapper split (``_draw_sky_track(ax, ...)``), maps the trajectory through the
+batched ``look_angles_track`` (one topocentric frame), and stays **geometry-only** —
+passes and brightness are Feature 1.5's concern. The live dashboard's sky panel reuses
+``_draw_sky_track`` via its ``azel=`` (precomputed look angles) and ``track_style=``
+seams.
+
 Two ground-track specifics:
 
 - **Dateline.** A continuous line would streak across the whole map each time longitude
@@ -31,19 +40,19 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
-from matplotlib.markers import MarkerStyle
-from matplotlib.transforms import Affine2D
 
 from ..core.frames import Frame, geodetic_track
+from ..core.observation import look_angles_track
 from .basemap import _coastline_lonlat, _render_earth_basemap
 from .style import (
     FIGSIZE_3D_PX,
     FIGSIZE_GROUND_TRACK,
+    FIGSIZE_SKY,
     MARKER_END,
     MARKER_START,
     PLOTLY_TIME_COLORSCALE,
@@ -52,6 +61,8 @@ from .style import (
     TIME_COLOR_START,
     TIMESERIES_COLOR,
     _apply_plotly_template,
+    _heading_marker,
+    _marker_legend_handle,
     _mpl_style,
     _require_min_samples,
 )
@@ -61,7 +72,9 @@ if TYPE_CHECKING:
     import plotly.graph_objects as go
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from matplotlib.projections.polar import PolarAxes
 
+    from ..core.observation import GroundStation
     from ..core.states import Trajectory
 
 logger = logging.getLogger(__name__)
@@ -150,14 +163,28 @@ def _dateline_segments(
 _DEFAULT_HEADING_DEG = 90.0
 
 
-def _track_heading_deg(lon: np.ndarray, lat: np.ndarray) -> float:
-    """Local heading (degrees) of the ground track at its end, for the end glyph.
+def _track_heading_deg(
+    lon: np.ndarray, lat: np.ndarray, *, at_index: int | None = None
+) -> float:
+    """Local heading (degrees) of the ground track, for a direction glyph.
 
-    Returns ``degrees(atan2(Δlat, Δlon))`` of the **last segment that neither wraps the
-    ±180° dateline nor is degenerate** (coincident points) — so a wrapping or
-    zero-length final segment falls back to the previous valid one. With no usable
-    segment at all (a single point, an all-wrapping/all-coincident track) it returns due
-    north (:data:`_DEFAULT_HEADING_DEG`), which rotates the triangle not at all.
+    Returns ``degrees(atan2(Δlat, Δlon))`` of a track segment, always skipping any
+    segment that **wraps the ±180° dateline or is degenerate** (coincident points):
+
+    - **``at_index=None`` (default)** — the **last** valid segment: the end-of-track
+      heading the shipped ``_draw_ground_track`` end triangle uses. A wrapping or
+      zero-length final segment falls back to the previous valid one (unchanged 1.1
+      behaviour).
+    - **``at_index`` given** — a *sample* index (the live dashboard's current-position
+      marker): the heading of the valid segment **nearest that sample**, so the live
+      marker reads the satellite's direction *now* rather than at the buffer's leading
+      edge. The index maps onto its forward segment (the last sample clamps to the final
+      segment); if that segment is invalid the nearest valid one is taken (backward
+      tie-break), reusing the identical dateline/degenerate-fallback convention.
+
+    With no usable segment at all (a single point, an all-wrapping/all-coincident track)
+    it returns due north (:data:`_DEFAULT_HEADING_DEG`), which rotates the triangle not
+    at all.
 
     Exact on the equirectangular (plate carrée, ``aspect="equal"``) map, where one
     degree of longitude and latitude are isotropic on screen, so no projection fix.
@@ -167,10 +194,18 @@ def _track_heading_deg(lon: np.ndarray, lat: np.ndarray) -> float:
     # Reuse the dateline keep-mask (no ±180° wrap) and drop zero-length segments, which
     # have no defined bearing.
     valid = (np.abs(dlon) <= _DATELINE_JUMP_DEG) & ((dlon != 0.0) | (dlat != 0.0))
-    if not np.any(valid):
+    valid_idx = np.flatnonzero(valid)
+    if valid_idx.size == 0:
         return _DEFAULT_HEADING_DEG
-    last = int(np.flatnonzero(valid)[-1])
-    return float(np.degrees(np.arctan2(dlat[last], dlon[last])))
+    if at_index is None:
+        chosen = int(valid_idx[-1])
+    else:
+        # Map the sample index onto its forward segment (last sample -> final segment),
+        # then pick the valid segment nearest it; argmin's first-min gives the backward
+        # tie-break that mirrors the default's "previous valid" fallback.
+        target = min(max(at_index, 0), len(dlon) - 1)
+        chosen = int(valid_idx[np.argmin(np.abs(valid_idx - target))])
+    return float(np.degrees(np.arctan2(dlat[chosen], dlon[chosen])))
 
 
 def _draw_ground_track(
@@ -179,6 +214,9 @@ def _draw_ground_track(
     *,
     show_map_overlay: bool = True,
     color_by_time: bool = True,
+    endpoint_labels: tuple[str, str] | None = None,
+    suppress_end_marker: bool = False,
+    extra_legend_handles: list[Line2D] | None = None,
 ) -> LineCollection | None:
     """Draw the ground track onto ``ax``; return the colorbar mappable (or ``None``).
 
@@ -188,6 +226,20 @@ def _draw_ground_track(
     bundled black coastline beneath. Start (blue circle) and end (red triangle oriented
     to the local track heading) markers and a legend are always drawn. Sets the
     equirectangular map framing; the caller owns the figure and any colorbar.
+
+    Three optional dashboard seams (for the live dashboard's centred buffer, where the
+    "end" is the *future* leading edge, not where the satellite is — so the direction
+    glyph belongs on the live marker, not the track end); all default to the shipped 1.1
+    behaviour, so the standalone ``plot_ground_track`` output is unchanged:
+
+    - ``endpoint_labels=(start_label, end_label)`` relabels the start/end legend keys
+      (the dashboard passes ``("past edge", "future edge")``); ``None`` keeps
+      ``"start"`` / ``"end"``.
+    - ``suppress_end_marker=True`` omits the heading-oriented end triangle **and** its
+      legend entry (only the start marker remains).
+    - ``extra_legend_handles`` are appended to the legend after the built-in start/end
+      keys (the dashboard adds its live-position and ground-station glyphs); the
+      primitive stays generic — it only forwards the handles, never their meaning.
     """
     lon, lat = _geodetic_lonlat(traj)
 
@@ -208,14 +260,9 @@ def _draw_ground_track(
         track = LineCollection(list(segments), colors=TIMESERIES_COLOR, zorder=2)
     ax.add_collection(track)
 
-    # End glyph: a triangle rotated to point along the local track heading. "^" points
-    # north (+y, 90°), so the (heading - 90) offset aims its apex along the heading. The
-    # rotation is per-trajectory, so the shape is built here, not in static MARKER_END.
-    heading = _track_heading_deg(lon, lat)
-    end_marker = MarkerStyle("^").transformed(Affine2D().rotate_deg(heading - 90.0))
-
-    ax.scatter(lon[0], lat[0], **MARKER_START)
-    ax.scatter(lon[-1], lat[-1], marker=end_marker, **MARKER_END)
+    start_label, end_label = (
+        endpoint_labels if endpoint_labels is not None else ("start", "end")
+    )
 
     # Legend keys use upright glyphs (the start circle and a fixed north-pointing "^").
     # The on-map triangle's rotation encodes heading, but in the legend there is no
@@ -223,28 +270,20 @@ def _draw_ground_track(
     # pointed at the start circle or the box edge it crowded the box. Proxy Line2D
     # handles aren't added to the axes, so the on-map collection count is unchanged.
     # Areas reuse MARKER_* (scatter `s` is points², Line2D markersize is points: √s).
-    legend_handles = [
-        Line2D(
-            [],
-            [],
-            linestyle="none",
-            marker="o",
-            markerfacecolor=MARKER_START["c"],
-            markeredgecolor=MARKER_START["edgecolors"],
-            markersize=MARKER_START["s"] ** 0.5,
-            label="start",
-        ),
-        Line2D(
-            [],
-            [],
-            linestyle="none",
-            marker="^",
-            markerfacecolor=MARKER_END["c"],
-            markeredgecolor=MARKER_END["edgecolors"],
-            markersize=MARKER_END["s"] ** 0.5,
-            label="end",
-        ),
-    ]
+    ax.scatter(lon[0], lat[0], **MARKER_START)
+    legend_handles = [_marker_legend_handle(MARKER_START, start_label)]
+
+    # End glyph: a triangle rotated to the local track heading (built by the shared
+    # _heading_marker, which owns the per-sample rotation; MARKER_END carries no shape).
+    # Suppressed for the centred buffer, where the direction glyph rides the live mark.
+    if not suppress_end_marker:
+        end_marker = _heading_marker(_track_heading_deg(lon, lat))
+        ax.scatter(lon[-1], lat[-1], marker=end_marker, **MARKER_END)
+        legend_handles.append(_marker_legend_handle(MARKER_END, end_label, marker="^"))
+
+    # The dashboard's live-position / ground-station keys (generic — just forwarded).
+    if extra_legend_handles is not None:
+        legend_handles.extend(extra_legend_handles)
     ax.legend(handles=legend_handles, loc="upper right")
 
     ax.set_xlim(-180.0, 180.0)
@@ -282,6 +321,129 @@ def plot_ground_track(
         _suptitle_from_metadata(fig, traj)
         fig.tight_layout()
     logger.info("Rendered ground track over %d samples", len(traj))
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Sky-track view (matplotlib polar, Feature 1.4)
+# ---------------------------------------------------------------------------
+#
+# Geometry only (the 1.4 <-> 1.5 line): the raw azimuth/elevation path on an
+# observer's sky dome — no passes, brightness, or lit/eclipse shading (those are
+# Feature 1.5's plot_sky_chart). Shared with the live dashboard's sky panel via the
+# azel= (precomputed look angles, no per-frame JVM) and track_style= (the dashboard's
+# halo stroke) seams, and reused verbatim by 1.5.
+
+#: The fixed light-blue sky disk (the standalone verb's background; the live dashboard
+#: overrides the facecolor with its sun-tint after calling _draw_sky_track).
+_SKY_DISK_COLOR = "#cfe8f3"
+#: The contract sky track: a single dark-navy line (not the blue->red time gradient —
+#: an observer reads a sky track as one continuous path). The dashboard overrides via
+#: track_style (a halo path-effect for contrast against its day->night background).
+_DEFAULT_SKY_TRACK_STYLE: dict[str, Any] = {"color": TIMESERIES_COLOR, "linewidth": 1.5}
+#: Compass azimuth gridlines (degrees) and labels — North at top, increasing clockwise.
+_SKY_AZIMUTH_TICKS = [0, 90, 180, 270]
+_SKY_AZIMUTH_LABELS = ["N", "E", "S", "W"]
+#: Radial gridlines in zenith-angle degrees (90 - elevation): centre = zenith (0),
+#: rim = horizon (90).
+_SKY_RADIAL_TICKS = [0, 30, 60, 90]
+
+
+def _draw_sky_track(
+    ax: PolarAxes,
+    trajectory: Trajectory,
+    station: GroundStation,
+    *,
+    min_elevation_deg: float = 0.0,
+    azel: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
+    track_style: dict[str, Any] | None = None,
+    warn_never_visible: bool = True,
+) -> None:
+    """Draw the observer's sky track onto a polar ``ax`` (zenith centre, horizon rim).
+
+    The geometry-only sky view (features.md §1.4): the satellite's azimuth/elevation
+    path as seen from ``station``, on a matplotlib **polar** projection — North at top,
+    azimuth clockwise, radius = zenith angle (90° − elevation), so the **zenith is at
+    the centre and the horizon at the rim**. Fixed light-blue disk, a single dark-navy
+    track (not a time gradient). Shares one drawing path with the live dashboard's sky
+    panel; reused verbatim by Feature 1.5's richer ``plot_sky_chart``.
+
+    The look angles come from the batched
+    :func:`~propygator.core.observation.look_angles_track` (one station
+    ``TopocentricFrame``) — **unless** a precomputed ``azel=(azimuth_deg,
+    elevation_deg, range_m)`` triple is supplied, the live dashboard's seam to avoid a
+    per-frame JVM crossing (``range_m`` is ignored here).
+
+    Samples below ``min_elevation_deg`` are masked to ``NaN`` so the pen lifts between
+    successive passes (no chord across the disk). If **no** sample clears
+    ``min_elevation_deg`` the empty disk is drawn and a one-time ``warnings.warn`` is
+    emitted — suppressed when ``warn_never_visible=False`` (the live dashboard, where a
+    transient blank sky is normal). ``track_style`` overrides the default line cosmetics
+    (the dashboard supplies a halo ``path_effects`` for contrast); the standalone verb's
+    output is unchanged. Draws onto the supplied ``ax``; the caller owns the figure.
+    """
+    if azel is None:
+        azimuth_deg, elevation_deg, _range_m = look_angles_track(station, trajectory)
+    else:
+        azimuth_deg, elevation_deg, _range_m = azel
+
+    visible = elevation_deg >= min_elevation_deg
+    if not np.any(visible) and warn_never_visible:
+        warnings.warn(
+            f"No sample rises above min_elevation_deg={min_elevation_deg}° as seen "
+            f"from station {station.name!r} over this span; the satellite never clears "
+            "the horizon (drawing an empty sky disk).",
+            stacklevel=2,
+        )
+
+    # Lift the pen below the horizon clip so disjoint passes don't chord across the
+    # disk; theta is the azimuth (radians), the radius is the zenith angle.
+    theta = np.radians(azimuth_deg)
+    radius = np.where(visible, 90.0 - elevation_deg, np.nan)
+    style = {**_DEFAULT_SKY_TRACK_STYLE, **(track_style or {})}
+    ax.plot(theta, radius, **style)
+
+    # Polar framing last so it is not perturbed by the plot's autoscale: North up,
+    # azimuth clockwise, radius = zenith angle (zenith centre, horizon rim).
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+    ax.set_rlim(0.0, 90.0)
+    ax.set_rticks(_SKY_RADIAL_TICKS)
+    ax.set_thetagrids(_SKY_AZIMUTH_TICKS, labels=_SKY_AZIMUTH_LABELS)
+    ax.set_facecolor(_SKY_DISK_COLOR)
+
+
+def plot_sky_track(
+    trajectory: Trajectory,
+    station: GroundStation,
+    *,
+    min_elevation_deg: float = 0.0,
+) -> Figure:
+    """Plot the satellite's path across ``station``'s sky (geometry-only polar view).
+
+    The observer's azimuth/elevation track on a polar sky dome — zenith at the centre,
+    horizon at the rim, North up, azimuth clockwise — drawn as a single dark-navy line
+    over a fixed light-blue disk. Samples below ``min_elevation_deg`` are lifted from
+    the line so each visible pass draws as its own arc; if the satellite never clears
+    that elevation over the span, an empty disk is drawn and a one-time warning is
+    emitted. Geometry only — discrete passes, brightness, and lit/eclipse shading belong
+    to Feature 1.5's ``plot_sky_chart`` (features.md §1.4). Returns the matplotlib
+    figure; the JVM starts lazily on first call (the topocentric projection).
+    """
+    import matplotlib.pyplot as plt
+
+    _require_min_samples(trajectory)
+    with _mpl_style():
+        fig, ax = plt.subplots(figsize=FIGSIZE_SKY, subplot_kw={"projection": "polar"})
+        _draw_sky_track(
+            cast("PolarAxes", ax),
+            trajectory,
+            station,
+            min_elevation_deg=min_elevation_deg,
+        )
+        _suptitle_from_metadata(fig, trajectory)
+        fig.tight_layout()
+    logger.info("Rendered sky track over %d samples", len(trajectory))
     return fig
 
 

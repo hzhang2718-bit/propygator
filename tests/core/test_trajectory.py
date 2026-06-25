@@ -166,6 +166,30 @@ def test_getitem_returns_immutable_state():
         s.velocity[0] = 123.0
 
 
+# --- span accessors (start_epoch / end_epoch) ------------------------------
+
+
+def test_span_accessors_are_realized_endpoints():
+    """start_epoch / end_epoch are the first / last sample epochs (no JVM)."""
+    n = 5
+    traj = _traj(n)
+    # Equal the private endpoint helper at(0) / at(-1) — the single source of truth
+    # Trajectory.at bounds-checks against (features.md §1.4 buffer engine).
+    assert traj.start_epoch == traj._epoch_at(0)
+    assert traj.end_epoch == traj._epoch_at(-1)
+    # And equal the materialized first / last sample epochs.
+    assert traj.start_epoch == traj[0].epoch
+    assert traj.end_epoch == traj[n - 1].epoch
+
+
+def test_span_accessors_single_sample():
+    """A one-sample trajectory has start_epoch == end_epoch."""
+    traj = Trajectory.from_arrays(
+        [_epoch(0)], _positions(1), _velocities(1), Frame.EME2000, metadata=_meta()
+    )
+    assert traj.start_epoch == traj.end_epoch == _epoch(0)
+
+
 # --- metadata validation ---------------------------------------------------
 
 

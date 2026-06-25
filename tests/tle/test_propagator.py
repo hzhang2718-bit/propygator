@@ -28,6 +28,7 @@ from propygator import (
     Frame,
     KeplerianElements,
     PropagationError,
+    StaleTLEWarning,
     TimeScale,
     TLEPropagationError,
     propagate_tle,
@@ -224,6 +225,23 @@ def test_no_stale_warning_within_30_days_both_ends():
         warnings.simplefilter("always")
         propagate_tle(tle, 5.0 * 86400.0, output_step=86400.0, start=start)
     assert not [w for w in record if "from the TLE epoch" in str(w.message)]
+
+
+def test_staletlewarning_subclasses_userwarning():
+    """The dedicated category is additive: existing UserWarning filters still match."""
+    assert issubclass(StaleTLEWarning, UserWarning)
+
+
+def test_stale_warning_uses_staletlewarning_category():
+    """The stale warn carries the StaleTLEWarning category (features.md §1.4).
+
+    Filtering on the specific category catches it (the Feature-1.4 live engine relies
+    on this to suppress the per-rebuild repeat surgically), and — because it subclasses
+    UserWarning — the broader ``pytest.warns(UserWarning)`` pin above still holds.
+    """
+    tle = _iss_tle()
+    with pytest.warns(StaleTLEWarning, match="from the TLE epoch"):
+        propagate_tle(tle, 40.0 * 86400.0, output_step=86400.0)
 
 
 # --- decay error path -------------------------------------------------------

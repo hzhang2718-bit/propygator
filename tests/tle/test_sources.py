@@ -167,6 +167,41 @@ def test_fetch_celestrak_custom_ttl(cache_dir, monkeypatch):
     assert len(rec.calls) == 2
 
 
+def test_fetch_tle_forwards_realtime_ttl(cache_dir, monkeypatch):
+    # Feature 1.4's realtime path reaches the 6 h TTL *through* fetch_tle. Cache an
+    # entry, age it past 6 h but within 24 h, then confirm the realtime ttl_s re-fetches
+    # while the default 24 h TTL would still serve from cache.
+    rec = _install_recorder(monkeypatch)
+
+    sources.fetch_tle("ISS")  # 1 network call; writes the cache
+    cache_file = sources._cache_path(25544)
+    age = time.time() - (sources._TTL_REALTIME_S + 600.0)  # > 6 h, < 24 h
+    os.utime(cache_file, (age, age))
+
+    # Default TTL (24 h): the aged entry is still fresh -> cache hit, no new call.
+    sources.fetch_tle("ISS")
+    assert len(rec.calls) == 1
+
+    # Realtime TTL (6 h): the same aged entry is now a miss -> a fresh network fetch.
+    sources.fetch_tle("ISS", ttl_s=sources._TTL_REALTIME_S)
+    assert len(rec.calls) == 2
+
+
+def test_fetch_tle_default_ttl_unchanged(cache_dir, monkeypatch):
+    # ttl_s=None (the default) keeps fetch_celestrak's 24 h general TTL: an entry aged
+    # past 6 h but within 24 h is still a hit (regression guard on the forwarding).
+    rec = _install_recorder(monkeypatch)
+
+    sources.fetch_tle("ISS")
+    cache_file = sources._cache_path(25544)
+    age = time.time() - (sources._TTL_REALTIME_S + 600.0)
+    os.utime(cache_file, (age, age))
+
+    sources.fetch_tle("ISS")
+
+    assert len(rec.calls) == 1
+
+
 # --- error paths --------------------------------------------------------------
 
 

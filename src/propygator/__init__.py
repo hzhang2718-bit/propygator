@@ -25,11 +25,20 @@ from .core.exceptions import (
     OrekitDataMissingError,
     PropagationError,
     PropygatorError,
+    StaleTLEWarning,
     TLEFetchError,
     TLEPropagationError,
 )
 from .core.frames import Frame
-from .core.observation import GeodeticPosition, GroundStation, Pass
+from .core.observation import (
+    AzElRange,
+    GeodeticPosition,
+    GroundStation,
+    Pass,
+    look_angles,
+    moon_look_angles,
+    sun_look_angles,
+)
 from .core.states import Orientation, State, Trajectory, _propygator_version
 from .core.time import Epoch, TimeScale
 from .core.tle import TLE
@@ -38,6 +47,7 @@ from .plotting import (
     plot_3d,
     plot_altitude,
     plot_ground_track,
+    plot_sky_track,
     plot_speed,
     plot_summary,
 )
@@ -59,6 +69,7 @@ from .propagation import (
     propagate_numerical,
 )
 from .tle import fetch_tle, propagate_tle
+from .tracking import current_ground_position, current_state, live_track
 
 # Single-sourced via core.states._propygator_version (importlib.metadata), which
 # returns "unknown" when running from a source tree without distribution metadata
@@ -79,6 +90,7 @@ __all__ = [
     "NumericalPropagationError",
     "TLEPropagationError",
     "TLEFetchError",
+    "StaleTLEWarning",
     "Epoch",
     "TimeScale",
     "Frame",
@@ -90,6 +102,7 @@ __all__ = [
     "GroundStation",
     "GeodeticPosition",
     "Pass",
+    "AzElRange",
     # Feature 1.1 — numerical propagator
     "propagate_numerical",
     "ForceModelConfig",
@@ -117,4 +130,14 @@ __all__ = [
     # Feature 1.3 — TLE propagator
     "propagate_tle",
     "fetch_tle",
+    # Feature 1.4 — realtime primitives + live dashboard
+    "current_state",
+    "current_ground_position",
+    "live_track",
+    # Feature 1.4 — sky-view kernel (look_angles_track / observer_snapshot stay
+    # reachable via propygator.core.observation)
+    "look_angles",
+    "sun_look_angles",
+    "moon_look_angles",
+    "plot_sky_track",
 ]

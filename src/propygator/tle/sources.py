@@ -174,6 +174,7 @@ def fetch_tle(
     source: str = "celestrak",
     *,
     use_cache: bool = True,
+    ttl_s: float | None = None,
 ) -> TLE:
     """Fetch a satellite's current TLE by friendly name or NORAD id (architecture §6).
 
@@ -183,6 +184,12 @@ def fetch_tle(
     forces a network hit), and returns a validated :class:`TLE` whose ``name`` is set
     from CelesTrak's line-0 so :func:`~propygator.propagate_tle`'s name-fallback carries
     the satellite's identity (features.md §1.3).
+
+    ``ttl_s`` overrides the cache freshness window for this fetch: ``None`` (the
+    default) keeps the 24 h general TTL, while Feature 1.4's realtime/live path passes
+    :data:`_TTL_REALTIME_S` (6 h) so a long-running tracker re-fetches more often
+    (architecture §10, the Feature-1.4 plumbing note). It simply makes
+    :func:`fetch_celestrak`'s existing ``ttl_s`` reachable through this verb.
 
     ``source`` is kept for forward-compatibility but ``"celestrak"`` is its only valid
     value in v1 (Space-Track / ``"auto"`` are deferred, architecture §3); any other
@@ -194,6 +201,9 @@ def fetch_tle(
             "(Space-Track and 'auto' multi-source resolution are deferred)."
         )
     norad_id = _resolve_norad_id(name_or_id)
-    raw = fetch_celestrak(norad_id, use_cache=use_cache)
+    # Only forward ttl_s when set so the default keeps fetch_celestrak's 24 h TTL
+    # (architecture §10) — passing None would override its _TTL_GENERAL_S default.
+    extra = {} if ttl_s is None else {"ttl_s": ttl_s}
+    raw = fetch_celestrak(norad_id, use_cache=use_cache, **extra)
     name, line1, line2 = _split_tle_block(raw)
     return TLE.from_strings(line1, line2, name=name)

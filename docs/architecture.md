@@ -610,7 +610,7 @@ def look_angles(station: GroundStation, state: State) -> AzElRange: ...
 
 Introduced for Feature 1.4's live sky view (features §1.4) but shared verbatim with Feature 1.5's pass finder, so building it in 1.4 brings 1.5's topocentric foundation forward.
 
-Feature 1.4 adds three siblings in the same module, sharing one topocentric kernel: `look_angles_track(station, trajectory)` — the batched analogue of `geodetic_track`, returning parallel az/el/range arrays (but **not** memoized on the `Trajectory`, since it is station-keyed) — and `sun_look_angles(station, epoch)` / `moon_look_angles(station, epoch)`, the same kernel projecting the Sun/Moon for the live sky panel's tint/markers and for 1.5's observer-darkness gate. All three are JVM-touching like `look_angles` (already on the §10 JVM-startup list); only the `AzElRange` value type is safe-before-init (features §1.4).
+Feature 1.4 adds four siblings in the same module, sharing one topocentric kernel: `look_angles_track(station, trajectory)` — the batched analogue of `geodetic_track`, returning parallel az/el/range arrays (but **not** memoized on the `Trajectory`, since it is station-keyed); `sun_look_angles(station, epoch)` / `moon_look_angles(station, epoch)`, the same kernel projecting the Sun/Moon for the live sky panel's tint/markers and for 1.5's observer-darkness gate; and `observer_snapshot(station, epoch, state)`, which builds the station frame once and projects the satellite + Sun + Moon together (the live dashboard's per-frame batch). All are JVM-touching like `look_angles` (on the §10 JVM-startup list); only the `AzElRange` value type is safe-before-init (features §1.4).
 
 ### `Pass`
 
@@ -687,8 +687,8 @@ src/propygator/
 │   ├── observation.py   GroundStation, Pass, GeodeticPosition, AzElRange,
 │   │                    look_angles(station, state) -> AzElRange (topocentric
 │   │                    az/el/range; JVM-touching, shared with find_passes; Feature 1.4 also adds
-│   │                    look_angles_track / sun_look_angles / moon_look_angles
-│   │                    to this one shared kernel).
+│   │                    look_angles_track / sun_look_angles / moon_look_angles /
+│   │                    observer_snapshot to this one shared kernel).
 │   │                    In core/ so io/ can import them without violating
 │   │                    the "io depends only on core" rule (§7 dep rule).
 │   └── catalogs.py      Popular satellite registry (friendly name → NORAD ID)
@@ -997,7 +997,7 @@ Three init paths:
 - `GroundStation`, `Pass`, and `AzElRange` construction (the value types are pure-Python; only the `look_angles` / `look_angles_track` *calls* start the JVM — see below).
 - VariableCd table construction and validation (the Orekit DragSensitive it lowers to is built inside propagate_numerical, not at config time).
 
-JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `TLE.from_state_unfitted` (it lowers the state to Orekit's TLE formatter), `current_state`, `current_ground_position`, `look_angles` / `look_angles_track` / `sun_look_angles` / `moon_look_angles` (they build an Orekit `TopocentricFrame`), `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). `TLE.from_norad_id` / `fetch_tle` are **network-touching** (not JVM-touching) but likewise sit outside the safe-before-init surface. Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
+JVM startup is reserved for: any `to_orekit()` call, `propagate_numerical`, `propagate_tle`, `fit_tle`, `TLE.from_state_unfitted` (it lowers the state to Orekit's TLE formatter), `current_state`, `current_ground_position`, `look_angles` / `look_angles_track` / `sun_look_angles` / `moon_look_angles` / `observer_snapshot` (they build an Orekit `TopocentricFrame`), `find_passes`, and `Trajectory.at()` (which builds the cached `Ephemeris`). `TLE.from_norad_id` / `fetch_tle` are **network-touching** (not JVM-touching) but likewise sit outside the safe-before-init surface. Code review and CI tests guard against accidental Orekit imports leaking into the "safe before init" surface.
 
 ### Orekit types stay internal
 
@@ -1038,7 +1038,7 @@ TLE fetches and force model loading cache to `~/.propygator/cache/`. Per-call `u
 
 Two TTLs serve different workflows:
 
-- **Realtime workflows** (`current_state`, `current_ground_position`): **6-hour TTL**. CelesTrak typically refreshes popular satellites several times per day, so a 6-hour TTL catches updates within roughly half a refresh cycle while avoiding pointless refetches of identical TLEs. **(Feature 1.4 plumbing note.)** `current_state` / `current_ground_position` take a `TLE` directly and do **not** fetch, so this 6-hour TTL is realized only on the *fetch* that produced the TLE — and the shipped `fetch_tle` always uses the 24-hour general TTL (`_TTL_REALTIME_S` exists in `tle/sources.py` but is unreachable through it). Feature 1.4 must surface the realtime TTL: add an internal realtime/`ttl_s` selector to `fetch_tle`, or have the live/realtime path call `fetch_celestrak(ttl_s=_TTL_REALTIME_S)` directly.
+- **Realtime workflows** (`current_state`, `current_ground_position`): **6-hour TTL**. CelesTrak typically refreshes popular satellites several times per day, so a 6-hour TTL catches updates within roughly half a refresh cycle while avoiding pointless refetches of identical TLEs. **(Feature 1.4 plumbing — resolved.)** `current_state` / `current_ground_position` take a `TLE` directly and do **not** fetch, so this 6-hour TTL is realized only on the *fetch* that produced the TLE. Feature 1.4 surfaced the realtime TTL through `fetch_tle`: it now takes a keyword-only `ttl_s: float | None = None` (forwarded to `fetch_celestrak`; default `None` keeps the 24-hour general TTL), so the live/realtime path selects `_TTL_REALTIME_S` (6 h) while ordinary fetches stay at 24 h.
 - **General fetches** (`fetch_celestrak`): **24-hour TTL**. Notebook re-runs within a day hit the cache; daily re-issues are picked up automatically. (Space-Track's `fetch_spacetrack` is deferred — §3.)
 
 Note that the cache lives on the *fetch* path, not on `propagate_tle` (which takes a `TLE` directly). The TTL governs how often we re-hit the network, not the freshness of the underlying TLE epoch.

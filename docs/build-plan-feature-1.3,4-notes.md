@@ -5,6 +5,13 @@
 > build plan when it is drafted. They record work that `features.md` §1.3
 > *references* but does not itself spell out. The binding contract stays
 > `features.md` §1.3 + `architecture.md` §6/§7 — nothing here changes a signature.
+>
+> **Update (2026-06-23): most items below are now built.** Feature 1.3 shipped in
+> `v0.3.0`, and Feature 1.4 chunks 1–5 (the realtime primitives, the topocentric
+> look-angle kernel, and `plot_sky_track`) are built on `feature/tle-tracker`. Notes
+> that are now addressed are marked **DONE** inline and retained for historical context;
+> the only items still open are the Feature 1.4 live dashboard (chunks 6–9) and the
+> Feature 1.5 pass-finder design choice called out in Note 4.
 
 ## Why these exist
 
@@ -15,6 +22,11 @@ exist before `propagate_tle` can be called at all. None are blockers; they are
 scope the build plan needs to sequence explicitly.
 
 ## Note 1 — The `TLE` core type must be built first (it does not exist yet)
+
+> **DONE — built and shipped in Feature 1.3 (`v0.3.0`).** The `TLE` type lives in
+> `core/tle.py` (`from_strings` + checksum, `.epoch`/`.norad_id`/`.to_orekit`,
+> `from_state_unfitted`, `from_norad_id`), is top-level re-exported, and the
+> safe-before-init split is as described. Retained below for historical context.
 
 `TLE` is specified in `architecture.md` §6 but is **not implemented anywhere** in
 `src/` — `tle/` is a bare `__init__.py`. Everything in §1.3 takes a `TLE`, so the
@@ -44,6 +56,10 @@ exercise it.
 
 ## Note 2 — `from_state_unfitted` needs more field decisions than §1.3 lists
 
+> **DONE — `TLE.from_state_unfitted` built and shipped in Feature 1.3 (`v0.3.0`).** The
+> non-physical field defaults and the TEME osculating-element mechanics below are
+> implemented; the documented non-faithfulness is in its docstring. Retained for context.
+
 §1.3 specifies the `norad_id` / `bstar` placeholders, but a bare `State` carries
 **none** of the other TLE fields. Before building, enumerate and pin a default for
 each non-physical field Orekit's `TLE(...)` constructor requires, e.g.:
@@ -71,6 +87,12 @@ lean on Orekit's `TLE` formatting + checksum).
 
 ## Note 3 — `fetch_tle` / sources are a prerequisite for the §1.3 examples
 
+> **DONE — built and shipped in Feature 1.3 (`v0.3.0`).** `tle/sources.py`
+> (`fetch_tle` / `fetch_celestrak` + the 6h/24h on-disk TTL cache, transport failures
+> wrapped as `TLEFetchError`) and the `core/catalogs.py` name→NORAD registry are
+> implemented; the **CelesTrak-only for v1** scope decision below stands (Space-Track /
+> `"auto"` remain deferred). Retained for context.
+
 The §1.3 / README examples (`fetch_tle("ISS")`, `from_norad_id`) assume
 `tle/sources.py` (`fetch_tle`, `fetch_celestrak`, `fetch_spacetrack`), the
 `~/.propygator/cache/` 6h/24h TTL cache (architecture §10), and the popular-
@@ -93,6 +115,14 @@ not deleted. For the name-fallback (features §1.3) to carry anything, `fetch_tl
 catalog friendly name.
 
 ## Note 4 — Sky view RELOCATED to Feature 1.4 (no longer a 1.3 build item)
+
+> **DONE (build substance) — built in Feature 1.4 chunks 3–5 on `feature/tle-tracker`:**
+> the shared `look_angles` / `look_angles_track` / `sun_look_angles` / `moon_look_angles`
+> / `observer_snapshot` + `AzElRange` kernel (`core/observation.py`) and the geometry-only
+> `plot_sky_track` / `_draw_sky_track` (`plotting/trajectories.py`), with disjoint-arc NaN
+> masking and the never-visible warn-once. **STILL OPEN:** the "Scope the 1.5 de-risking
+> honestly" refinement at the end of this note is a Feature 1.5 `find_passes` design
+> choice (sampling- vs. event-based finder) that has not been decided yet.
 
 > **Superseded by the §1.3 redesign (features.md:594, 679–681).** Earlier drafts built
 > the observer-centric sky view *in* 1.3 to pull Feature 1.5's topocentric math forward.
@@ -171,10 +201,22 @@ codebase already chose these patterns elsewhere):
 
 ## Note 5 — TEME is an ECI frame
 
+> **DONE — honored across Features 1.3–1.4.** `plot_3d` draws coastlines only in ITRF
+> (ignored with a warning for an inertial frame), and the new sky view is observer-relative
+> az/el, frame-independent, with no coastline — so a TEME (ECI) input is fine.
+
 - This means that the 3D plotly Earth in TEME should **not** have coastlines imposed
   on it.
 
 ## Also fold in
+
+> **DONE — every item in this section was built and shipped in Feature 1.3 (`v0.3.0`):**
+> the `core/sampling.py` promotion (`_sample_count` / epoch grid / the shared
+> `_MAX_OUTPUT_SAMPLES` cap + propagator-agnostic pre-flight checks), the `Epoch.seconds_since`
+> difference helper + the stale-TLE warn-once, the UTC-forced metadata timestamps, the
+> required keyword-only `output_step`, the `PropagationError` / `NumericalPropagationError`
+> / `TLEPropagationError` hierarchy, and the propagator-neutral sample-cap message. Retained
+> for historical context.
 
 - **Sample-count reuse — DECIDED (#7).** `propagate_tle` lives in
   `tle/propagator.py`, which may import only from `core/` (§7 dependency rule), so
@@ -253,6 +295,12 @@ codebase already chose these patterns elsewhere):
   the shared raise.
 
 ## Feature 1.4 build prerequisites (surfaced by the 2026-06-22 §1.4 audit)
+
+> **DONE — all three prerequisites built in Feature 1.4 chunk 1 on `feature/tle-tracker`:**
+> `StaleTLEWarning(UserWarning)` in `core/exceptions.py` (applied as the `category=` at
+> `propagate_tle`'s stale-warn site), the public `Trajectory.start_epoch` / `end_epoch`
+> accessors in `core/states.py`, and the `fetch_tle(ttl_s=...)` realtime-TTL plumbing in
+> `tle/sources.py`. (The original "do not exist yet" framing below predates the build.)
 
 These are concrete pieces of code that **do not exist yet** and that the Feature 1.4
 design (features.md §1.4) silently assumes. Like the `Epoch`-difference helper and the
