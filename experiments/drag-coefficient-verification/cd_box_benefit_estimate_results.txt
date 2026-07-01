@@ -1,0 +1,27 @@
+========================================================================
+TIER B BENEFIT ESTIMATE (BoxFaceCd vs best-fit Tier-A scalar)
+========================================================================
+Sail: flat 4.0 m x 4.0 m (16 m^2/face), m=12 kg, A/m=1.33 m^2/kg
+Orbit: 450 km circular, inc 51.6 deg, period 93.6 min, 2-day window, dt=120 s
+Epoch 2002-07-01T00:00 (solar max, F10.7=180, Ap=15), 1440 samples/beta
+Sun sanity: |s|=1.0000, declination +23.13 deg, drift over window 1.91 deg (0.95 deg/day)
+
+    beta   c_star   resid %    ds_recal   ds_nominal  ds_ref(TierA)
+    4.9d    2.691    7.109%  -33287.23m   337743.02m    2034457.32m
+   30.0d    2.614    5.948%  -19598.51m   240348.66m    1642787.19m
+   60.0d    2.380    5.771%    3629.51m    70979.91m     892753.60m
+
+resid %   = work-weighted RMS of (CdA_BoxFace - c_star*A_proj) as a %
+            of mean drag area: the fraction NO constant Cd absorbs.
+ds_recal  = net along-track offset [m] over the window from the
+            recalibrated residual (the part that survives best-fit).
+ds_nominal= same, vs an un-recalibrated nominal Cd=2.2 (for contrast).
+ds_ref    = along-track distance the Tier-A drag itself removes (scale).
+
+Worst-case surviving residual: 7.11% of mean drag at beta=4.9 deg,
+  along-track -33287.2 m over 2 days = 1.64% of the Tier-A along-track drag effect.
+Heuristic reading (NOT the decision -- Checkpoint A is the maintainer's):
+  >~ a few % surviving residual that is COHERENT (accumulates secularly,
+  not zero-mean) => MATERIAL => GO signal; clearly immaterial => DROP.
+
+Saved figure: cd_box_benefit_estimate.png

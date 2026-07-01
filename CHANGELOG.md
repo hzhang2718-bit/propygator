@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- BoxFaceCd experiments demonstrating how it may be useful, but only for satellites
+  where shear drag (previously unaccounted for) is highly significant.
+- BoxFaceCd table that is shipped with the experiment, supporting BoxFaceCd.default().
+- BoxFaceCd arguments that can be incorporated into propagate_numerical, including a
+  default one for the shipped table and options for users to use their custom tables.
+
+### Changed
+
+### Removed
+
+- IncidenceVariableCd skeleton has been removed and replaced with BoxFaceCd table
+  because solar array shadowing makes simple Cd table interpolation impossible.
+
 ## [0.4.0] - 2026-06-24
 
 ### Added

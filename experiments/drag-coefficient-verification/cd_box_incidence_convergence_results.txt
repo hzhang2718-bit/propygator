@@ -1,0 +1,33 @@
+========================================================================
+TIER B INCIDENCE-INTERPOLATION CONVERGENCE STUDY (BoxFaceCd)
+========================================================================
+Per-face Cd(theta) over the full face-flow angle [0, pi], linear
+interpolation from nested uniform grids. Axis is THETA, not cos(theta)
+(the shear cusp argument; general-upgrades-1.md 'Tier B Drag').
+
+Representative state: 400 km solar-max  rho=8.456e-12 kg/m^3  T=1284 K  alpha=0.900  V_rel=7174 m/s
+per-face Cd anchors:  theta=0 (head-on)    2.4996
+                      theta=90 (edge-on)   0.0880  (contract: shear floor ~0.07)
+                      theta=110 deg        0.0001  (contract: ~0, leeward taper)
+                      theta=180 (leeward) -0.0000
+
+Linear-interpolation error vs uniform node spacing (relative to peak Cd = 2.4996):
+   nodes   spacing     max err    max %     rms err    rms %  max-ratio
+       5   45.000d   1.921e-01   7.686%   7.535e-02   3.014%       -
+       9   22.500d   5.487e-02   2.195%   2.509e-02   1.004%       3.50
+      17   11.250d   2.674e-02   1.070%   7.910e-03   0.316%       2.05
+      33    5.625d   8.751e-03   0.350%   2.055e-03   0.082%       3.06
+      65    2.812d   2.357e-03   0.094%   5.161e-04   0.021%       3.71
+     129    1.406d   5.991e-04   0.024%   1.292e-04   0.005%       3.93
+
+A max-ratio near 4.0 each row is clean 2nd-order convergence (error
+~ h^2): a larger uniform theta grid provably reaches any error target,
+with no special node placement. (general-upgrades-1.md 'Tier B Drag'.)
+
+Shape stability across altitude (separability of incidence from (radius, density)):
+    500 km vs 300 km: max normalized-shape deviation  3.958%
+    800 km vs 300 km: max normalized-shape deviation  7.180%
+  -> max shape deviation 7.180% across 300-800 km: the incidence
+     shape is altitude-stable, so the convergence result transfers.
+
+Saved figure: cd_box_incidence_convergence.png

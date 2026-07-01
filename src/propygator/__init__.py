@@ -10,8 +10,8 @@ The Feature 1.1 surface is re-exported here: the data-model types, the
 ``SpacecraftConfig``/``SpacecraftGeometry``, ``VariableCd``, ``IntegratorConfig``,
 ``AltitudeLimits``, the attitude family), the ``plot_*`` functions, and
 ``export_csv`` / ``export_all``.
-``IncidenceVariableCd`` (the deferred Tier-B skeleton) stays reachable via
-``propygator.propagation``. Feature 1.3 adds the ``TLE`` type, the ``propagate_tle``
+``BoxFaceCd`` (the per-face, convex-box Tier-B drag table) is re-exported beside
+``VariableCd``. Feature 1.3 adds the ``TLE`` type, the ``propagate_tle``
 verb, and the CelesTrak ``fetch_tle`` path (``TLE.from_norad_id`` rides on it).
 """
 
@@ -54,6 +54,7 @@ from .plotting import (
 from .propagation import (
     AltitudeLimits,
     AttitudeConfig,
+    BoxFaceCd,
     CustomAttitude,
     ForceModelConfig,
     Inertial,
@@ -110,6 +111,7 @@ __all__ = [
     "SpacecraftConfig",
     "SpacecraftGeometry",
     "VariableCd",
+    "BoxFaceCd",
     "AltitudeLimits",
     "AttitudeConfig",
     "LofAligned",

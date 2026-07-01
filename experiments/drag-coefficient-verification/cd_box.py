@@ -1,11 +1,12 @@
 """
-Tier B placeholder: per-face flat-plate drag coefficient (Schaaf-Chambre /
-Sentman, diffuse re-emission at the DRIA reflected temperature).
+Tier B per-face flat-plate drag coefficient (Schaaf-Chambre / Sentman, diffuse
+re-emission at the DRIA reflected temperature).
 
->>> PLACEHOLDER <<<  cd_panel_species() is the standard closed form. Swap in
-your propygator per-face coefficient when ready; the harness around it is the
-deliverable. Correctness gate: integrating these panels over a sphere must
-reproduce cd_core.cd_sphere_species to <0.1%.
+cd_panel_species() is the standard closed form and the authoritative
+experiment-side per-face kernel for the BoxFaceCd work -- cd_box_faces.py wraps
+it (mass-flux weighting over species) and cross_validate_box_face.py drives it
+against the independent generator reconstruction. Correctness gate: integrating
+these panels over a sphere must reproduce cd_core.cd_sphere_species to <0.1%.
 """
 import numpy as np
 from scipy.special import erf

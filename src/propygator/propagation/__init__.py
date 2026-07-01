@@ -22,7 +22,7 @@ from .guards import AltitudeLimits
 from .integrators import IntegratorConfig
 from .numerical import propagate_numerical
 from .spacecraft import (
-    IncidenceVariableCd,
+    BoxFaceCd,
     SpacecraftConfig,
     SpacecraftGeometry,
     VariableCd,
@@ -35,7 +35,7 @@ __all__ = [
     "SpacecraftConfig",
     "SpacecraftGeometry",
     "VariableCd",
-    "IncidenceVariableCd",
+    "BoxFaceCd",
     "AltitudeLimits",
     "AttitudeConfig",
     "LofAligned",

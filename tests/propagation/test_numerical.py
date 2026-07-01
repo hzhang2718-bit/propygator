@@ -6,8 +6,8 @@ integrator presets, the chunk-8 perturbation set on the sphere — third body, d
 fixed and :class:`VariableCd` coefficients, SRP, tides, relativity — and the chunk-9
 **box geometry + full attitude family**: box drag/SRP via
 ``BoxAndSolarArraySpacecraft``, a box ``VariableCd``, each attitude mode end-to-end, the
-attitude/geometry consistency warning, the deferred ``IncidenceVariableCd`` runtime, and
-the ``force_models`` / ``spacecraft`` / ``attitude`` metadata grammar. Like
+attitude/geometry consistency warning, the Tier B per-face ``BoxFaceCd`` box drag
+runtime, and the ``force_models`` / ``spacecraft`` / ``attitude`` metadata grammar. Like
 ``test_conversions`` / ``test_stack_compat``, every test starts the JVM once via the
 session-scoped ``orekit`` fixture (the pure-Python config tests live in
 ``test_force_models`` / ``test_integrators`` / ``test_spacecraft`` / ``test_attitude``
@@ -33,9 +33,9 @@ from propygator import (
     Trajectory,
 )
 from propygator.propagation import (
+    BoxFaceCd,
     CustomAttitude,
     ForceModelConfig,
-    IncidenceVariableCd,
     Inertial,
     InPlaneTracking,
     IntegratorConfig,
@@ -714,17 +714,6 @@ def _identity_law(state: State) -> Orientation:  # noqa: ARG001 - law ignores th
     return Orientation.from_quaternion(1.0, 0.0, 0.0, 0.0)
 
 
-def _incidence_table() -> IncidenceVariableCd:
-    """A minimal valid Tier B incidence table (its runtime lookup is deferred)."""
-    return IncidenceVariableCd.from_table(
-        np.full((2, 2, 2, 2), 2.2),
-        radius_axis=np.array([6.6e6, 7.0e6]),
-        density_axis=np.array([1e-13, 1e-11]),
-        azimuth_axis=np.array([0.0, np.pi]),
-        elevation_axis=np.array([-np.pi / 2, np.pi / 2]),
-    )
-
-
 def test_box_attitude_changes_drag_cross_section():
     """A non-cube box drags differently under InPlaneTracking vs LofAligned.
 
@@ -907,52 +896,183 @@ def test_sphere_ecef_nadir_attitude_warns_and_falls_back():
     assert "attitude" not in traj.metadata
 
 
-def test_box_incidence_variable_cd_drag_raises():
-    """A box ``IncidenceVariableCd`` under drag raises the deferred Tier B error."""
-    box = SpacecraftConfig(
-        geometry=SpacecraftGeometry.box_and_panels(
-            x_length_m=1.0,
-            y_length_m=1.0,
-            z_length_m=1.0,
-            drag_coefficient=_incidence_table(),
-        )
-    )
-    with pytest.raises(NotImplementedError, match="IncidenceVariableCd"):
-        propagate_numerical(
-            _leo_state(),
-            600.0,
-            output_step=600.0,
-            force_models=_DRAG_ONLY,
-            spacecraft=box,
-        )
+def test_box_face_cd_constant_matches_total_area_sphere():
+    """A constant per-face ``BoxFaceCd`` == an ``IsotropicDrag`` of total surface area.
 
-
-def test_box_incidence_variable_cd_ignored_when_drag_off():
-    """With drag off the incidence table is never consulted; the run succeeds.
-
-    Consistent with the bogus-atmosphere-when-drag-off precedent: a deferred Cd model
-    that is never used must not abort an SRP-only box propagation.
+    With ``Cd = K`` on every face the assembled ``CdA = Σ K·A_i = K · 2(xy+yz+zx)`` is
+    the box's total surface area times ``K``, independent of attitude — so the per-face
+    drag must equal a sphere drag with that area and Cd. Pins the full-area six-face
+    summation and the sphere-style ``½`` formula exactly (general-upgrades-1 "Tier B
+    Drag", Runtime).
     """
-    box = SpacecraftConfig(
-        geometry=SpacecraftGeometry.box_and_panels(
-            x_length_m=1.0,
-            y_length_m=1.0,
-            z_length_m=1.0,
-            drag_coefficient=_incidence_table(),
+    from propygator.propagation.numerical import _build_drag_force
+
+    state, atmosphere = _drag_eval_setup()
+    x, y, z, k = 2.0, 1.0, 1.5, 2.3
+    surface = 2.0 * (x * y + y * z + z * x)
+    box_geom = SpacecraftGeometry.box_and_panels(
+        x_length_m=x,
+        y_length_m=y,
+        z_length_m=z,
+        drag_coefficient=BoxFaceCd.from_callable(lambda r, d, th: k),
+    )
+    sphere_geom = SpacecraftGeometry.sphere(area_m2=surface, drag_coefficient=k)
+    box_force = _build_drag_force(box_geom, atmosphere, None)
+    sphere_force = _build_drag_force(sphere_geom, atmosphere, None)
+    a_box = box_force.acceleration(state, box_force.getParameters())
+    a_sphere = sphere_force.acceleration(state, sphere_force.getParameters())
+    # Same ρ, relVel, mass; only the effective CdA can differ, and it is K·surface in
+    # both — so the two accelerations are bit-for-bit the same formula.
+    assert a_box.subtract(a_sphere).getNorm() < 1e-15
+
+
+def test_box_face_cd_windward_projection_matches_orekit_box():
+    """A windward-projection ``BoxFaceCd`` reproduces Orekit's native box drag exactly.
+
+    With per-face ``Cd = K·max(0, cos θ)`` — the windward projected-area convention —
+    the per-face sum ``CdA = Σ K·max(0,cos θ_i)·A_i`` equals Orekit's own
+    ``BoxAndSolarArraySpacecraft`` drag at uniform ``Cd = K``. Agreement to machine
+    precision confirms the inertial→body rotation sense (``applyTo``, not
+    ``applyInverseTo`` which is ~9 % off), the ``θ = arccos(n·flow)`` round-trip, and
+    the ±X/±Y/±Z face normals + areas (general-upgrades-1 "Tier B Drag", Convention).
+    """
+    from org.hipparchus.geometry.euclidean.threed import Vector3D
+    from org.orekit.forces import BoxAndSolarArraySpacecraft
+    from org.orekit.forces.drag import DragForce
+
+    from propygator.core.bodies import _sun
+    from propygator.propagation.numerical import _build_drag_force
+
+    state, atmosphere = _drag_eval_setup()
+    x, y, z, k = 2.0, 1.0, 1.5, 2.4
+    box_geom = SpacecraftGeometry.box_and_panels(
+        x_length_m=x,
+        y_length_m=y,
+        z_length_m=z,
+        drag_coefficient=BoxFaceCd.from_callable(
+            lambda r, d, th: k * max(0.0, float(np.cos(th)))
+        ),
+    )
+    per_face = _build_drag_force(box_geom, atmosphere, None)
+    # Orekit native box at uniform Cd = K (windward projected area, zero lift ratio).
+    native_box = BoxAndSolarArraySpacecraft(
+        x, y, z, _sun(), 0.0, Vector3D(0.0, 1.0, 0.0), k, 0.0, 0.3, 0.6
+    )
+    native = DragForce(atmosphere, native_box)
+    a_face = per_face.acceleration(state, per_face.getParameters())
+    a_native = native.acceleration(state, native.getParameters())
+    # Independent summation orders, so compare relative to the drag magnitude (~1e-11
+    # m/s²): the reconstructions agree to ~machine precision, far inside 1e-9 relative.
+    assert a_face.subtract(a_native).getNorm() < 1e-9 * a_native.getNorm()
+
+
+def test_box_face_cd_sums_leeward_faces():
+    """All six faces contribute: a leeward-dropping windward-only sum is strictly less.
+
+    A constant per-face Cd over all six faces gives ``CdA = K·(total surface area)``; a
+    windward-only variant (Cd → 0 past θ = π/2) drops the faces the flow does not
+    directly strike. For a cube at a generic attitude exactly three faces are windward,
+    so the all-faces drag is ~2× the windward-only drag — proving the leeward shear tail
+    the per-face table carries is summed, not dropped (general-upgrades-1 "Tier B Drag",
+    Why all faces; the real default table's face-on bus gap is the documented ~5–11 %).
+    """
+    from propygator.propagation.numerical import _build_drag_force
+
+    state, atmosphere = _drag_eval_setup()
+    edge = 1.0  # a cube: 3 windward + 3 leeward faces at a generic attitude
+    all_faces = SpacecraftGeometry.box_and_panels(
+        x_length_m=edge,
+        y_length_m=edge,
+        z_length_m=edge,
+        drag_coefficient=BoxFaceCd.from_callable(lambda r, d, th: 0.07),
+    )
+    windward_only = SpacecraftGeometry.box_and_panels(
+        x_length_m=edge,
+        y_length_m=edge,
+        z_length_m=edge,
+        drag_coefficient=BoxFaceCd.from_callable(
+            lambda r, d, th: 0.07 if th < np.pi / 2 else 0.0
+        ),
+    )
+    a_all = _build_drag_force(all_faces, atmosphere, None)
+    a_wind = _build_drag_force(windward_only, atmosphere, None)
+    n_all = a_all.acceleration(state, a_all.getParameters()).getNorm()
+    n_wind = a_wind.acceleration(state, a_wind.getParameters()).getNorm()
+    assert n_wind > 0.0
+    assert n_all / n_wind > 1.5  # leeward faces add real drag (cube: ~2×)
+
+
+def test_box_face_cd_radius_edge_warn_once():
+    """A ``BoxFaceCd`` whose radius span misses the orbit clamps + warns once per edge.
+
+    Mirrors the ``VariableCd`` edge-warning contract: the clamp fires every integration
+    substep, but each boundary's edge-tailored message is emitted exactly once per run.
+    The orbit (r ~ 6878 km) sits above a low table span (soft "above" note) and below a
+    high table span (loud "below" note); θ spans the full [0, π] so it never clamps.
+    """
+    initial = _leo_state()  # r ~ 6878 km
+
+    def _box(radius_axis: np.ndarray) -> SpacecraftConfig:
+        return SpacecraftConfig(
+            mass_kg=200.0,
+            geometry=SpacecraftGeometry.box_and_panels(
+                x_length_m=1.0,
+                y_length_m=1.0,
+                z_length_m=1.0,
+                drag_coefficient=BoxFaceCd.from_table(
+                    np.full((2, 2, 2), 2.5),
+                    radius_axis=radius_axis,
+                    density_axis=np.array([1e-13, 1e-11]),
+                    incidence_axis=np.array([0.0, np.pi]),
+                ),
+            ),
         )
-    )
-    srp_only = ForceModelConfig(
-        gravity_degree=4,
-        gravity_order=4,
-        sun_third_body=False,
-        moon_third_body=False,
-        drag=False,
-        srp=True,
-    )
+
+    common = dict(duration=1800.0, output_step=600.0, force_models=_DRAG_ONLY)
+    # Table entirely below the orbit -> every lookup clamps to the HIGH edge (soft).
+    with warnings.catch_warnings(record=True) as caught_high:
+        warnings.simplefilter("always")
+        propagate_numerical(
+            initial, spacecraft=_box(np.array([6.0e6, 6.1e6])), **common
+        )
+    high = [w for w in caught_high if "above the drag-table grid" in str(w.message)]
+    assert len(high) == 1
+    # Table entirely above the orbit -> every lookup clamps to the LOW edge (loud note).
+    with warnings.catch_warnings(record=True) as caught_low:
+        warnings.simplefilter("always")
+        propagate_numerical(
+            initial, spacecraft=_box(np.array([7.0e6, 7.1e6])), **common
+        )
+    low = [w for w in caught_low if "below the drag-table grid" in str(w.message)]
+    assert len(low) == 1
+
+
+def test_box_face_cd_default_box_propagates():
+    """A convex box with ``BoxFaceCd.default()`` propagates under drag end-to-end.
+
+    The headline Tier B path: ``solar_array_area_m2 = 0`` (a convex bus), the shipped
+    per-face table drives drag, and the metadata records ``Cd=table:box_face_default``.
+    """
     traj = propagate_numerical(
-        _leo_state(), 600.0, output_step=600.0, force_models=srp_only, spacecraft=box
+        _leo_state(),
+        1200.0,
+        output_step=600.0,
+        force_models=_BOX_FORCES,
+        spacecraft=SpacecraftConfig(
+            mass_kg=300.0,
+            geometry=SpacecraftGeometry.box_and_panels(
+                x_length_m=1.0,
+                y_length_m=1.0,
+                z_length_m=1.0,
+                solar_array_area_m2=0.0,
+                drag_coefficient=BoxFaceCd.default(),
+            ),
+        ),
+        attitude=InPlaneTracking(),
     )
     assert isinstance(traj, Trajectory)
+    assert traj.frame is Frame.EME2000
+    assert "Cd=table:box_face_default" in traj.metadata["spacecraft"]
 
 
 def test_box_variable_cd_matches_fixed_drag():

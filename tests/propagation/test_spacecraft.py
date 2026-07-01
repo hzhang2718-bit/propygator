@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from propygator.propagation import (
-    IncidenceVariableCd,
+    BoxFaceCd,
     SpacecraftConfig,
     SpacecraftGeometry,
     VariableCd,
@@ -97,10 +97,10 @@ def test_sphere_accepts_variable_cd():
     assert g.drag_coefficient is table
 
 
-def test_sphere_rejects_incidence_table():
-    inc = _toy_incidence_table()
-    with pytest.raises(ValueError, match="incidence"):
-        SpacecraftGeometry.sphere(area_m2=1.0, drag_coefficient=inc)  # type: ignore[arg-type]
+def test_sphere_rejects_box_face_cd():
+    bf = _box_face_table()
+    with pytest.raises(ValueError, match="no flow incidence"):
+        SpacecraftGeometry.sphere(area_m2=1.0, drag_coefficient=bf)  # type: ignore[arg-type]
 
 
 # --- box geometry ----------------------------------------------------------
@@ -200,17 +200,32 @@ def test_box_high_cd_warns_not_raises():
     assert g.drag_coefficient == 7.0
 
 
-def test_box_accepts_variable_and_incidence_tables():
+def test_box_accepts_variable_and_box_face_tables():
     table = _toy_table()
-    inc = _toy_incidence_table()
+    bf = _box_face_table()
     g1 = SpacecraftGeometry.box_and_panels(
         x_length_m=1.0, y_length_m=1.0, z_length_m=1.0, drag_coefficient=table
     )
+    # A convex bus (solar_array_area_m2 == 0, the default) accepts a BoxFaceCd.
     g2 = SpacecraftGeometry.box_and_panels(
-        x_length_m=1.0, y_length_m=1.0, z_length_m=1.0, drag_coefficient=inc
+        x_length_m=1.0, y_length_m=1.0, z_length_m=1.0, drag_coefficient=bf
     )
     assert g1.drag_coefficient is table
-    assert g2.drag_coefficient is inc
+    assert g2.drag_coefficient is bf
+
+
+def test_box_with_arrays_rejects_box_face_cd():
+    # BoxFaceCd is convex-box-only: a paneled box (solar_array_area_m2 > 0) is rejected
+    # at construction, never at propagation (general upgrades 1, "Tier B Drag").
+    bf = _box_face_table()
+    with pytest.raises(ValueError, match="convex box only"):
+        SpacecraftGeometry.box_and_panels(
+            x_length_m=1.0,
+            y_length_m=1.0,
+            z_length_m=1.0,
+            solar_array_area_m2=5.0,
+            drag_coefficient=bf,
+        )
 
 
 # --- VariableCd table ------------------------------------------------------
@@ -225,15 +240,23 @@ def _toy_table() -> VariableCd:
     )
 
 
-def _toy_incidence_table() -> IncidenceVariableCd:
-    grid = np.zeros((2, 2, 2, 2))
-    axis = np.array([0.0, 1.0])
-    return IncidenceVariableCd.from_table(
+def _box_face_table() -> BoxFaceCd:
+    """A small per-face table with a head-on→leeward Cd falloff over θ ∈ [0, π]."""
+    radius_axis = np.array([6.6e6, 7.0e6])
+    density_axis = np.array([1e-13, 1e-11])
+    incidence_axis = np.array([0.0, np.pi / 2, np.pi])
+    # grid[radius, density, incidence]: high head-on, ~0.07 edge-on, ~0 leeward.
+    grid = np.array(
+        [
+            [[3.0, 0.07, 0.0], [3.2, 0.07, 0.0]],
+            [[2.8, 0.06, 0.0], [3.0, 0.06, 0.0]],
+        ]
+    )
+    return BoxFaceCd.from_table(
         grid,
-        radius_axis=axis,
-        density_axis=axis,
-        azimuth_axis=axis,
-        elevation_axis=axis,
+        radius_axis=radius_axis,
+        density_axis=density_axis,
+        incidence_axis=incidence_axis,
     )
 
 
@@ -360,45 +383,165 @@ def test_sphere_default_loads_committed_asset():
     assert 2.0 < t(6_828_000.0, 1e-12) < 3.5
 
 
-# --- IncidenceVariableCd skeleton ------------------------------------------
+# --- BoxFaceCd (per-face incidence table) ----------------------------------
 
 
-def test_incidence_constructs_and_validates():
-    inc = _toy_incidence_table()
-    assert isinstance(inc._metadata_id(), str)
+def test_box_face_constructs_and_validates():
+    bf = _box_face_table()
+    assert isinstance(bf._metadata_id(), str)
 
 
-def test_incidence_with_array_axis():
-    grid = np.zeros((2, 2, 2, 2, 2))
-    axis = np.array([0.0, 1.0])
-    inc = IncidenceVariableCd.from_table(
+def test_box_face_exact_at_grid_nodes():
+    bf = _box_face_table()
+    # Lands exactly on grid nodes -> returns the stored value.
+    assert bf(6.6e6, 1e-13, 0.0) == pytest.approx(3.0)
+    assert bf(6.6e6, 1e-13, np.pi / 2) == pytest.approx(0.07)
+    assert bf(7.0e6, 1e-11, np.pi) == pytest.approx(0.0)
+
+
+def test_box_face_trilinear_interior():
+    # Cell centre across all three axes: mean of the eight corners.
+    radius_axis = np.array([0.0, 2.0])
+    density_axis = np.array([0.0, 4.0])
+    incidence_axis = np.array([0.0, np.pi])
+    grid = np.arange(8.0).reshape(2, 2, 2)  # corners 0..7
+    bf = BoxFaceCd.from_table(
         grid,
-        radius_axis=axis,
-        density_axis=axis,
-        azimuth_axis=axis,
-        elevation_axis=axis,
-        array_axis=axis,
+        radius_axis=radius_axis,
+        density_axis=density_axis,
+        incidence_axis=incidence_axis,
     )
-    assert inc._array_axis is not None
+    assert bf(1.0, 2.0, np.pi / 2) == pytest.approx(grid.mean())
 
 
-def test_incidence_shape_mismatch_raises():
-    grid = np.zeros((2, 2, 2))  # too few dims for 4 axes
-    axis = np.array([0.0, 1.0])
+def test_box_face_from_callable():
+    bf = BoxFaceCd.from_callable(
+        lambda radius_m, density_kgm3, theta_rad: 2.0 + theta_rad
+    )
+    assert bf(7e6, 1e-12, 0.5) == pytest.approx(2.5)
+    assert bf._metadata_id() == "<lambda>"
+
+
+def test_box_face_from_callable_named():
+    bf = BoxFaceCd.from_callable(
+        lambda radius_m, density_kgm3, theta_rad: 2.2, name="my_law"
+    )
+    assert bf._metadata_id() == "my_law"
+
+
+def test_box_face_from_callable_rejects_noncallable():
     with pytest.raises(ValueError):
-        IncidenceVariableCd.from_table(
-            grid,
-            radius_axis=axis,
-            density_axis=axis,
-            azimuth_axis=axis,
-            elevation_axis=axis,
-        )
+        BoxFaceCd.from_callable(42)  # type: ignore[arg-type]
 
 
-def test_incidence_runtime_raises_not_implemented():
-    inc = _toy_incidence_table()
-    with pytest.raises(NotImplementedError, match="Tier B"):
-        inc(0.5, 0.5, 0.5, 0.5)
+def test_box_face_from_callable_validates_result():
+    nan_cd = BoxFaceCd.from_callable(
+        lambda radius_m, density_kgm3, theta_rad: float("nan")
+    )
+    with pytest.raises(ValueError, match="invalid Cd"):
+        nan_cd(7e6, 1e-12, 0.5)
+    negative_cd = BoxFaceCd.from_callable(
+        lambda radius_m, density_kgm3, theta_rad: -1.0
+    )
+    with pytest.raises(ValueError, match="invalid Cd"):
+        negative_cd(7e6, 1e-12, 0.5)
+
+
+def test_box_face_rejects_non_finite_input():
+    bf = _box_face_table()
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError, match="finite"):
+            bf(bad, 1e-12, 0.5)
+        with pytest.raises(ValueError, match="finite"):
+            bf(7e6, bad, 0.5)
+        with pytest.raises(ValueError, match="finite"):
+            bf(7e6, 1e-12, bad)
+
+
+def test_box_face_clamps_radius_density_and_warns_per_edge():
+    # (radius, density) clamp to the nearest edge with an edge-tailored warn-once,
+    # reusing the shared VariableCd messages; theta never clamps.
+    bf = _box_face_table()  # radius [6.6e6, 7.0e6], density [1e-13, 1e-11]
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter("always")
+        below = bf(1.0, 1e-20, 0.0)  # radius + density both below min
+        above = bf(9e6, 1e-3, np.pi)  # radius + density both above max
+        bf(1.0, 1e-20, 0.0)  # repeat: must not re-warn an already-warned boundary
+    # Clamped to the corner grid values (head-on low corner; leeward high corner).
+    assert below == pytest.approx(3.0)
+    assert above == pytest.approx(0.0)
+    msgs = [str(r.message) for r in records if issubclass(r.category, UserWarning)]
+    assert sum("below the drag-table grid" in m for m in msgs) == 1  # low edge, loud
+    assert sum("above the drag-table grid" in m for m in msgs) == 1  # high edge, soft
+    assert sum("total density outside the table grid" in m for m in msgs) == 1
+    assert len(msgs) == 3
+
+
+def test_box_face_in_range_does_not_warn():
+    bf = _box_face_table()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # any warning becomes an error
+        # An interior point across all three axes never warns (theta never clamps).
+        assert bf(6.8e6, 1e-12, np.pi / 4) > 0.0
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {
+            "grid": np.zeros((2, 2)),  # 2-D grid for 3 axes -> shape mismatch
+            "radius_axis": np.array([1.0, 2.0]),
+            "density_axis": np.array([1.0, 2.0]),
+            "incidence_axis": np.array([0.0, np.pi]),
+        },
+        {
+            "grid": np.zeros((2, 2, 2)),
+            "radius_axis": np.array([2.0, 1.0]),  # not increasing
+            "density_axis": np.array([1.0, 2.0]),
+            "incidence_axis": np.array([0.0, np.pi]),
+        },
+        {
+            "grid": np.full((2, 2, 2), np.nan),  # non-finite grid
+            "radius_axis": np.array([1.0, 2.0]),
+            "density_axis": np.array([1.0, 2.0]),
+            "incidence_axis": np.array([0.0, np.pi]),
+        },
+        {
+            "grid": np.zeros((2, 2, 2)),
+            "radius_axis": np.array([1.0, 2.0]),
+            "density_axis": np.array([1.0, 2.0]),
+            "incidence_axis": np.array([-0.1, np.pi]),  # below 0
+        },
+        {
+            "grid": np.zeros((2, 2, 2)),
+            "radius_axis": np.array([1.0, 2.0]),
+            "density_axis": np.array([1.0, 2.0]),
+            "incidence_axis": np.array([0.0, np.pi + 0.1]),  # above pi
+        },
+    ],
+)
+def test_box_face_from_table_validation(kwargs):
+    with pytest.raises(ValueError):
+        BoxFaceCd.from_table(**kwargs)
+
+
+def test_box_face_default_loads_committed_asset():
+    bf = BoxFaceCd.default()
+    assert bf._metadata_id() == "box_face_default"
+    assert bf._grid is not None and bf._grid.ndim == 3
+    # Same validated geocentric-radius band as the sphere table, plus a full [0, pi]
+    # face-flow-angle axis.
+    assert bf._radius_axis is not None and bf._incidence_axis is not None
+    assert bf._radius_axis[0] == pytest.approx(6_528_000.0)
+    assert bf._radius_axis[-1] == pytest.approx(7_778_000.0)
+    assert bf._incidence_axis[0] == pytest.approx(0.0)
+    assert bf._incidence_axis[-1] == pytest.approx(np.pi)
+    # Head-on (theta=0) is a real free-molecular per-face Cd; edge-on floors near ~0.07.
+    head_on = bf(6_828_000.0, 1e-12, 0.0)
+    edge_on = bf(6_828_000.0, 1e-12, np.pi / 2)
+    assert 2.0 < head_on < 5.0
+    assert 0.0 < edge_on < 0.5
+    assert head_on > edge_on
 
 
 # --- metadata serializer ---------------------------------------------------
@@ -469,15 +612,45 @@ def test_metadata_table_hash_for_user_table():
     assert f"table:{table._metadata_id()}" in s
 
 
-def test_content_hash_distinguishes_2d_from_incidence():
-    # Same numeric axes, different table kind -> different hash (axis set folded in).
+def test_metadata_box_face_default_token():
+    c = SpacecraftConfig(
+        mass_kg=420.0,
+        geometry=SpacecraftGeometry.box_and_panels(
+            x_length_m=2.0,
+            y_length_m=1.5,
+            z_length_m=1.0,
+            solar_array_area_m2=0.0,
+            drag_coefficient=BoxFaceCd.default(),
+        ),
+    )
+    assert c._metadata_string() == (
+        "box:x=2.0,y=1.5,z=1.0,arrays=0.0,axis=(0,1,0);"
+        "m=420.0,Cd=table:box_face_default,abs=0.3,spec=0.6"
+    )
+
+
+def test_metadata_box_face_hash_for_user_table():
+    bf = _box_face_table()
+    c = SpacecraftConfig(
+        geometry=SpacecraftGeometry.box_and_panels(
+            x_length_m=1.0, y_length_m=1.0, z_length_m=1.0, drag_coefficient=bf
+        )
+    )
+    s = c._metadata_string()
+    assert "Cd=table:box_face_default" not in s  # a user table records a content hash
+    assert f"Cd=table:{bf._metadata_id()}" in s
+
+
+def test_content_hash_distinguishes_2d_from_box_face():
+    # Same numeric axes, different table kind -> different hash (kind tag + axis set
+    # folded in), so a 2-D VariableCd can never collide with a per-face BoxFaceCd.
     axis = np.array([0.0, 1.0])
+    incidence = np.array([0.0, np.pi])
     table = VariableCd.from_table(np.zeros((2, 2)), radius_axis=axis, density_axis=axis)
-    inc = IncidenceVariableCd.from_table(
-        np.zeros((2, 2, 2, 2)),
+    bf = BoxFaceCd.from_table(
+        np.zeros((2, 2, 2)),
         radius_axis=axis,
         density_axis=axis,
-        azimuth_axis=axis,
-        elevation_axis=axis,
+        incidence_axis=incidence,
     )
-    assert table._metadata_id() != inc._metadata_id()
+    assert table._metadata_id() != bf._metadata_id()

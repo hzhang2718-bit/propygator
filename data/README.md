@@ -21,6 +21,20 @@ which is *not* shipped and is fetched separately via
   across one density cell the two schemes differ by only ~0.1–0.3 % of Cd (negligible
   against thermospheric density uncertainty), so raw-linear interpolation is kept.
 
+- **`box_face_cd_default.npz`** — the shipped per-face drag-coefficient table loaded by
+  `BoxFaceCd.default()` (Tier B drag, `docs/general-upgrades-1.md` "Tier B Drag"). A
+  `(geocentric radius, total density, face-flow angle θ)` grid of free-molecular **box
+  face** Cd values (Schaaf–Chambre/Sentman DRIA, normal pressure + tangential shear,
+  referenced to the face's *full* area), with keys `grid` (shape
+  `(n_radius, n_density, n_incidence)`), `radius_axis` (m), `density_axis` (kg/m³,
+  log-spaced), `incidence_axis` (rad, uniform over `[0, π]`), and a `metadata_json`
+  provenance string. The runtime sums `CdA = Σ_i Cd_i(θ_i)·A_i` over the six faces of a
+  convex box. It shares the sphere table's gas-surface assumptions (SESAM α anchor,
+  300 K wall, diffuse re-emission) — cross-table coherence. Regenerate with
+  `python scripts/generate_box_face_cd_table.py` (same generation-only deps as the
+  sphere table; see that script's docstring). End users load the committed array and
+  compute nothing.
+
 - **`coastline_110m.npz`** — the bundled low-resolution **Natural Earth 1:110m**
   coastline used to draw map overlays on ground-track plots and to drape the 3D ITRF
   Earth (Feature 1.1 plotting, `propygator.plotting.basemap`). No `cartopy`: it stores

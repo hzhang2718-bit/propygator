@@ -1,0 +1,77 @@
+============================================================================
+TIER B RIGOROUS BENEFIT STUDY (BoxFaceCd vs best-fit Tier-A constant Cd)
+============================================================================
+propygator 0.4.0; real propagate_numerical
+Sail: flat 4.0 m x 4.0 m (16 m^2/face), z=0.02 m, m=12 kg, A/m=1.33 m^2/kg
+Orbit: 450 km circular, inc 51.6 deg, 3-day window, output_step=120 s
+Epoch 2002-07-01T00:00:00 (solar max); attitude SunPointing(+Z face -> Sun); Sun declination +23.13 deg
+Forces: gravity 70x70 + Sun/Moon + NRLMSISE-00 drag + SRP (SRP/gravity common-mode, cancel in A-B)
+Recalibration: minimize RMS along-track separation vs BoxFace over Cd grid [2.1, 2.3, 2.45, 2.6, 2.8], parabolic refine
+
+... running beta ~ 5 deg (BoxFace + 5 Cd-grid + confirm + no-drag) ...
+... running beta ~ 30 deg (BoxFace + 5 Cd-grid + confirm + no-drag) ...
+
+----------------------------------------------------------------------------
+PER-BETA RESULTS
+----------------------------------------------------------------------------
+
+beta = 5.0 deg  (RAAN 87.2 deg)
+  BoxFace altitude: 450.0 -> 365.3 km over 3 d
+  best-fit constant Cd  c* = 2.692
+  Cd grid -> RMS along-track sep [km]:
+      Cd=2.10:  1474.009
+      Cd=2.30:  1023.165
+      Cd=2.45:   656.888
+      Cd=2.60:   265.545  <- min
+      Cd=2.80:   290.086
+  RESIDUAL after best-fit (the non-absorbable part):
+      RMS along-track     :    19.22 km
+      max |along-track|   :    32.49 km
+      final along-track   :     0.99 km
+  For contrast, un-recalibrated nominal Cd=2.2:
+      final along-track   : -3041.54 km
+  Tier-A drag's own along-track effect (best-fit vs no-drag):
+      final               :  6430.83 km
+      max                 :  6831.99 km
+  RESIDUAL as fraction of the Tier-A drag effect:
+      final residual / final drag effect :   0.02 %
+      RMS residual   / max drag effect   :   0.28 %
+
+beta = 30.0 deg  (RAAN 259.0 deg)
+  BoxFace altitude: 450.0 -> 398.8 km over 3 d
+  best-fit constant Cd  c* = 2.614
+  Cd grid -> RMS along-track sep [km]:
+      Cd=2.10:   924.734
+      Cd=2.30:   574.076
+      Cd=2.45:   298.965
+      Cd=2.60:    18.759  <- min
+      Cd=2.80:   377.771
+  RESIDUAL after best-fit (the non-absorbable part):
+      RMS along-track     :    16.49 km
+      max |along-track|   :    61.97 km
+      final along-track   :    61.97 km
+  For contrast, un-recalibrated nominal Cd=2.2:
+      final along-track   : -1734.67 km
+  Tier-A drag's own along-track effect (best-fit vs no-drag):
+      final               :  6698.48 km
+      max                 :  6698.48 km
+  RESIDUAL as fraction of the Tier-A drag effect:
+      final residual / final drag effect :   0.93 %
+      RMS residual   / max drag effect   :   0.25 %
+
+----------------------------------------------------------------------------
+HEADLINE
+----------------------------------------------------------------------------
+Worst case (beta 30.0 deg): a best-fit CONSTANT Cd still
+leaves 62.0 km of along-track divergence over 3 days,
+= 0.93 % of the Tier-A drag effect itself (RMS 16.5 km).
+This is the part NO constant Cd can absorb: the attitude-correlated
+per-face shape that only BoxFaceCd represents.
+
+READING (NOT the decision -- the SHIP/DROP call is the maintainer's):
+  * residual that is a coherent, growing few-% of the drag effect
+    and survives recalibration => MATERIAL => SHIP signal.
+  * residual that collapses to ~0 at the best-fit Cd => DROP.
+
+Total wall time: 487 s
+Saved figure: cd_box_benefit_study.png

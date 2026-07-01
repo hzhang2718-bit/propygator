@@ -1,13 +1,19 @@
 # Tier B drag table — maturity, difficulty, and the interpolation question
 
-> **Status: FINDINGS / ANALYSIS — not a design contract and not a build plan.** A
-> standalone assessment of whether (and how) to build the Tier B incidence-keyed box
-> drag table (`IncidenceVariableCd`), written to capture the reasoning before any build
-> decision. It does **not** supersede anything. The binding designs remain
-> `docs/features.md` §1.1 ("Drag-coefficient modeling") and `docs/architecture.md` §13
-> ("Coefficient of drag modeling"); the supporting evidence is in
-> `experiments/drag-coefficient-verification/`. If Tier B is later adopted, the relevant
-> parts here get folded into a build plan the usual way.
+> **Status: FINDINGS / ANALYSIS (historical) — Tier B has since been BUILT and SHIPPED.**
+> A standalone assessment, written *before* the build decision, of whether (and how) to
+> build the Tier B box drag table. **Tier B now ships as `BoxFaceCd`** — a per-face,
+> incidence-resolved table for a *convex box* (not the whole-body
+> `(radius, density, azimuth, elevation)` grid this doc explored, and not the retired
+> `IncidenceVariableCd` skeleton). The binding design is `docs/general-upgrades-1.md`
+> "Tier B Drag" (with the `docs/history/build-plan-tier-b-drag.md` build plan); `docs/features.md`
+> §1.1 and `docs/architecture.md` §13 carry the as-built description. This doc is kept as
+> the **reasoning record**: its "low-risk linear interpolation for the convex box"
+> conclusion and its convergence-study template were both borne out — the shipped design
+> keys and interpolates on the face-flow angle θ over `[0, π]`, and the committed
+> convergence study confirmed clean ~2nd-order falloff. Its "deferred / if ever adopted /
+> no shipped default" framing below is **retired**; read the specifics as the pre-build
+> analysis they were.
 
 ## 1. The question
 

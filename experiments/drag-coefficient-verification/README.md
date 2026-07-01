@@ -48,11 +48,17 @@ expected outcome (addendum §2/§4): the high-altitude limit is soft because dra
 | `cd_sphere_experiment.py` | Tier A. Dense ~130–1400 km sweep keyed on **geocentric radius**, with a storm cohort, testing the `(radius, ρ)` collapse two ways (per-band scatter vs coded thresholds + a train/test interpolant). Writes `cd_time_independence.png`. |
 | `cd_box.py` | Tier B per-face flat-plate C_D (Schaaf–Chambre / Sentman). Self-check: integrating panels over a sphere reproduces `cd_core` to < 0.1 %. |
 | `cd_box_experiment.py` | Tier B. The same radius-keyed collapse test at fixed attitude (cube + plate), with the storm cohort and coded thresholds. Writes `cd_tierB.png`. |
+| `cd_box_faces.py` | **Tier B `BoxFaceCd` shared per-face helpers (Chunk 1).** Wraps `cd_box.cd_panel_species` with the same mass-flux weighting as `box_cd`, but keyed on the face-flow angle θ ∈ [0, π] (the axis the shipped `BoxFaceCd` table uses, per `general-upgrades-1.md` "Tier B Drag"). Single source for the two Chunk-1 drivers. |
+| `cd_box_incidence_convergence.py` | **Tier B incidence-interpolation convergence study (Chunk 1).** Per-face Cd(θ) on a fine [0, π] grid as truth → nested coarse uniform grids → linear interp back → max/RMS error vs node spacing (the ~2nd-order check), plus a shape-vs-altitude separability overlay. Writes `cd_box_incidence_convergence.png`. |
+| `cd_box_benefit_estimate.py` | **Tier B cheap benefit estimate (Chunk 1) → GO/NO-GO Checkpoint A.** Sun-pointing LEO sail from a kinematic orbit + analytic Sun (no Orekit, no integrator); BoxFace `CdA(t) = Σ Cd_i(θ_i)·A_i` vs the best-fit Tier-A scalar × windward projected area, residual after recalibration, swept over β. Writes `cd_box_benefit_estimate.png`. |
 | `kn_floor.py` | **Knudsen low-altitude floor (Chunk 2).** The model-validity instrument the collapse study is blind to (addendum §2): composition-weighted mean free path λ from per-species NRLMSISE-00 densities + a documented hard-sphere σ table, `Kn = λ/L`, and `floor_altitude(L)` — the `Kn = 10` free-molecular crossing scanned at a conservative high-activity atmosphere. The method the runtime re-implements (addendum §6.3). |
 | `kn_floor_experiment.py` | Sweeps `floor_altitude(L)` over 0.1–30 m (CubeSat → station) with the λ hand-check, the monotonicity check, and the conservative-vs-mid-activity direction check. Writes `kn_floor.png`. |
 | `cross_validate_models.py` | **Model cross-validation + Phase-2 band (Chunk 3, addendum §5/§4).** Drives *both* `cd_core.py` and the shipped generator's `_sphere_cd_*` internals (imported from `scripts/generate_sphere_cd_table.py`) off one identical set of NRLMSISE-00 rows and asserts the two independent reconstructions agree ≪ 1%; reconciles the accommodation anchor (Langmuir K) and the relative-speed formula first; prints the derived validity band. |
-| `cd_time_independence.png`, `cd_tierB.png`, `kn_floor.png` | Result figures from the authoring runs (see Provenance). |
-| `cd_sphere_results.txt`, `cd_box_results.txt`, `kn_floor_results.txt`, `cross_validate_results.txt` | Captured stdout from the authoring runs — a point-in-time snapshot of the exact numbers behind the figures and "Results" above. Regenerable via step 4; used by no code. |
+| `cross_validate_box_face.py` | **Tier B `BoxFaceCd` per-face cross-validation (Chunk 3, contract Evidence-pipeline 3).** The box twin: drives *both* the experiment per-face kernel (`cd_box.cd_panel_species` via `cd_box_faces`) and the shipped generator's `_face_cd_*` internals (imported from `scripts/generate_box_face_cd_table.py`) off one identical set of NRLMSISE-00 rows. Asserts the shared closed form (pressure **and** shear) to machine precision, then the force-relevant assembled `CdA = Σ Cd_i·A_i` for a convex box + plate swept over attitude × radius × density to ≪ 1%, plus a secondary max-absolute per-face gate. The §5-equivalence invariant that lets the Chunk-1/2 evidence transfer to the shipped `box_face_cd_default.npz`. |
+| `cd_box_benefit_study.py` | **Tier B rigorous benefit study (Chunk 6, contract Evidence-pipeline 4) → final GO/NO-GO.** The hybrid "propagate in the conda env" twin of the Chunk-1 cheap estimate: the **real** `propagate_numerical` of the Sun-pointing sail, Tier A (best-fit constant Cd) vs `BoxFaceCd.default()`, comparing along-track divergence and the residual that survives best-fit constant-Cd recalibration. **Runs in the propygator conda env (JVM + orekit-data), NOT this venv** — the only scripts here that do (this + the edge-on companion). Writes `cd_box_benefit_study.png`. |
+| `cd_box_benefit_study_edgeon.py` | **Tier B edge-on companion study (Chunk 6, application-specific).** The physics inverts when the sail is held *edge-on* (`InPlaneTracking`) instead of Sun-pointing: the large faces' projected area collapses, so tangential **shear** (which the projected-area Tier A model omits) dominates. Reports along-track divergence vs *physical* Tier A (Cd=2.2 and `VariableCd.sphere`), the best-fit constant Cd (whose value shows whether it is physical), and drag-vs-SRP magnitude. Conda env. Writes `cd_box_benefit_study_edgeon.png`. |
+| `cd_time_independence.png`, `cd_tierB.png`, `kn_floor.png`, `cd_box_incidence_convergence.png`, `cd_box_benefit_estimate.png`, `cd_box_benefit_study.png`, `cd_box_benefit_study_edgeon.png` | Result figures from the authoring runs (see Provenance). |
+| `cd_sphere_results.txt`, `cd_box_results.txt`, `kn_floor_results.txt`, `cross_validate_results.txt`, `cross_validate_box_face_results.txt`, `cd_box_incidence_convergence_results.txt`, `cd_box_benefit_estimate_results.txt`, `cd_box_benefit_study_results.txt`, `cd_box_benefit_study_edgeon_results.txt` | Captured stdout from the authoring runs — a point-in-time snapshot of the exact numbers behind the figures and "Results" above. Regenerable via step 4; used by no code. |
 | `kn_floor_runtime_crosscheck.txt` | **Runtime Kn-floor §5 cross-check (Chunk 9).** Captured stdout of `scripts/generate_kn_floor_composition.py` (a *shipped* maintainer tool, not in this dir): the conservative-profile per-species composition embedded in `propagation/guards.py`, plus a self-check that its continuous-MSIS `floor_altitude(L)` reproduces `kn_floor_results.txt` and that the runtime's grid+bisection method matches it to < 0.3 km. The recorded evidence that the runtime reconstruction equals the experiment (addendum §5/§10.2). |
 
 ## How to run
@@ -77,8 +83,24 @@ python cd_box_experiment.py    > cd_box_results.txt
 python kn_floor_experiment.py  > kn_floor_results.txt
 python cross_validate_models.py > cross_validate_results.txt
 
+# Tier B (BoxFaceCd) evidence, build-plan Chunk 1
+python cd_box_incidence_convergence.py > cd_box_incidence_convergence_results.txt
+python cd_box_benefit_estimate.py      > cd_box_benefit_estimate_results.txt
+
+# Tier B (BoxFaceCd) per-face cross-validation, build-plan Chunk 3
+python cross_validate_box_face.py      > cross_validate_box_face_results.txt
+
 # 5. leave the environment when done
 deactivate
+```
+
+The Chunk-6 rigorous benefit study (`cd_box_benefit_study.py`) is the exception:
+it propagates with shipped propygator, so it runs in the **conda** env (which has
+the JVM + orekit-data), **not** this throwaway venv:
+
+```powershell
+conda run -n propygator python cd_box_benefit_study.py        > cd_box_benefit_study_results.txt
+conda run -n propygator python cd_box_benefit_study_edgeon.py > cd_box_benefit_study_edgeon_results.txt
 ```
 
 The `> ...results.txt` redirect captures the full numeric output (the figures only
@@ -220,6 +242,167 @@ the table regeneration read:
 | **Lower edge** | **~150 km** (geocentric radius 6,528,000 m) | retained; not extended downward (volatile/unvalidated density below; the Knudsen floor governs low-altitude *model* validity). Size-independent — the large-satellite case is covered by the per-body Kn floor, not by raising this edge |
 | **Upper edge** | **~1400 km** (radius 7,778,000 m) — *signed off 2026-06-15* | extended from the old 1200 km to the full green-validated sweep, so high/elliptical LEO no longer trips nuisance clamp warnings. The collapse stays green (≤ 5 %) throughout, so the high "cut" is **non-binding** |
 | **Knudsen floor `floor_altitude(L)`** | **110.5 km** (0.1 m) → **222.5 km** (30 m) | conservative high-activity (Chunk 2); body-size-dependent runtime warning (threshold 2), separate from the table edge |
+
+## Tier B per-face drag (`BoxFaceCd`) — Chunk 1 & 3 evidence
+
+The Tier B work adds a per-face, incidence-resolved drag coefficient for a convex
+box (`BoxFaceCd`; binding contract `docs/general-upgrades-1.md` "Tier B Drag",
+build plan `docs/history/build-plan-tier-b-drag.md`). Chunk 1 produces the offline evidence
+that gates whether it is worth shipping, **before** any runtime is built.
+
+**(1) Incidence-interpolation convergence** (`cd_box_incidence_convergence.py`,
+local venv run 2026-06-27). The shipped table will store the per-face Cd on a 1-D
+**θ axis over `[0, π]`** (face-flow angle; θ = 0 head-on, π⁄2 edge-on, π leeward)
+and interpolate linearly. The per-face coefficient is smooth (C∞) in θ — head-on
+Cd ≈ **2.50**, edge-on floors at **0.088** (the tangential-shear floor the contract
+predicts at ~0.07), and tapers to ~**0 by θ ≈ 110°** — so linear interpolation
+converges cleanly:
+
+| nodes | spacing | max err | RMS err |
+|------:|--------:|--------:|--------:|
+| 5 | 45.0° | 7.69 % | 3.01 % |
+| 9 | 22.5° | 2.20 % | 1.00 % |
+| 17 | 11.25° | 1.07 % | 0.32 % |
+| 33 | 5.62° | 0.35 % | 0.08 % |
+| 65 | 2.81° | 0.09 % | 0.02 % |
+| 129 | 1.41° | 0.02 % | 0.005 % |
+
+(errors relative to the peak per-face Cd). RMS error falls a clean **~4× per
+halving** of the spacing (ratios 3.0 → 3.2 → 3.85 → 3.98 → 3.99 — textbook
+2nd-order), so a larger **uniform** grid provably hits any error target with no
+special node placement. The max-error ratio is noisier (rides the high-curvature
+"knee" near edge-on) but also ≈ 4× by the fine grids. The Cd(θ) **shape** is
+altitude-stable (incidence separable from `(radius, density)`), so the result
+transfers across the band. **Reading:** a **~33-node θ axis (≈ 5.6° spacing)** already
+gives < 0.4 % max / < 0.1 % RMS — the input to the Chunk-2 grid-resolution sign-off.
+
+**(2) Cheap benefit estimate → GO/NO-GO Checkpoint A** (`cd_box_benefit_estimate.py`,
+local venv run 2026-06-27). For a representative **Sun-pointing LEO drag sail**
+(4 m × 4 m, 16 m²/face, m = 12 kg, A/m ≈ 1.33 m²/kg; 450 km circular, inc 51.6°,
+solar max; kinematic orbit + analytic Sun, **no Orekit / no integrator**), compare
+the per-face `CdA_BoxFace(t) = Σ Cd_i(θ_i)·A_i` against the **best-fit** Tier-A
+scalar × windward projected area `Σ max(0, cos θ_i)·A_i`, swept over β:
+
+| β (Sun vs orbit plane) | best-fit c\* | surviving residual | along-track after recal | vs un-recal (Cd=2.2) |
+|---:|---:|---:|---:|---:|
+| 4.9° | 2.69 | **7.11 %** | −33.3 km / 2 d | +338 km |
+| 30.0° | 2.61 | **5.95 %** | −19.6 km / 2 d | +240 km |
+| 60.0° | 2.38 | **5.77 %** | +3.6 km / 2 d | +71 km |
+
+The surviving residual is the **work-weighted RMS of `CdA_BoxFace − c*·A_proj`** as a
+% of mean drag — and because `c*` is the least-squares optimum, it is the **minimum
+over all constant Cd**, i.e. the fraction *no* scalar can absorb. Recalibrating the
+scalar removes ~90 % of the gap (e.g. 338 km → 33 km along-track at β ≈ 5°), but a
+**coherent ~6–7 % shape residual survives**, accumulating secularly to ~33 km of
+along-track over just 2 days (~1.6 % of the total Tier-A drag effect, growing with
+mission length). That divergence is largest where the sail sweeps the full incidence
+range (low β) and is the attitude-correlated systematic a single Cd structurally
+cannot represent — including the edge-on shear drag that Tier-A's windward-projected
+area drops to zero. **Reading: material AND survives best-fit recalibration → a GO
+signal** for `BoxFaceCd` (the formal Checkpoint-A call is the maintainer's; the
+rigorous propagation-based study in Chunk 6 is the final confirmation).
+
+**(3) Per-face cross-validation → §5-equivalence invariant** (`cross_validate_box_face.py`,
+local venv run 2026-06-28). The experiment per-face kernel (`cd_box.cd_panel_species`
+via `cd_box_faces`) and the **shipped** generator (`scripts/generate_box_face_cd_table.py`,
+`_face_cd_*`) are **two independent reconstructions** of the same Schaaf–Chambre /
+Sentman DRIA flat-face physics. The Chunk-1/2 convergence and collapse evidence
+transfers to the shipped `box_face_cd_default.npz` **only if the two agree** — the
+box twin of the sphere check above. Both are driven off one identical set of
+NRLMSISE-00 rows; the assertion is on the **force-relevant assembled `CdA = Σ Cd_i·A_i`**
+(an O(1 m²) total never near zero), exactly as the sphere check asserts on *total*
+C_D, not per-species terms:
+
+| check | result |
+|-------|--------|
+| Shared per-face closed form (pressure **and** shear, per species, identical inputs) | **8.9e-16** — bit-identical to machine precision across the full `[0, π]` axis |
+| Mass-flux-weighted per-face Cd (identical V, α) | **3.9e-07** — the lone He molecular-mass nuance (4.0026 vs 4.002602 amu, a trace species) |
+| Accommodation anchor → Langmuir K (α = 0.90) | **0.017 %** (shared with the sphere; both pipelines run at the shared K) |
+| **End-to-end `CdA`, 3570 (condition × altitude × attitude) points, 2 geometries, lat −60..70°** | **box 2.0×1.5×1.0** max **0.0364 %** / mean 0.0063 %; **plate 1.0×1.0×0.02** max **0.1193 %** / mean 0.0122 % — **PASS ≪ 1 %** |
+| Pure-physics `CdA` (shared speed, isolates the closed form) | **≤ 2.5e-07** — confirms the end-to-end residual is purely the speed convention |
+| Secondary: global max **absolute** per-face diff | **3.7e-04** (gate `ε_abs = 0.02`, well under the ~0.07 edge-on floor) — guards the grazing/leeward regime a relative gate cannot |
+
+The headline **0.1193 %** (recorded in the table metadata as `cross_validation_max_rel_pct`)
+is dominated by the documented spherical-vs-geocentric **relative-speed radius
+convention** — the same sub-1 % effect the sphere table carries — not by the per-face
+physics, which is bit-identical. The plate's larger figure is that convention amplified
+at high latitude × grazing incidence on the small leeward faces. **So the §5-equivalence
+invariant holds: the convergence/validity evidence is safe to transfer to the shipped
+per-face table.**
+
+**(4) Rigorous benefit study → final GO/NO-GO** (`cd_box_benefit_study.py`, conda-env
+run 2026-06-30). The propagation-based confirmation of the Chunk-1 cheap signal, using
+the **real** `propagate_numerical` (gravity 70×70 + Sun/Moon + NRLMSISE-00 drag + SRP).
+The same Sun-pointing sail is propagated over a **3-day** window twice — Tier A (the
+box with a scalar Cd) vs `BoxFaceCd.default()` (per-face) — identical in every other
+respect (SRP/gravity/third-body are common-mode and cancel). The constant Cd is
+**best-fit by minimizing the RMS along-track separation vs the BoxFace run** (the
+strongest single-Cd recalibration); the residual at that optimum is the part no
+constant Cd can absorb. Normalized against the Tier-A drag's own along-track effect
+(best-fit drag run vs a no-drag run):
+
+| β | alt 450 km → | best-fit c\* | residual RMS | residual final / max | un-recal Cd=2.2 final | Tier-A drag effect | residual / drag effect |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 5.0° | 365 km | 2.692 | 19.2 km | 1.0 / 32.5 km | −3042 km | 6431 km | 0.02 % final, 0.28 % RMS |
+| 30.0° | 399 km | 2.614 | 16.5 km | 62.0 / 62.0 km | −1735 km | 6698 km | 0.93 % final, 0.25 % RMS |
+
+**Reading (the formal SHIP/DROP call is the maintainer's).** The rigorous study
+**tempers the Chunk-1 GO signal.** Chunk 1's headline "~7 % surviving residual" is a
+**force-level** figure (per-face `CdA` vs a best-fit-scaled projected area). At the
+**trajectory level** that does *not* become a 7 % along-track error: along-track drift
+is dominated by the **secular** (orbit-averaged) drag rate, which is a pure **scale**
+that a single constant Cd captures — so the best-fit Cd absorbs **> 99 %** of the
+divergence (e.g. the −3042 km error at the textbook Cd = 2.2 collapses to ~1 km final
+at c\* = 2.69, β = 5°; the recalibration objective in the figure has a sharp minimum).
+What *survives* is the small, attitude-correlated **shape** residual: **~16–19 km RMS,
+up to ~62 km, over 3 days — well under 1 % (0.25–0.93 %) of the ~6500 km total drag
+effect**, and an order of magnitude under the 15–30 % thermospheric density-model
+uncertainty that dominates real drag error. The residual is real and partly coherent
+(it grows secularly at β = 30°, so its *absolute* size scales with mission length), but
+its *fraction* of the drag effect stays sub-1 %. **By the contract's strict gate
+("material AND survives best-fit recalibration") the quantitative benefit is therefore
+borderline — leaning DROP / "marginal"** — even though the qualitative case (BoxFaceCd
+is the physically-correct model, already built/validated/tested, removes a known
+systematic, benefit grows with mission length) may still justify shipping. The
+maintainer makes the final call from this evidence — see the edge-on companion
+below, which shows the benefit is strongly **scenario-dependent**.
+
+**(5) Edge-on companion study (maintainer application)** (`cd_box_benefit_study_edgeon.py`,
+conda-env run 2026-06-30). The gate above used the contract's *Sun-pointing* sail,
+where shear is a <1% correction. A maintainer application — a box solar sail held
+**edge-on** to minimize drag (`InPlaneTracking`, the 1 m² faces parallel to the flow)
+— **inverts** that result: the large faces' projected area collapses, so drag is
+dominated by **tangential shear** on those faces, which the projected-area Tier A
+model (constant Cd *or* `VariableCd`, via Orekit's `BoxAndSolarArraySpacecraft`) omits
+entirely. Scenario: 1 m² × 1 cm box, 2 kg (A/m 0.5), 400 km circular, solar max,
+5-day window.
+
+| quantity | value |
+|---|---|
+| BoxFace altitude | 400 → 386.9 km / 5 d |
+| along-track divergence, physical Tier A **Cd = 2.2** vs BoxFace | **−1639 km** / 5 d |
+| along-track divergence, **`VariableCd.sphere`** vs BoxFace | **−1426 km** / 5 d |
+| empirical drag underestimate (physical Tier A vs BoxFace) | **~2.1×** |
+| best-fit constant Cd | **4.74** — 2.2× textbook, **above** the free-molecular ceiling (~2.6); residual still ~103 km |
+| BoxFace drag effect vs SRP effect (5 d) | 3006 km vs 0.6 km → **drag ≫ SRP (~5000×)** |
+
+**Reading (decision deferred to the maintainer).** For an edge-on sail the verdict
+inverts the Sun-pointing one. (a) At 400 km / solar max **drag dominates SRP by
+~5000×**, so drag modeling is paramount here. (b) BoxFace predicts **~2× the drag** of
+a physically-configured Tier A (Cd = 2.2 or the shipped `VariableCd` table), a
+**~1400–1640 km** along-track divergence over 5 days. (c) **No physical constant Cd
+recovers it** — the best-fit is Cd ≈ 4.7 (above the ~2.6 ceiling propygator itself
+flags as improbable), and even that leaves ~103 km of shape residual. So unlike the
+Sun-pointing case (best-fit Cd ≈ 2.7, physical, <1% residual), the projected-area Tier
+A models here structurally miss the shear and only an above-physical fudge factor
+approximates BoxFace. **Caveat:** the effect is ~2×, **not** the ~9× a *perfect*
+edge-on hold would give — `InPlaneTracking` tracks *inertial* velocity while the flow
+is Earth-relative (co-rotation), leaving the sail a few degrees off exact edge-on, so
+the large faces keep some projected area Tier A does capture; tracking the true
+relative velocity would widen the gap. The result is also specific to the
+drag-dominated 400 km / solar-max regime (higher altitude or solar min cuts drag and
+can restore SRP dominance). **This is the regime where `BoxFaceCd` is load-bearing**;
+the maintainer weighs it against the Sun-pointing (<1%) case for the ship/drop call.
 
 ## Provenance
 

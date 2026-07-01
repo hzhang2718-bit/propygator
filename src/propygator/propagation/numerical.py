@@ -14,9 +14,11 @@ projected-area computation to the box and overrides only the scalar Cd (via the
 box's "global drag factor"). The :data:`AttitudeConfig` is lowered to a native
 Orekit provider (:func:`~propygator.propagation.attitude._to_provider`). A sphere is
 orientation-independent, so a non-default attitude on a sphere triggers a one-time
-consistency warning and falls back to ``LofAligned`` (features.md §1.1). An
-``IncidenceVariableCd`` (Tier B) on a box raises ``NotImplementedError`` when drag is
-wired.
+consistency warning and falls back to ``LofAligned`` (features.md §1.1). A box
+:class:`BoxFaceCd` (Tier B per-face drag) instead drives a per-face free-molecular
+drag sum — each face's flow angle resolved and its Cd looked up, summed over the full
+face areas — through that same custom ``DragSensitive`` (general-upgrades-1 "Tier B
+Drag").
 
 **Force scope.** Each ``ForceModelConfig`` toggle maps to its Orekit force model
 and is wired only when enabled. The ``force_models`` metadata is driven by *what
@@ -56,7 +58,7 @@ from .force_models import ForceModelConfig, _serialize_force_models
 from .guards import _DETECTOR_THRESHOLD_S
 from .integrators import IntegratorConfig
 from .spacecraft import (
-    IncidenceVariableCd,
+    BoxFaceCd,
     SpacecraftConfig,
     SpacecraftGeometry,
     VariableCd,
@@ -438,11 +440,13 @@ def _build_box_spacecraft(
     ``RadiationSensitive``), so the caller builds it once and shares it. The 10-arg
     ctor is ``(x, y, z, sun, arrayArea, arrayAxis, dragCoeff, liftRatio, absorption,
     specular)``; lift ratio is ``0.0`` (v1 models no aerodynamic lift). The base drag
-    coefficient is **always ``1.0``**: every drag path (fixed Cd or a
-    :class:`VariableCd` / :class:`IncidenceVariableCd` table) routes through the custom
-    box ``DragSensitive``, which applies the per-substep scalar Cd as the box's single
-    "global drag factor" (drag is exactly linear in that factor — verified), so the
-    Kn-floor warn-once hook is shared by all of them (addendum §6.2). The array axis is
+    coefficient is **always ``1.0``**: the fixed-Cd and :class:`VariableCd` drag paths
+    route through the custom box ``DragSensitive``, which applies the per-substep scalar
+    Cd as the box's single "global drag factor" (drag is exactly linear in that factor —
+    verified), so the Kn-floor warn-once hook is shared by both (addendum §6.2). A
+    :class:`BoxFaceCd` box is still built here, but only to drive SRP — its drag takes
+    the dedicated per-face path (:func:`_build_box_face_drag_force`), not this object's
+    ``dragAcceleration``. The array axis is
     already a validated unit vector. Box field invariants hold (validated at
     construction).
     """
@@ -478,17 +482,19 @@ def _build_drag_force(
 ) -> "org.orekit.forces.ForceModel":
     """Build the drag ``ForceModel`` (chunk 8 sphere; chunk 9 box + Kn floor).
 
-    Every drag path routes through :func:`_build_drag_sensitive` (the shared custom
-    ``DragSensitive``), so they share both the scalar-Cd lookup shape and the §6.2
-    free-molecular-floor warn-once hook. ``cd_lookup`` is the :class:`VariableCd` (its
-    call does the lookup + the edge-aware clamp warning) or a fixed-Cd constant
-    (:func:`_constant_cd`); ``accel`` is the **sphere** ``IsotropicDrag`` formula or the
-    **box** delegation to ``BoxAndSolarArraySpacecraft.dragAcceleration`` (the box is
-    built at base dragCoeff=1.0 and the Cd is applied as its global drag factor). A box
-    :class:`IncidenceVariableCd` (Tier B) raises ``NotImplementedError`` — its runtime
-    lookup is deferred (architecture §13). ``box`` is the shared object also used by SRP
-    (``None`` for a sphere). The Kn floor for this body (addendum §6.2/§6.3) is computed
-    once here.
+    Every fixed-Cd / :class:`VariableCd` drag path routes through
+    :func:`_build_drag_sensitive` (the shared custom ``DragSensitive``), so they share
+    both the scalar-Cd lookup shape and the §6.2 free-molecular-floor warn-once hook.
+    ``cd_lookup`` is the :class:`VariableCd` (its call does the lookup + the edge-aware
+    clamp warning) or a fixed-Cd constant (:func:`_constant_cd`); ``accel`` is the
+    **sphere** ``IsotropicDrag`` formula or the **box** delegation to
+    ``BoxAndSolarArraySpacecraft.dragAcceleration`` (the box is built at base
+    dragCoeff=1.0 and the Cd is applied as its global drag factor). A box
+    :class:`BoxFaceCd` (Tier B per-face table) takes the dedicated per-face path
+    (:func:`_build_box_face_drag_force`) — the **same** shared proxy, but the six face
+    lookups and ``CdA`` sum live in the accel closure. ``box`` is the shared object also
+    used by SRP (``None`` for a sphere, and unused by drag for a ``BoxFaceCd``). The Kn
+    floor for this body (addendum §6.2/§6.3) is computed once here.
     """
     import jpype
     from org.orekit.forces.drag import DragForce
@@ -496,16 +502,17 @@ def _build_drag_force(
     from .guards import _kn_floor_setup
 
     cd = geometry.drag_coefficient
-    if isinstance(cd, IncidenceVariableCd):
-        raise NotImplementedError(
-            "IncidenceVariableCd (Tier B, incidence-keyed box drag) is a validated "
-            "skeleton in v1: its runtime Cd lookup is deferred (architecture §13). Use "
-            "a fixed Cd or a VariableCd on box_and_panels for now."
-        )
     # The body's free-molecular validity floor: (floor_radius_m, warning) or None when
     # it falls outside the captured band. Computed once at setup; checked per-substep
     # inside the proxy so the loud regime warning fires once on the first dip below it.
     kn_floor = _kn_floor_setup(geometry)
+
+    if isinstance(cd, BoxFaceCd):
+        # Tier B per-face convex-box drag: the six face lookups + CdA assembly need the
+        # SpacecraftState attitude, so they live in a dedicated accel closure (not the
+        # 2-arg cd_lookup shape) that reuses the same shared proxy + Kn-floor hook.
+        return _build_box_face_drag_force(geometry, atmosphere, cd, kn_floor)
+
     # A VariableCd does its own table lookup + edge-aware clamp warning; a fixed Cd is a
     # constant. Both flow through the same proxy.
     cd_lookup = cd if isinstance(cd, VariableCd) else _constant_cd(float(cd))
@@ -553,6 +560,76 @@ def _build_drag_force(
         )
 
     return DragForce(atmosphere, _build_drag_sensitive(cd_lookup, _box_accel, kn_floor))
+
+
+def _build_box_face_drag_force(
+    geometry: SpacecraftGeometry,
+    atmosphere: "org.orekit.models.earth.atmosphere.Atmosphere",
+    table: BoxFaceCd,
+    kn_floor: "tuple[float, str] | None",
+) -> "org.orekit.forces.ForceModel":
+    """Per-face drag ``ForceModel`` for a convex box with a :class:`BoxFaceCd` (Tier B).
+
+    A convex body never self-shadows in free-molecular flow, so its drag is the exact
+    **independent sum of its six per-face contributions** — which a single uniform Cd
+    cannot represent, so this does **not** route through
+    ``BoxAndSolarArraySpacecraft.dragAcceleration`` (the box object is still built, but
+    only to drive SRP). Each substep the accel closure rotates the incoming-flow
+    direction into the body frame, forms every face's flow angle θ, looks up that
+    face's Cd, and assembles ``CdA = Σ Cd_i · A_i`` over the **full** face areas — the
+    incidence projection (the ``cos θ`` pressure falloff *and* the tangential-shear
+    floor) is already baked into ``Cd_i``, so the areas are **not** re-projected. The
+    acceleration is the sphere-style ``½ (CdA/m) ρ |relVel| relVel`` form (Orekit's
+    ``+½`` sign). **All six faces** are evaluated (windward and leeward), so the leeward
+    shear tail is not dropped and there is no face-on attitude discontinuity
+    (general-upgrades-1 "Tier B Drag").
+
+    The closure reuses the **same** shared :func:`_build_drag_sensitive` proxy as every
+    other drag path (so the Kn-floor warn-once hook is shared and no new Java interface
+    is introduced); its ``cd_lookup`` is a no-op because the per-face path owns its own
+    lookups. The table's edge-aware clamp warnings are given once-per-run scope here,
+    exactly as a :class:`VariableCd`.
+    """
+    from org.orekit.forces.drag import DragForce
+
+    assert geometry.x_length_m is not None  # a box always carries its edge lengths
+    assert geometry.y_length_m is not None
+    assert geometry.z_length_m is not None
+
+    # Give the table's edge-clamp warnings the same once-per-run scope as the Kn floor.
+    table._reset_edge_warnings()
+    # Full face areas: the ±X faces span y*z, the ±Y faces x*z, the ±Z faces x*y.
+    area_x = geometry.y_length_m * geometry.z_length_m
+    area_y = geometry.x_length_m * geometry.z_length_m
+    area_z = geometry.x_length_m * geometry.y_length_m
+
+    def _box_face_accel(state, density, relative_velocity, _scalar_cd):  # noqa: ANN001, ANN202
+        radius_m = float(state.getPosition().getNorm())
+        rho = float(density)
+        # Incoming-flow direction the body sees: -relVel/|relVel|, rotated into the
+        # body frame via applyTo (verified to machine precision against Orekit's box
+        # drag; applyInverseTo is wrong by ~9% — see the ecef-nadir convention work).
+        flow_inertial = relative_velocity.normalize().negate()
+        flow_body = state.getAttitude().getRotation().applyTo(flow_inertial)
+        cd_area = 0.0
+        for component, area in (
+            (flow_body.getX(), area_x),
+            (flow_body.getY(), area_y),
+            (flow_body.getZ(), area_z),
+        ):
+            # The two opposite faces on each axis see +component and -component. The
+            # clip is mandatory: at exact head-on/leeward a finite-precision dot can
+            # land just past +/-1, where an unclamped arccos returns NaN and poisons
+            # the drag acceleration with a silent NaN.
+            for cosine in (component, -component):
+                theta = math.acos(max(-1.0, min(1.0, cosine)))
+                cd_area += table(radius_m, rho, theta) * area
+        factor = 0.5 * cd_area / state.getMass() * density * relative_velocity.getNorm()
+        return relative_velocity.scalarMultiply(float(factor))
+
+    return DragForce(
+        atmosphere, _build_drag_sensitive(_constant_cd(0.0), _box_face_accel, kn_floor)
+    )
 
 
 def _build_srp_force(
@@ -817,8 +894,9 @@ def propagate_numerical(
     ``DragSensitive`` (an ``IsotropicDrag``-equivalent formula) and
     ``IsotropicRadiationSingleCoefficient`` for SRP; a ``box_and_panels`` geometry
     builds one ``BoxAndSolarArraySpacecraft`` driving both drag and SRP, with drag
-    routed through that same custom ``DragSensitive`` (a box ``IncidenceVariableCd``
-    raises ``NotImplementedError`` when drag is wired). The
+    routed through that same custom ``DragSensitive`` (a box ``BoxFaceCd`` instead
+    drives a per-face free-molecular drag sum through that proxy — the box object then
+    feeds SRP only). The
     ``attitude`` argument is lowered to a native Orekit provider and wired into the
     propagator; a non-default attitude on a sphere has no dynamical effect, so it
     emits a one-time consistency warning and falls back to ``LofAligned``. The
@@ -851,8 +929,7 @@ def propagate_numerical(
     Raises ``ValueError`` for invalid inputs (non-inertial frame, non-positive or
     mis-ordered ``duration`` / ``output_step``, unknown ``integrator.type``,
     ``gravity_field``, or ``atmosphere_model``, ``ClassicalRK4`` without
-    ``fixed_step_s``); ``NotImplementedError`` for a box ``IncidenceVariableCd`` under
-    drag (Tier B deferred); and
+    ``fixed_step_s``); and
     :class:`~propygator.core.exceptions.NumericalPropagationError` if the integrator
     fails and the failure is **not** a drag-driven re-entry (a too-tight tolerance, a
     bad setup, or any non-low-altitude stiffness) — carrying the Orekit message only
@@ -865,9 +942,12 @@ def propagate_numerical(
       * Drag acts on the projected cross-section but produces no torque, and
         aerodynamic lift is not modeled; attitude is not perturbed by drag.
       * The drag coefficient is a fixed value, a (geocentric radius, density)
-        table value (``VariableCd``, sphere or box), or — for a faithful box —
-        an incidence-keyed table (``IncidenceVariableCd``). Per-facet gas-surface
-        physics (full Sentman) is not modeled.
+        table value (``VariableCd``, sphere or box), or — for a convex box with no
+        solar arrays — a per-face free-molecular incidence table (``BoxFaceCd``,
+        Sentman/Schaaf-Chambre) that resolves how each face meets the flow.
+        Solar-array shadowing (non-convex bodies), aerodynamic lift, and
+        higher-fidelity gas-surface physics (multiple reflection, per-facet
+        material/temperature, transitional/continuum flow) are not modeled.
       * Drag modeling is valid only within an altitude band — free-molecular flow
         above a body-size-dependent floor (~110 km for a small CubeSat rising to
         ~220 km for a large bus/station) up to the Cd-table ceiling (~1400 km).

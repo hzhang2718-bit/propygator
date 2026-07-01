@@ -1,0 +1,60 @@
+============================================================================
+TIER B EDGE-ON BENEFIT STUDY (solar sail held edge-on; BoxFaceCd vs Tier A)
+============================================================================
+propygator 0.4.0; real propagate_numerical
+Sail: 1.0 m x 1.0 m (1.0 m^2 faces), edge 0.01 m, m=2.0 kg, A/m=0.50 m^2/kg
+Orbit: 400 km circular, inc 51.6 deg, 5-day window, output_step=120 s
+Epoch 2002-07-01T00:00:00 (solar MAX -- high-drag case; solar min would cut drag)
+Attitude InPlaneTracking: 1 m^2 faces held EDGE-ON to the flow (minimum-drag config)
+Forces: gravity 70x70 + Sun/Moon + NRLMSISE-00 drag + SRP
+
+... propagating BoxFace + physical Tier A + no-drag + grav-only + 7-pt Cd sweep ...
+
+----------------------------------------------------------------------------
+RESULTS
+----------------------------------------------------------------------------
+BoxFace altitude: 400.0 -> 386.9 km over 5 days
+
+1. PRIMARY -- along-track divergence a real user suffers vs BoxFace truth:
+     Tier A, constant Cd=2.2      : final   -1638.8 km, max   1638.8 km
+     Tier A, VariableCd.sphere    : final   -1426.4 km, max   1426.4 km
+   (both use projected-area drag -> omit the large-face shear entirely)
+
+2. Best-fit CONSTANT Cd (wide sweep) -- is the divergence absorbable, and
+   at what Cd?
+     Cd=  2.2: RMS along-track vs BoxFace     728.3 km
+     Cd=  3.0: RMS along-track vs BoxFace     490.1 km
+     Cd=  4.0: RMS along-track vs BoxFace     185.2 km
+     Cd=  5.0: RMS along-track vs BoxFace     125.8 km  <- min
+     Cd=  7.0: RMS along-track vs BoxFace     760.0 km
+     Cd= 10.0: RMS along-track vs BoxFace    1710.2 km
+     Cd= 15.0: RMS along-track vs BoxFace    3121.2 km
+     best-fit c* = 4.74   (residual final 103.1 km, max 103.1 km)
+     -> that is 2.2x the textbook 2.2, and ABOVE the free-molecular physical range (~2.0-2.6)
+        i.e. no PHYSICALLY-reasoned constant Cd recovers BoxFace here
+
+3. Does drag even matter for this sail? (drag vs SRP along-track effect)
+     BoxFace drag effect (vs no-drag) : final    3006.4 km, max   3006.4 km
+     Tier A(2.2) drag effect          : final    1445.9 km
+     SRP effect (no-drag vs grav-only): final       0.6 km, max      0.7 km
+     analytic SRP accel ~ 4.10e-06 m/s^2 (Cr~1.8, A/m=0.50)
+     BoxFace drag effect / SRP effect = 4970.2x
+
+----------------------------------------------------------------------------
+HEADLINE
+----------------------------------------------------------------------------
+Empirical drag underestimate of physical Tier A vs BoxFace: ~2.1x
+A user running physical Tier A (Cd=2.2 or VariableCd) mis-predicts the
+along-track by ~1639 km over 5 days; recovering it needs Cd~4.7 (above the physical range).
+(Not the idealized ~9x: InPlaneTracking tracks INERTIAL velocity, but the
+ flow is Earth-relative (co-rotation), so the sail sits a few deg off exact
+ edge-on -- the large faces keep some projected area Tier A does capture.)
+At this altitude/epoch, BoxFace drag is 4970.2x the SRP effect, so drag DOMINATES SRP.
+READING (NOT the decision -- the SHIP/DROP call is the maintainer's):
+  Edge-on inverts the Sun-pointing result: the shear term is the dominant
+  drag, projected-area Tier A structurally omits it, and no PHYSICAL
+  constant Cd recovers it. If drag matters vs SRP here (see #3), this is
+  BoxFaceCd's load-bearing use case.
+
+Total wall time: 253 s
+Saved figure: cd_box_benefit_study_edgeon.png

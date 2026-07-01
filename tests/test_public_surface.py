@@ -36,6 +36,7 @@ EXPECTED_NAMES = [
     "SpacecraftConfig",
     "SpacecraftGeometry",
     "VariableCd",
+    "BoxFaceCd",
     "AttitudeConfig",
     "LofAligned",
     "LofOffset",

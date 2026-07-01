@@ -6,7 +6,7 @@ Companion document to `architecture.md`. Where `architecture.md` locks in the cr
 
 ## 1.1 Numerical propagator
 
-> **Status: DRAFTED.** Force-model, spacecraft, attitude, integrator, output, and metadata sections are settled. `VariableCd` (a precomputed Cd table keyed on geocentric radius and live total density) is the v1 variable-drag path for **both** sphere and box geometry (a density-varying scalar Cd); a faithful incidence-keyed box table (`IncidenceVariableCd`) is designed as the documented extension. Full per-facet Sentman remains deferred (architecture §13). SRP uses a conical shadow. Attitude is a first-class input with seven modes, all but one backed by native Orekit providers. Remaining open items are cosmetic plot details. The **drag-validity & altitude-guards addendum** (drag-model validity domain + the altitude/regime guard system) has been built and folded into the subsections below — the signature (`limits=`), the metadata block (termination keys), "Escape and re-entry" (rewritten to the as-built guards), "Drag-coefficient modeling" (the §5 invariant, two-tier regime warnings, Knudsen floor), and the limitations note.
+> **Status: DRAFTED.** Force-model, spacecraft, attitude, integrator, output, and metadata sections are settled. `VariableCd` (a precomputed Cd table keyed on geocentric radius and live total density) is the v1 variable-drag path for **both** sphere and box geometry (a density-varying scalar Cd); a per-face incidence-resolved box table (`BoxFaceCd`, Tier B) is shipped for the convex box (binding design `docs/general-upgrades-1.md` "Tier B Drag"). Full per-facet Sentman remains deferred (architecture §13). SRP uses a conical shadow. Attitude is a first-class input with seven modes, all but one backed by native Orekit providers. Remaining open items are cosmetic plot details. The **drag-validity & altitude-guards addendum** (drag-model validity domain + the altitude/regime guard system) has been built and folded into the subsections below — the signature (`limits=`), the metadata block (termination keys), "Escape and re-entry" (rewritten to the as-built guards), "Drag-coefficient modeling" (the §5 invariant, two-tier regime warnings, Knudsen floor), and the limitations note.
 
 ### Public signature
 
@@ -122,7 +122,7 @@ SpacecraftGeometry.box_and_panels(
     z_length_m: float,
     solar_array_area_m2: float = 0.0,
     solar_array_axis: tuple[float, float, float] = (0.0, 1.0, 0.0),
-    drag_coefficient: float | VariableCd | IncidenceVariableCd = 2.2,
+    drag_coefficient: float | VariableCd | BoxFaceCd = 2.2,
     absorption_coefficient: float = 0.3,            # in [0, 1]
     specular_reflection_coefficient: float = 0.6,   # in [0, 1]
 ) -> SpacecraftGeometry
@@ -154,7 +154,8 @@ Drag uses projected area along velocity-relative-to-atmosphere × `drag_coeffici
 | `box_and_panels` with non-unit `solar_array_axis` | normalized silently |
 | `box_and_panels` `absorption`/`specular` outside `[0, 1]` | `ValueError` |
 | `box_and_panels` `absorption + specular > 1` | `ValueError` (negative diffuse) |
-| `sphere` given an `IncidenceVariableCd` | `ValueError` (no incidence dependence) |
+| `sphere` given a `BoxFaceCd` | `ValueError` (a sphere has no flow incidence; use a fixed Cd or `VariableCd`) |
+| `box_and_panels` given a `BoxFaceCd` with `solar_array_area_m2 > 0` | `ValueError` (`BoxFaceCd` is a convex box only and cannot represent solar-array shadowing; set `solar_array_area_m2=0`, or use a fixed Cd / `VariableCd`) |
 
 A fixed Cd > 5 or sphere Cr > 3 emits a warning but doesn't raise — improbable, but used for sensitivity studies.
 
@@ -328,7 +329,7 @@ The optional physics keys are emitted only when they actually shaped the traject
  "drag:NRLMSISE-00", "srp", "tides:solid"]
 ```
 
-**`spacecraft` string.** Deterministic; numbers are coerced to `float` and rendered with `repr()` (so an int- and a float-valued coefficient serialize identically — `Cd=2` and `Cd=2.0` both yield `2.0`); semicolon separates geometry from mass/coefficients. A `VariableCd` / `IncidenceVariableCd` records `Cd=table:<name-or-hash>` (the hash includes the table's axis set, so a 2-D and an incidence table for the same geometry don't collide).
+**`spacecraft` string.** Deterministic; numbers are coerced to `float` and rendered with `repr()` (so an int- and a float-valued coefficient serialize identically — `Cd=2` and `Cd=2.0` both yield `2.0`); semicolon separates geometry from mass/coefficients. A `VariableCd` / `BoxFaceCd` records `Cd=table:<name-or-hash>` (the hash folds in a kind tag and the table's axis set, so a 2-D `VariableCd` and a per-face `BoxFaceCd` can't collide; `BoxFaceCd.default()` records `Cd=table:box_face_default`).
 
 ```
 "sphere:A=1.0;m=1000.0,Cd=2.2,Cr=1.5"
@@ -363,7 +364,6 @@ The optional physics keys are emitted only when they actually shaped the traject
 | `SunPointing.pointing_axis` parallel to `phasing_axis` | `ValueError` |
 | `attitude.law` not callable (`CustomAttitude`) | `ValueError` |
 | `AltitudeLimits(...)` unreasonable — `min_altitude_km < 0`, `max_altitude_km` above the escape-parity altitude (≈ 320,621 km), or `min >= max` — raised at **construction**, not at a crossing | `ValueError` |
-| `box_and_panels` `IncidenceVariableCd` under drag — Tier B deferred (architecture §13) | `NotImplementedError` |
 | `NadirPointing(velocity_reference='ecef')` on an orbit whose ground-relative velocity is ~0 (e.g. geostationary / instantaneously ground-stationary) — the yaw target `v_rel = v − ω⊕×r` is undefined, so its direction can't be formed | `NumericalPropagationError` (carrying the underlying message; LEO yaw-steering is the validated domain — ECEF-nadir addendum §2) |
 | Integrator fails (usually `min_step_s` saturation) **and** the failure is a drag-driven re-entry (drag on, descending, osculating perigee already below the ~150 km drag-table floor) | *stop & report* — partial `Trajectory`, `termination_reason="reentry"` (**not** an error; addendum §6.6) |
 | Integrator fails for any **other** reason (over-tight tolerance, bad setup, non-low-altitude stiffness) | `NumericalPropagationError` (may carry a recovered `err.partial_trajectory`, or `None`) |
@@ -398,26 +398,29 @@ VariableCd.from_table(grid, *, radius_axis, density_axis)
 VariableCd.sphere_default()                 # shipped sphere table
 VariableCd.from_callable(fn)                # fn(radius_m, density_kgm3) -> Cd
 
-# Faithful box (Tier B): adds body-frame flow-incidence axes.
-IncidenceVariableCd.from_table(
-    grid, *, radius_axis, density_axis,
-    azimuth_axis, elevation_axis, array_axis=None,
+# Convex box (Tier B): a per-face (geocentric radius, density, face-flow angle) table.
+BoxFaceCd.default()                          # shipped per-face box/plate table
+BoxFaceCd.from_table(                        # grid shape (n_radius, n_density, n_incidence)
+    grid, *, radius_axis, density_axis, incidence_axis, name=None,
 )
+BoxFaceCd.from_callable(fn, *, name=None)    # fn(radius_m, density_kgm3, theta_rad) -> Cd
 ```
 
-`drag_coefficient` widens to `float | VariableCd | IncidenceVariableCd` (`sphere` accepts `float | VariableCd`; `box_and_panels` accepts all three). The `VariableCd` / `IncidenceVariableCd` objects are pure-Python tables, safe to construct before init.
+`drag_coefficient` widens to `float | VariableCd | BoxFaceCd` (`sphere` accepts `float | VariableCd`; `box_and_panels` accepts all three). The `VariableCd` / `BoxFaceCd` objects are pure-Python tables, safe to construct before init.
 
 **Tier A — density-varying scalar Cd (sphere and box).** A sphere has no incidence dependence, so `(radius, density)` fully determines its Cd. The box keeps Orekit's attitude-driven projected-area bookkeeping; only the scalar Cd it would apply is replaced by the table value. This captures the solar-cycle / diurnal / altitude trend that a flat 2.2 misses, but applies one scalar uniformly across faces — it does **not** capture per-face incidence (that is Tier B).
 
-**Tier B — incidence-keyed box table.** A box's true Cd also depends on how each face meets the flow, so a faithful table adds body-frame incidence axes (azimuth, elevation; optional array-articulation axis), generated offline by a panel method (ADBSat) or DSMC. No shipped default — a box table is geometry/material-specific. At runtime the model computes the relative-velocity direction in the body frame from the attitude and looks up Cd on the multi-D grid.
+**Tier B — per-face incidence table (`BoxFaceCd`, convex box).** A box's true Cd also depends on how each *face* meets the flow. `BoxFaceCd` resolves this per face: a single universal `(geocentric radius, total density, face-flow angle θ ∈ [0, π])` table whose value is **one face's** Cd, referenced to that face's **full** area, as a function of the angle θ between the face normal and the incoming flow (θ = 0 head-on, π⁄2 edge-on, π fully leeward). The incidence projection is already baked in — the normal-pressure part falls off as `cos θ`, but the tangential-shear part does **not** vanish edge-on (it floors at ~0.07 at θ = π⁄2 and tapers smoothly to ~0 by θ ≈ 110°) — so the table spans the leeward half and every face is a direct lookup. In free-molecular flow a **convex** body never self-shadows, so total drag is the exact **independent sum of the six per-face contributions**: at runtime the attitude rotates the flow direction into the body frame, each face's θ is formed, and `CdA = Σ_i Cd_i · A_i` is assembled over the full face areas (no re-projection) and applied as the sphere-style `a = ½ (CdA/m) ρ |v_rel| v_rel`. Because the coefficient is per-unit-area and geometry-independent, **one shipped default serves every convex box and plate** — `BoxFaceCd.default()` (asset `data/box_face_cd_default.npz`), carrying the same gas-surface assumptions as the Tier A sphere default (SESAM accommodation anchored α = 0.90 / 400 km solar-max, diffuse re-emission, 300 K wall); a spacecraft with markedly different surface physics supplies its own via `from_table` / `from_callable`. The axis is θ (not `cos θ`): the shear's `sin θ` factor is smooth in θ but becomes `√(1−cos²θ)` — an infinite-derivative cusp at the poles — in `cos θ`, so a θ axis interpolates linearly with clean ~2nd-order convergence and no special node placement. All six faces are evaluated (windward *and* leeward) — dropping the leeward/edge shear would understate a near-cubic bus's drag by ~5–11 % at a face-on attitude and inject a non-physical discontinuity there. `BoxFaceCd` is **convex-box-only**: valid on `box_and_panels` with `solar_array_area_m2 == 0` (a protruding, articulating array makes the body non-convex, and its sweeping bus-array shadowing needs a panel method / DSMC — out of scope). Binding design: `docs/general-upgrades-1.md` "Tier B Drag".
 
-**Runtime.** Each variable Cd maps to a thin custom `DragSensitive` whose `dragAcceleration` reads geocentric radius from the state, takes the passed-in total density (plus body-frame incidence for Tier B), interpolates Cd, and assembles `a = −½ (Cd·A/m) ρ |v_rel| v_rel` exactly as `IsotropicDrag` / the box model would. **The custom `DragSensitive` is instantiated inside `propagate_numerical`, never at geometry construction** — that keeps the geometry factory on the safe-before-init surface (architecture §10).
+**When `BoxFaceCd` matters (honest, scenario-dependent).** The per-face correction is *attitude-correlated*, so its orbit-level benefit depends entirely on how the body flies. For a bus flown **face-on / nadir-held / tumbling / Sun-pointing** — where the ram meets faces near head-on — a best-fit *physical* constant Cd (or `VariableCd`) absorbs almost all of the difference: the along-track divergence over a multi-day LEO propagation is **< 1 %**, and `BoxFaceCd` is not worth its per-substep cost there. Its load-bearing case is **grazing / edge-on flight of a high-area-to-mass flat plate (a solar / drag sail)**: there the tangential shear dominates, a physical constant Cd (2.2, or `VariableCd`) *under*-predicts along-track by ~1400–1640 km over 5 days at 400 km / solar max, and the constant needed to patch it (best-fit Cd ≈ 4.7) is unphysically large and *still* leaves a ~100 km residual — a **~2× effect a recalibrated scalar cannot absorb**. That non-absorbable regime is why `BoxFaceCd` ships. **Caveat on the ~2× figure:** it was measured with `InPlaneTracking`, which tracks **inertial** velocity only (it has no `velocity_reference` option — only `NadirPointing` offers `ecef`), so a body held "edge-on" that way sits a few degrees off the true Earth-relative flow; the idealized perfectly-edge-on benefit is larger (~9×), but the shipped, honestly-measured figure is ~2×. (Giving `InPlaneTracking` the same `ecef` option is a possible future upgrade — it would change a shipped "no parameters" contract, so it is *not* part of Tier B.)
+
+**Runtime.** Each variable Cd maps to a thin custom `DragSensitive` whose `dragAcceleration` reads geocentric radius from the state, takes the passed-in total density (and, for `BoxFaceCd`, the attitude the state carries), interpolates Cd, and assembles `a = −½ (Cd·A/m) ρ |v_rel| v_rel` exactly as `IsotropicDrag` / the box model would. A `BoxFaceCd` instead sums the effective `CdA = Σ_i Cd_i · A_i` over the box's six faces inside its accel closure — it does **not** route through the Orekit box model (whose single uniform Cd cannot consume a per-face table; the box object is still built, but only to drive SRP). The inertial→body rotation is `state.getAttitude().getRotation().applyTo(...)`, verified to machine precision against Orekit's own box drag. **The custom `DragSensitive` is instantiated inside `propagate_numerical`, never at geometry construction** — that keeps the geometry factory on the safe-before-init surface (architecture §10).
 
 As built (addendum Chunk 9), **every** drag path — sphere or box, *fixed Cd or a table* — routes through this one custom `DragSensitive`, so the free-molecular-floor warn-once hook (below) and the table-edge warnings share a single code path. The trade: a fixed-Cd sphere, which Orekit could otherwise drive natively via `IsotropicDrag`, now crosses the Java↔Python boundary for the drag formula on every substep — marginal next to the default `NRLMSISE-00` density query, a larger share under a cheaper atmosphere (`Harris-Priester`); the uniformity was judged worth it for v1. The shared proxy also exposes no drag `ParameterDriver`, which is invisible to forward/backward propagation and TLE fitting and matters only for numerical OD (out of scope for v1). See architecture §13.
 
 > **Implementation note (Orekit sign convention, verified at build).** The textbook `a = −½ … |v_rel| v_rel` above assumes `v_rel = v_spacecraft − v_atmosphere`. Orekit hands `DragSensitive.dragAcceleration` the **opposite-signed** relative velocity, `relativeVelocity = v_atmosphere − v_spacecraft`, and `IsotropicDrag` therefore applies a **positive** scalar: `a = +½ (Cd·A/m) ρ |relativeVelocity| relativeVelocity`. The custom `DragSensitive` must use the `+½` form with Orekit's argument to match `IsotropicDrag` (verified to ~1e-21 m/s²); the two expressions denote the same physical deceleration. A faithfulness test pins this against `IsotropicDrag` at constant Cd. The per-substep work is a low-dimensional interpolation plus a `|position|`; far cheaper than per-facet Sentman, but measurably slower than stock fixed-Cd drag — benchmark at implementation.
 
-**Where the table comes from.** `sphere_default()` is generated once by maintainers and committed to `data/`; end users load a small array and compute nothing. Generation sweeps a high-fidelity Cd model (closed-form Sentman for the sphere) over a grid of thermospheric conditions and regrids onto the `(radius, density)` mesh — order 10⁴–10⁵ vectorized evaluations, sub-minute. A box (Tier B) table is a deliberate user setup step (a generation script or an external tool such as ADBSat / DSMC); the output is the same kind of array.
+**Where the table comes from.** `sphere_default()` is generated once by maintainers and committed to `data/`; end users load a small array and compute nothing. Generation sweeps a high-fidelity Cd model (closed-form Sentman for the sphere) over a grid of thermospheric conditions and regrids onto the `(radius, density)` mesh — order 10⁴–10⁵ vectorized evaluations, sub-minute. The convex-box `BoxFaceCd.default()` table is generated the same way by `scripts/generate_box_face_cd_table.py` — the per-face free-molecular closed form (normal pressure **and** tangential shear, Sentman/Schaaf-Chambre) swept over `(radius, density, θ)`, sharing the sphere default's accommodation model, cross-validated ≪ 1 % on `CdA` against the experiment kernel — and committed as `data/box_face_cd_default.npz`. Users needing a different surface material/temperature or a non-convex body supply their own via `from_table` / `from_callable`.
 
 **Freshness.** The table encodes a *physics relationship* (given this density at this radius, what is Cd?), not the atmospheric *state*; the time-varying density is supplied live by the atmosphere model from orekit-data space-weather files. So the table tracks current conditions and never goes stale with time — it needs regenerating only when the geometry/material changes or a revised physics model ships. (Keying on a solar index instead of density would bake space-weather assumptions into the table and make it drift; this is why density is the key.)
 
@@ -443,9 +446,12 @@ Spacecraft-model limitations (v1):
   * Drag acts on the projected cross-section but produces no torque, and
     aerodynamic lift is not modeled; attitude is not perturbed by drag.
   * The drag coefficient is a fixed value, a (geocentric radius, density)
-    table value (VariableCd, sphere or box), or — for a faithful box — an
-    incidence-keyed table (IncidenceVariableCd). Per-facet gas-surface
-    physics (full Sentman) is not modeled.
+    table value (VariableCd, sphere or box), or — for a convex box with no
+    solar arrays — a per-face free-molecular incidence table (BoxFaceCd,
+    Sentman/Schaaf-Chambre) that resolves how each face meets the flow.
+    Solar-array shadowing (non-convex bodies), aerodynamic lift, and
+    higher-fidelity gas-surface physics (multiple reflection, per-facet
+    material/temperature, transitional/continuum flow) are not modeled.
   * Drag modeling is valid only within an altitude band — free-molecular flow
     above a body-size-dependent floor (~110 km for a small CubeSat rising to
     ~220 km for a large bus/station) up to the Cd-table ceiling (~1400 km).
@@ -563,7 +569,7 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 
 - **Attitude API** — seven-mode `AttitudeConfig` family (`LofAligned` / `LofOffset` / `Inertial` / `SunPointing` / `NadirPointing` / `InPlaneTracking` / `CustomAttitude`), TNW as the local orbital frame; all but `CustomAttitude` lower to native Orekit providers (`FrameAlignedProvider`, `CelestialBodyPointed` / `AlignedAndConstrained`, `LofOffset(TNW)`). `CustomAttitude.law` returns a propygator `Orientation`, not an Orekit/Hipparchus `Rotation`.
 - **Spacecraft optical coefficients** — on the geometry factories; sphere uses one Cr, box uses absorption + specular (each in [0, 1]).
-- **Variable drag coefficient** — `VariableCd`, a `(geocentric radius, total density)` table, for **sphere and box** (Tier A: density-varying scalar Cd); `IncidenceVariableCd` (Tier B: + body-frame incidence) is the faithful box extension, no shipped default; clamp-to-edge out-of-grid; the custom `DragSensitive` is built inside `propagate_numerical`. Full per-facet Sentman deferred.
+- **Variable drag coefficient** — `VariableCd`, a `(geocentric radius, total density)` table, for **sphere and box** (Tier A: density-varying scalar Cd); `BoxFaceCd` (Tier B: a per-face `(radius, density, face-flow angle)` table for a convex box, with a shipped `default()`) resolves how each face meets the flow; clamp-to-edge out-of-grid; the custom `DragSensitive` is built inside `propagate_numerical`. Full per-facet Sentman deferred.
 - **IntegratorConfig** — three presets locked; `high_precision` rel-tolerance flagged for verification.
 - **SRP shadow** — conical (umbra + penumbra), ellipsoidal Earth; matches Orekit's default.
 - **Output layout** — composite `plot_summary`; 3D and CSV separate; `_draw_*(ax, ...)` primitives; `plot_speed` plots speed magnitude; ground track / 3D colored by time, time-series dark blue, outlines black, bundled coastline (no `cartopy`).
@@ -575,7 +581,7 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 ### Still open / deferred for 1.1
 
 - Cosmetic plot details (dark-blue hex, colormap endpoints, axis labels, figure sizes, legend placement) — deferred; structural layout is fixed. Endpoint glyphs are the current cosmetic baseline: a blue start circle in both spatial plots, and direction-indicating end glyphs — a heading-oriented triangle on the ground track and a velocity-oriented cone in the 3-D view (ECEF-nadir & direction-markers addendum §3).
-- Full per-facet Sentman drag coefficient — deferred (architecture §13); `IncidenceVariableCd` is the faithful v1-extension path for the box.
+- Full per-facet Sentman drag coefficient — deferred (architecture §13); `BoxFaceCd` (Tier B, shipped) is the per-face convex-box path, and full per-facet material/temperature + non-convex shadowing remain the deferred extension.
 - Time-varying / programmed attitude and local-orbital frames beyond TNW — deferred; `CustomAttitude` is the v1 escape hatch.
 
 ---
