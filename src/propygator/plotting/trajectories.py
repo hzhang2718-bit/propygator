@@ -344,9 +344,13 @@ _DEFAULT_SKY_TRACK_STYLE: dict[str, Any] = {"color": TIMESERIES_COLOR, "linewidt
 #: Compass azimuth gridlines (degrees) and labels — North at top, increasing clockwise.
 _SKY_AZIMUTH_TICKS = [0, 90, 180, 270]
 _SKY_AZIMUTH_LABELS = ["N", "E", "S", "W"]
-#: Radial gridlines in zenith-angle degrees (90 - elevation): centre = zenith (0),
-#: rim = horizon (90).
-_SKY_RADIAL_TICKS = [0, 30, 60, 90]
+#: Radial gridlines. The matplotlib polar *radius* is the zenith angle (90 − elevation),
+#: so the zenith sits at the centre and the horizon at the rim — but the rings are
+#: **labelled in elevation** (the quantity an observer reads), so 90° reads at the
+#: centre and 0° at the rim. Positions are zenith angles; each label is ``90 − pos``.
+#: The zenith centre (position 0) is left unlabelled — its ring degenerates to the pole.
+_SKY_RADIAL_POSITIONS_DEG = [30, 60, 90]
+_SKY_RADIAL_LABELS = ["60", "30", "0"]
 
 
 def _draw_sky_track(
@@ -364,9 +368,11 @@ def _draw_sky_track(
     The geometry-only sky view (features.md §1.4): the satellite's azimuth/elevation
     path as seen from ``station``, on a matplotlib **polar** projection — North at top,
     azimuth clockwise, radius = zenith angle (90° − elevation), so the **zenith is at
-    the centre and the horizon at the rim**. Fixed light-blue disk, a single dark-navy
-    track (not a time gradient). Shares one drawing path with the live dashboard's sky
-    panel; reused verbatim by Feature 1.5's richer ``plot_sky_chart``.
+    the centre and the horizon at the rim**. The radial rings are **labelled in
+    elevation** (90° at the centre, 0° at the rim), the quantity an observer reads.
+    Fixed light-blue disk, a single dark-navy track (not a time gradient). Shares one
+    drawing path with the live dashboard's sky panel; reused verbatim by Feature 1.5's
+    richer ``plot_sky_chart``.
 
     The look angles come from the batched
     :func:`~propygator.core.observation.look_angles_track` (one station
@@ -408,7 +414,7 @@ def _draw_sky_track(
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_rlim(0.0, 90.0)
-    ax.set_rticks(_SKY_RADIAL_TICKS)
+    ax.set_rgrids(_SKY_RADIAL_POSITIONS_DEG, labels=_SKY_RADIAL_LABELS)
     ax.set_thetagrids(_SKY_AZIMUTH_TICKS, labels=_SKY_AZIMUTH_LABELS)
     ax.set_facecolor(_SKY_DISK_COLOR)
 
@@ -422,8 +428,9 @@ def plot_sky_track(
     """Plot the satellite's path across ``station``'s sky (geometry-only polar view).
 
     The observer's azimuth/elevation track on a polar sky dome — zenith at the centre,
-    horizon at the rim, North up, azimuth clockwise — drawn as a single dark-navy line
-    over a fixed light-blue disk. Samples below ``min_elevation_deg`` are lifted from
+    horizon at the rim, North up, azimuth clockwise, radial rings labelled in elevation
+    (90° centre, 0° rim) — drawn as a single dark-navy line over a fixed light-blue
+    disk. Samples below ``min_elevation_deg`` are lifted from
     the line so each visible pass draws as its own arc; if the satellite never clears
     that elevation over the span, an empty disk is drawn and a one-time warning is
     emitted. Geometry only — discrete passes, brightness, and lit/eclipse shading belong

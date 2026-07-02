@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Elevation markers in live dashboard's sky view are corrected to have 90 degrees
+  correspond to zenith.
+
 ### Removed
 
 - IncidenceVariableCd skeleton has been removed and replaced with BoxFaceCd table

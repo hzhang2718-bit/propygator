@@ -81,6 +81,25 @@ def test_plot_sky_track_polar_conventions(iss_sky):
         plt.close(fig)
 
 
+def test_sky_track_radial_labels_read_as_elevation(iss_sky):
+    """Radial rings are labelled in elevation (90° at the zenith centre, 0° at the
+    horizon rim), even though the plotted radius is the zenith angle."""
+    traj, station = iss_sky
+    fig = plot_sky_track(traj, station)
+    try:
+        ax = fig.axes[0]
+        # Each drawn ring's label is its elevation = 90 − (zenith-angle position); the
+        # zenith centre (position 0) is intentionally left unlabelled.
+        rings = {
+            round(pos): text.get_text()
+            for pos, text in zip(ax.get_yticks(), ax.get_yticklabels())
+            if text.get_text()
+        }
+        assert rings == {30: "60", 60: "30", 90: "0"}
+    finally:
+        plt.close(fig)
+
+
 def test_sky_track_lifts_pen_between_passes(iss_sky):
     """Below-horizon samples are NaN so the pen lifts between the discrete passes."""
     traj, station = iss_sky
