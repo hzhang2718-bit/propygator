@@ -16,7 +16,10 @@ inertial (EME2000/TEME) or ITRF ground-relative.
 Primitive contract (depended on by chunk 11d): ``_draw_altitude`` / ``_draw_speed``
 draw onto the given ``ax`` and set the y-axis label (and, for speed, a frame title);
 they do **not** create a figure, set the x-axis label, or apply the style — the caller
-owns those so a shared-x composite labels only its bottom panel.
+owns those so a shared-x composite labels only its bottom panel. Each returns the
+``Line2D`` it drew (the live dashboard's mutate-in-place seam, per the
+general-upgrades-1 "Live Dashboard Blitting" contract); wrapper/composite callers that
+only build a figure ignore it, mirroring ``_draw_ground_track``'s colorbar mappable.
 """
 
 from __future__ import annotations
@@ -40,6 +43,7 @@ if TYPE_CHECKING:
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
+    from matplotlib.lines import Line2D
 
     from ..core.states import Trajectory
 
@@ -67,17 +71,21 @@ def _speed_descriptor(frame: Frame) -> str:
     return "Ground-relative" if frame is Frame.ITRF else "Inertial"
 
 
-def _draw_altitude(ax: Axes, traj: Trajectory) -> None:
+def _draw_altitude(ax: Axes, traj: Trajectory) -> Line2D:
     """Draw geodetic altitude (km) vs elapsed hours onto ``ax``.
 
     Altitude is WGS84 geodetic height from the shared
     :func:`~propygator.core.frames.geodetic_track` (convert to ITRF, project each
     sample). Sets the y-axis label only; the caller owns the x-axis label and figure.
+    Returns the altitude :class:`~matplotlib.lines.Line2D` — the live dashboard's
+    mutate-in-place seam (``set_data`` on rebuild, mirroring ``_draw_ground_track``'s
+    returned colorbar mappable); the standalone ``plot_altitude`` ignores it.
     """
     _itrf, _lat, _lon, alt_m = geodetic_track(traj)
     altitude_km = alt_m / 1000.0
-    ax.plot(_elapsed_hours(traj), altitude_km, color=TIMESERIES_COLOR)
+    (line,) = ax.plot(_elapsed_hours(traj), altitude_km, color=TIMESERIES_COLOR)
     ax.set_ylabel("Altitude (km)")
+    return line
 
 
 def _draw_speed(
@@ -88,7 +96,7 @@ def _draw_speed(
     speeds_kms: np.ndarray | None = None,
     color: str | None = None,
     label: str | None = None,
-) -> None:
+) -> Line2D:
     """Draw speed magnitude (km/s) vs elapsed hours onto ``ax``.
 
     Two modes share one axis-drawing path:
@@ -106,7 +114,10 @@ def _draw_speed(
       redraw never re-runs an O(N) JVM loop (features.md §1.4 "Per-frame work").
       ``frame`` is ignored here — it drives neither the conversion nor the title.
 
-    Either way, the caller owns the x-axis label and the figure.
+    Either way, the caller owns the x-axis label and the figure. Returns the speed
+    :class:`~matplotlib.lines.Line2D` (from either branch) — the live dashboard's
+    mutate-in-place seam (``set_data`` on rebuild, mirroring ``_draw_ground_track``'s
+    returned colorbar mappable); the standalone ``plot_speed`` ignores it.
     """
     if speeds_kms is None:
         if frame is None:
@@ -116,15 +127,16 @@ def _draw_speed(
             )
         in_frame = traj.to_frame(frame)
         speed_kms = np.linalg.norm(in_frame.velocities, axis=1) / 1000.0
-        ax.plot(_elapsed_hours(traj), speed_kms, color=TIMESERIES_COLOR)
+        (line,) = ax.plot(_elapsed_hours(traj), speed_kms, color=TIMESERIES_COLOR)
         ax.set_ylabel("Speed (km/s)")
         ax.set_title(f"{_speed_descriptor(frame)} speed — {frame.value}")
-        return
+        return line
 
-    ax.plot(_elapsed_hours(traj), speeds_kms, color=color, label=label)
+    (line,) = ax.plot(_elapsed_hours(traj), speeds_kms, color=color, label=label)
     ax.set_ylabel("Speed (km/s)")
     if label is not None:
         ax.legend()
+    return line
 
 
 def _suptitle_from_metadata(fig: Figure, traj: Trajectory) -> None:

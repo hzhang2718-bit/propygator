@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Elevation markers in live dashboard's sky view are corrected to have 90 degrees
   correspond to zenith.
+- Instead of erasing every frame, TLE live dashboard now preserves zoom.
 
 ### Removed
 

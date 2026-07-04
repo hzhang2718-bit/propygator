@@ -134,6 +134,19 @@ The type annotations also encode the scope statically: `sphere`'s `drag_coeffici
 > the artist split, the background-invalidation policy, the four blit-specific wrinkles,
 > and the build sequence. It supersedes only the enumerated `features.md` §1.4 spots
 > below; the buffer engine, panel content, and `live_track` signature are unchanged.
+>
+> **Outcome (Checkpoint A, 2026-07-03): shipped as the mutate-in-place layer only.**
+> Build-sequence step 1 landed — build-once / mutate-in-place at `blit=False`, which is
+> the entire interactivity headline (zoom/pan survives every redraw and buffer rebuild).
+> The blit layer proper (steps 2–3: `blit=True`, the three-step background invalidation,
+> the axes-anchored readout, the band-change re-cache) was **declined at the build
+> plan's Checkpoint A go/no-go**: at `refresh_s=1 s` the flicker-free/CPU win did not
+> justify the four wrinkles' full handling plus the private-`_blit_cache` matplotlib
+> coupling. Blitting stays the named later optimization; the section below remains its
+> design record. The Supercessions were **folded back into `features.md` §1.4 in that
+> partial form** (mutate-in-place at `blit=False`; blitting still deferred — the
+> "blitting shipped in v0.5.0" wording below did *not* happen), so they no longer
+> override §1.4.
 
 ### Supercessions
 
@@ -181,7 +194,7 @@ This works **only because the dynamic artists are `set_animated(True)`** — Fun
 
 > **De-risked (matplotlib 3.10.9, the pinned env).** A standalone reproduction of this exact structure — fixed limits, a static artist mutated on a forced rebuild, an animated artist returned each frame, `FuncAnimation(blit=True)` stepped over an `Agg` canvas — confirmed every load-bearing claim *in pixels*: (i) *without* `_blit_cache.clear()` the mutated static content is silently lost on the tick **after** the rebuild (the stale-background defect); (ii) *with* the three-step it persists on subsequent ticks; (iii) a synchronous `fig.canvas.draw()` skips `set_animated(True)` artists (no ghost baked into the captured background); (iv) `_blit_draw` re-captures **only** when `ax._get_view()` differs (source lines ~1208–1212), so with the limits pinned the invalidation must be explicit; (v) both test bootstraps (`fig.canvas.draw()` **or** `anim._init_draw()`) leave `_step()` clean — `_blit_cache` exists from construction; and (vi) wrinkle 1 renders correctly via **both** `Line2D.set_marker(MarkerStyle)` (the rotation transform is preserved on the internal `_marker`, even though `get_marker()` returns the base `"^"`) and `PathCollection.set_paths`.
 
-**Fixed axis limits (so a rebuild doesn't blow away zoom).** Autoscaling on rebuild would reset a user's zoom. Set **stable limits once** and never autoscale: the ground track is already fixed (−180..180 / −90..90) and the sky is fixed (`rlim(0, 90)`); give altitude and speed stable y-ranges (taken from the first buffer, held across rebuilds — for near-circular LEO, the primary target, the altitude/speed envelope is effectively constant over a session). A user zoom then survives even a rebuild. (This pinned view is also *why* background invalidation above must be explicit: with the limits fixed, FuncAnimation's automatic view-change re-cache never fires.) **Caveat:** the first-buffer envelope bounds later windows only when the orbit is near-circular; a highly eccentric orbit (GTO / Molniya), or a session long enough to show drag decay, can carry altitude/speed outside it and clip. If that matters, *widen* the fixed range when a later buffer exceeds it (never shrink — shrinking mid-session would fight a user's zoom); this stays out of scope while the target is LEO.
+**Fixed axis limits (so a rebuild doesn't blow away zoom).** Autoscaling on rebuild would reset a user's zoom. Set **stable limits once** and never autoscale: the ground track is already fixed (−180..180 / −90..90) and the sky is fixed (`rlim(0, 90)`); give altitude and speed stable y-ranges (taken from the first buffer, held across rebuilds — for near-circular LEO, the primary target, the altitude/speed envelope is effectively constant over a session). A user zoom then survives even a rebuild. (This pinned view is also *why* background invalidation above must be explicit: with the limits fixed, FuncAnimation's automatic view-change re-cache never fires.) **Caveat:** the first-buffer envelope bounds later windows only when the orbit is near-circular **and the buffer spans at least one orbit**; a highly eccentric orbit (GTO / Molniya), a session long enough to show drag decay, or a buffer shorter than one orbit (which sees only a slice of the per-orbit altitude oscillation — the demo script's `--fast` smoke mode surfaced exactly this clipping in LEO) can carry altitude/speed outside it and clip. The named remedy **shipped with the mutate-in-place layer**: on rebuild, `_draw_static` *widens* the dashboard-set altitude/speed y-limits to enclose the new buffer's envelope — never shrinking (shrinking mid-session would fight a user's zoom), and only while the panel still sits at the dashboard's own last-applied limits, so a user-zoomed/panned viewport is never touched.
 
 **The four blit wrinkles** (each a build checkpoint):
 

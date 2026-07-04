@@ -227,6 +227,15 @@ def _draw_ground_track(
     to the local track heading) markers and a legend are always drawn. Sets the
     equirectangular map framing; the caller owns the figure and any colorbar.
 
+    The **return stays the colorbar mappable** (unlike the altitude/speed/sky
+    primitives, which return their ``Line2D``) — ``plot_ground_track`` /
+    ``plot_summary`` need it for the colorbar. The other static handle the live
+    dashboard mutates on rebuild, the **start marker**, is not returned: it is the
+    *sole* scatter ``PathCollection`` this primitive adds (the track and coastline are
+    ``LineCollection``s), created here before the dashboard adds its own live/station
+    scatters, so ``live.py`` captures it off ``ax.collections`` at build time
+    (general-upgrades-1 "Live Dashboard Blitting").
+
     Three optional dashboard seams (for the live dashboard's centred buffer, where the
     "end" is the *future* leading edge, not where the satellite is — so the direction
     glyph belongs on the live marker, not the track end); all default to the shipped 1.1
@@ -362,7 +371,7 @@ def _draw_sky_track(
     azel: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None,
     track_style: dict[str, Any] | None = None,
     warn_never_visible: bool = True,
-) -> None:
+) -> Line2D:
     """Draw the observer's sky track onto a polar ``ax`` (zenith centre, horizon rim).
 
     The geometry-only sky view (features.md §1.4): the satellite's azimuth/elevation
@@ -387,6 +396,9 @@ def _draw_sky_track(
     transient blank sky is normal). ``track_style`` overrides the default line cosmetics
     (the dashboard supplies a halo ``path_effects`` for contrast); the standalone verb's
     output is unchanged. Draws onto the supplied ``ax``; the caller owns the figure.
+    Returns the track :class:`~matplotlib.lines.Line2D` — the live dashboard's
+    mutate-in-place seam (``set_data`` on rebuild, mirroring ``_draw_ground_track``'s
+    returned colorbar mappable); the standalone ``plot_sky_track`` ignores it.
     """
     if azel is None:
         azimuth_deg, elevation_deg, _range_m = look_angles_track(station, trajectory)
@@ -407,7 +419,7 @@ def _draw_sky_track(
     theta = np.radians(azimuth_deg)
     radius = np.where(visible, 90.0 - elevation_deg, np.nan)
     style = {**_DEFAULT_SKY_TRACK_STYLE, **(track_style or {})}
-    ax.plot(theta, radius, **style)
+    (track_line,) = ax.plot(theta, radius, **style)
 
     # Polar framing last so it is not perturbed by the plot's autoscale: North up,
     # azimuth clockwise, radius = zenith angle (zenith centre, horizon rim).
@@ -417,6 +429,7 @@ def _draw_sky_track(
     ax.set_rgrids(_SKY_RADIAL_POSITIONS_DEG, labels=_SKY_RADIAL_LABELS)
     ax.set_thetagrids(_SKY_AZIMUTH_TICKS, labels=_SKY_AZIMUTH_LABELS)
     ax.set_facecolor(_SKY_DISK_COLOR)
+    return track_line
 
 
 def plot_sky_track(

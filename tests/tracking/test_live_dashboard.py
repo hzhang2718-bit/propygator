@@ -25,7 +25,9 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
+from matplotlib.collections import LineCollection, PathCollection
 
 import propygator as pgr
 from propygator import TLE, GroundStation
@@ -153,6 +155,162 @@ def test_raw_tle_target_is_not_auto_refreshed(frozen_now):
         _iss_tle(), output_step=_STEP, half_window_s=_HALF, refresh_s=_REFRESH
     )
     _tick(anim)
+
+
+# --- mutate-in-place / interactivity (build-plan blitting chunk 2) -----------
+#
+# The interactivity headline: the scene is built once and mutated in place (no
+# ax.clear(), no autoscale), so a user's zoom/pan survives every redraw *and* a buffer
+# rebuild. These pass at blit=False. Artists are located off the axes: the live marker
+# is the sole Line2D on the ground panel; the gradient track is the ground
+# LineCollection carrying a colour array (the coastline has none); the start marker is
+# the sole scatter PathCollection; the altitude curve/cursor are ground-adjacent lines.
+
+
+def _ground_track_lc(fig) -> LineCollection:
+    """The blue->red gradient track (the ground LineCollection with a colour array; the
+    coastline LineCollection has none)."""
+    return next(
+        c
+        for c in fig.axes[0].collections
+        if isinstance(c, LineCollection) and c.get_array() is not None
+    )
+
+
+def _start_marker(fig) -> PathCollection:
+    """The start-of-buffer marker: the first scatter PathCollection on the ground axis
+    (created before any station/live scatter)."""
+    return next(c for c in fig.axes[0].collections if isinstance(c, PathCollection))
+
+
+def test_zoom_survives_redraw_three_panel(frozen_now):
+    anim = live_track(
+        _iss_tle(), output_step=_STEP, half_window_s=_HALF, refresh_s=_REFRESH
+    )
+    fig = anim._fig
+    ax_ground, ax_alt = fig.axes[0], fig.axes[1]
+    # A user zoom via the toolbar sets explicit limits (and disables autoscale).
+    ax_ground.set_xlim(-40.0, 20.0)
+    ax_ground.set_ylim(-10.0, 30.0)
+    ax_alt.set_ylim(500.0, 520.0)
+
+    _tick(anim)  # a non-rebuild redraw under the frozen clock
+
+    assert ax_ground.get_xlim() == pytest.approx((-40.0, 20.0))
+    assert ax_ground.get_ylim() == pytest.approx((-10.0, 30.0))
+    assert ax_alt.get_ylim() == pytest.approx((500.0, 520.0))
+
+
+def test_zoom_survives_redraw_four_panel_including_sky(frozen_now):
+    station = GroundStation("Durham", 36.0, -78.9)
+    anim = live_track(
+        _iss_tle(), station, output_step=_STEP, half_window_s=_HALF, refresh_s=_REFRESH
+    )
+    fig = anim._fig
+    ax_ground = fig.axes[0]
+    sky_ax = next(ax for ax in fig.axes if ax.name == "polar")
+    ax_ground.set_xlim(0.0, 60.0)
+    sky_ax.set_rlim(0.0, 45.0)  # zoom the sky disk (radial limit == the polar y-axis)
+
+    _tick(anim)  # updates glyph offsets + disk tint, must not reset the view
+
+    assert ax_ground.get_xlim() == pytest.approx((0.0, 60.0))
+    assert sky_ax.get_ylim() == pytest.approx((0.0, 45.0))
+
+
+def test_rebuild_preserves_zoom_and_refreshes_curves(monkeypatch):
+    base = _iss_tle().epoch
+    monkeypatch.setattr(Epoch, "now", classmethod(lambda cls: base))
+    anim = live_track(
+        _iss_tle(), output_step=_STEP, half_window_s=_HALF, refresh_s=_REFRESH
+    )
+    fig = anim._fig
+    ax_ground, ax_alt = fig.axes[0], fig.axes[1]
+    alt_line = ax_alt.lines[0]
+    start_marker = _start_marker(fig)
+
+    ax_ground.set_xlim(-40.0, 20.0)
+    ax_alt.set_ylim(500.0, 520.0)
+    before_alt = np.array(alt_line.get_ydata())
+    before_offset = np.array(start_marker.get_offsets())
+
+    # Advance the wall clock past the displayed leading edge -> the tick rebuilds.
+    monkeypatch.setattr(
+        Epoch, "now", classmethod(lambda cls: base.shifted_by(_HALF + 5.0))
+    )
+    _tick(anim)
+
+    # The zoom survives even a rebuild (limits are pinned, never autoscaled).
+    assert ax_ground.get_xlim() == pytest.approx((-40.0, 20.0))
+    assert ax_alt.get_ylim() == pytest.approx((500.0, 520.0))
+    # The static curves refreshed to the new (re-centred) buffer.
+    assert not np.array_equal(before_alt, np.array(alt_line.get_ydata()))
+    assert not np.array_equal(before_offset, np.array(start_marker.get_offsets()))
+
+
+def test_rebuild_widens_default_ylim_when_curve_exceeds(monkeypatch):
+    """Untouched default y-limits widen (never shrink) when a rebuild's curve exceeds
+    the first-buffer envelope, so the refreshed curve can't clip out of view.
+
+    The short test buffer (~4 min) sees only a thin slice of the ISS's ~20 km
+    per-orbit altitude oscillation, so a rebuild 15 min later is guaranteed to exceed
+    the first envelope — the clipping this guards against. The other half of the
+    property (a user-zoomed panel is never touched, even when the new curve exceeds
+    its limits) is ``test_rebuild_preserves_zoom_and_refreshes_curves`` above.
+    """
+    base = _iss_tle().epoch
+    monkeypatch.setattr(Epoch, "now", classmethod(lambda cls: base))
+    anim = live_track(
+        _iss_tle(), output_step=_STEP, half_window_s=_HALF, refresh_s=_REFRESH
+    )
+    fig = anim._fig
+    ax_alt = fig.axes[1]
+    lo0, hi0 = ax_alt.get_ylim()
+
+    # 15 min later the re-centred buffer sits on a different part of the altitude
+    # oscillation, outside the first envelope -> the rebuild must widen.
+    monkeypatch.setattr(Epoch, "now", classmethod(lambda cls: base.shifted_by(900.0)))
+    _tick(anim)
+
+    lo1, hi1 = ax_alt.get_ylim()
+    assert lo1 <= lo0 and hi1 >= hi0  # widen-only: neither edge ever moves inward
+    assert (lo1, hi1) != (lo0, hi0)  # and it genuinely widened
+    # The refreshed altitude curve fits inside the widened range.
+    ydata = np.asarray(ax_alt.lines[0].get_ydata())
+    assert lo1 <= float(ydata.min()) and float(ydata.max()) <= hi1
+
+
+def test_dynamic_artists_mutate_in_place(monkeypatch):
+    base = _iss_tle().epoch
+    # One clock read at build, then one per tick (both pre-drain, so no rebuild).
+    times = iter([base, base.shifted_by(10.0), base.shifted_by(40.0)])
+    monkeypatch.setattr(Epoch, "now", classmethod(lambda cls: next(times)))
+    anim = live_track(
+        _iss_tle(), output_step=_STEP, half_window_s=_HALF, refresh_s=_REFRESH
+    )
+    fig = anim._fig
+    live_marker = fig.axes[0].lines[0]
+    alt_cursor = fig.axes[1].lines[1]
+    readout = fig._suptitle
+
+    _tick(anim)  # now = base + 10 s
+    marker_1 = np.array(live_marker.get_xdata())
+    cursor_1 = list(alt_cursor.get_xdata())
+    text_1 = readout.get_text()
+
+    _tick(anim)  # now = base + 40 s
+    marker_2 = np.array(live_marker.get_xdata())
+    cursor_2 = list(alt_cursor.get_xdata())
+    text_2 = readout.get_text()
+
+    # The dynamic artists' data changes across frames...
+    assert not np.array_equal(marker_1, marker_2)
+    assert cursor_1 != cursor_2
+    assert text_1 != text_2
+    # ...and the SAME artist objects persist (mutated in place, never recreated).
+    assert fig.axes[0].lines[0] is live_marker
+    assert fig.axes[1].lines[1] is alt_cursor
+    assert fig._suptitle is readout
 
 
 # --- display-seam helpers ----------------------------------------------------
