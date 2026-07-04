@@ -494,10 +494,14 @@ class BoxFaceCd:
     dominates: a physical constant Cd *under*-predicts along-track by a factor of ~2
     that a recalibrated scalar cannot absorb (~1400-1640 km / 5 d at 400 km, solar
     max; best-fit Cd ~= 4.7 still leaves a ~100 km residual). That non-absorbable
-    regime is why it ships. The ~2x is measured with :class:`InPlaneTracking`, which
-    tracks *inertial* velocity only, so an "edge-on" body sits a few degrees off the
-    true Earth-relative flow — the idealized perfectly-edge-on benefit is larger
-    (~9x); this uses the honest shipped figure.
+    regime is why it ships. The ~2x is measured with :class:`InPlaneTracking` at its
+    default *inertial* velocity reference, so the body sat a few degrees off the true
+    Earth-relative flow (the idealized perfectly-edge-on benefit is larger, ~9x).
+    ``InPlaneTracking(velocity_reference="ecef")`` now closes that gap — it holds the
+    plate exactly on the co-rotating flow, a real but modest further refinement
+    (~1.12x drag-effect cut, −273 km along-track / 5 d, for a 1 m² / 0.5 kg sail on a
+    500 km SSO at solar max; inclination-dependent, vanishing for equatorial
+    prograde). Evidence: ``experiments/ecef-attitude-benefit/``.
     """
 
     __slots__ = (

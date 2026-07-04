@@ -242,3 +242,99 @@ anim = FuncAnimation(fig, update, init_func=init, blit=True,
 2. **Flip on `blit=True` + explicit background invalidation, 3-panel.** Set `blit=True`; `init_func` returns the animated set; move the readout to the axes-anchored `Text` inside `ax.bbox` (wrinkle 3); add the three-step re-cache (mutate → synchronous `draw()` → `anim._blit_cache.clear()`) on buffer rebuild. *Verify:* the background-invalidation **pixel** test passes (a forced rebuild's new static content survives *subsequent* ticks, not just the rebuild tick); zoom still survives; `update()` returns the dynamic artists.
 3. **4-panel sky under blit.** Sky glyphs via `set_offsets` (wrinkle 4); the twilight band-change re-cache via the same three-step (wrinkle 2); static sky track/disk/legend. *Verify:* 4-panel builds; a band change triggers exactly one re-cache and the new facecolor survives later ticks; glyph offsets update per frame.
 4. **Docs + wrap-up.** Fold these Supercessions back into `features.md` §1.4 (clear-and-redraw → mutate-in-place + blit), add the CHANGELOG `[Unreleased]` entry, and update the `live_track` docstring's rendering note; squash-merge to `main` (no tag — v0.5.0 is tagged only after all general upgrades land).
+
+
+## ECEF InPlaneTracking
+
+> Adds **`velocity_reference: str = "inertial"`** to `InPlaneTracking` — the third
+> general upgrade feeding v0.5.0 (branch `feature/ecef-attitudes`). `"ecef"` re-aims the
+> mode's velocity alignment from the inertial velocity to the Earth-relative
+> (atmosphere-relative) velocity `v_rel = v − ω⊕×r`, reusing the custom ECEF
+> `TargetProvider` shipped with `NadirPointing(velocity_reference="ecef")` **unchanged**.
+> The headline user is a feathered drag/solar sail flown with `BoxFaceCd`: today no
+> declarative mode can zero a flat body's angle of attack to the true co-rotating flow —
+> the Tier B GO-caveat regime is reachable only via `CustomAttitude`. This section is the
+> **binding contract** for the change: axis construction, signature, validation, metadata,
+> failure modes, and the evidence gate. It supersedes only the enumerated `features.md`
+> §1.1 / `architecture.md` §13 spots below; everything else stands.
+>
+> **Outcome (2026-07-04): shipped in full.** Checkpoint A resolved **GO** on the Chunk-1
+> stand-in study (2 kg sail: −63.3 km / 5 d, 1.12×); the Chunk-4 refresh re-measured with
+> the **shipped mode** at the 0.5 kg sail mass (−273 km / 5 d, 1.12×; shipped vs stand-in
+> agree to 0.02 km max along-track — evidence: `experiments/ecef-attitude-benefit/`). The
+> Supercessions below are **folded back** into `features.md` §1.1 / `architecture.md` §13 /
+> the `BoxFaceCd` docstring and no longer override — note the failure-modes fold-back uses
+> the build-verified wording (near-zero `v_rel` completes with a meaningless attitude;
+> raises only at exact zero), per **Details → Failure mode / degenerate domain**.
+
+### Supercessions
+
+- **`features.md` §1.1, `InPlaneTracking` dataclass** — gains `velocity_reference: str = "inertial"` (`"inertial"` | `"ecef"`, validated at construction like `NadirPointing`'s). The docstring's unconditional "Exact for all orbits, since the orbit normal is always perpendicular to velocity" is scoped to the `inertial` reference; the `ecef` reference is exact-primary (+Y on the wind) / best-effort-secondary (+Z within the out-of-plane wind angle of the orbit normal — ≤ ~3.8° in LEO, identically 0 for equatorial orbits). See **Details → Axis construction**.
+- **`features.md` §1.1, native-provider mapping table** — the `InPlaneTracking` row (today "`LofOffset(TNW, fixed axis permutation)` or `AlignedAndConstrained` (+Y → `VELOCITY`, +Z → `MOMENTUM`)") becomes: `AlignedAndConstrained`, primary +Y → `PredefinedTarget.VELOCITY` (`inertial`) or the custom ECEF-velocity `TargetProvider` (`ecef`), secondary +Z → `PredefinedTarget.MOMENTUM`.
+- **`features.md` §1.1, failure-modes table** — the `NadirPointing(velocity_reference='ecef')` ground-relative-stationary row now also covers `InPlaneTracking(velocity_reference='ecef')` (there the undefined direction is the *primary* target) **and is reworded to the build-verified behavior**: near-zero `v_rel` does **not** raise — the run completes with a physically meaningless attitude; `NumericalPropagationError` fires only at exactly zero `|v_rel|` (see **Details → Failure mode / degenerate domain**). LEO is the validated domain.
+- **`features.md` §1.1, metadata grammar** — the `attitude` token `in_plane_tracking` becomes `in_plane_tracking:vel=inertial` | `in_plane_tracking:vel=ecef` (the `nadir_pointing:vel=…` grammar; **always emitted**, so the default's serialized form changes from the bare `in_plane_tracking`).
+- **`features.md` §1.1, "When `BoxFaceCd` matters" caveat paragraph** — its Tier B-era caveat ("measured with `InPlaneTracking`, which tracks **inertial** velocity only … (Giving `InPlaneTracking` the same `ecef` option is a possible future upgrade — … *not* part of Tier B.)") is **retired: the option now ships**. The paragraph keeps the honestly-measured ~2× figure, re-framed as the `inertial`-reference figure, and cites the `ecef`-referenced result from this upgrade's benefit study. The **same caveat text in the `BoxFaceCd` docstring** (`propagation/spacecraft.py`, its "when it matters" note) is updated identically.
+- **`architecture.md` §13, "Attitude family" resolved note** — extended: `InPlaneTracking` now wires both `velocity_reference` options through the same custom ECEF `TargetProvider` as `NadirPointing`, swapped into the *primary* slot.
+- **Code** — the migration touches, at minimum: `propagation/attitude.py` (the field + `__post_init__` validation sharing `_VALID_VELOCITY_REFERENCES` and mirroring `NadirPointing`'s message shape; `_metadata_string`; the `_to_provider` `InPlaneTracking` branch — swap the primary target when `ecef` and rewrite its "velocity ⊥ momentum so both hold" comment; the class docstring); the consuming tests (`tests/propagation/test_attitude.py`, `test_attitude_providers.py`, `test_numerical.py` metadata assertions that read the bare `in_plane_tracking` token); and any `README.md` / `CLAUDE.md` attitude-family mentions. No `numerical.py` change (the attitude lowering is generic) and no new exports (`InPlaneTracking` is already top-level). (Detailed sequencing is the build plan's job; this lists the surface so none is missed.)
+
+### Context
+
+The decision record:
+
+- **This is an attitude-fidelity fix, not a force fix.** Orekit's `DragForce` already uses the true co-rotating-atmosphere relative velocity for the *force*; only the *attitude* is misaligned when a mode tracks inertial velocity. The wind offset `angle(v, v_rel)` reaches ~3.8° at 500 km (|ω⊕×r| ≈ 500 m/s vs v ≈ 7.6 km/s) and is strongly inclination-dependent: identically 0 for equatorial prograde orbits (the wind is along-track), maximal for polar/SSO orbits, where at the equator crossings the entire wind is **out of the orbit plane**. Drag sails fly SSO — the maximum-benefit regime.
+- **For a feathered sail the residual angle of attack dominates the edge area.** At 3.8° AoA the big faces present `sin 3.8° ≈ 6.6 %` of their area to the flow — for a thin sail (~1 % edge-to-face area ratio) that is ~20× the edge area, so the misalignment, not the edge, sets the feathered drag. Whether *net* drag drops when feathering to the true wind is a genuine ram-vs-shear trade (the grazing shear floor ~0.07 full-face-referenced is the same order as the 3.8° projected ram term) — precisely the question `BoxFaceCd` exists to answer, and why the benefit study is front-loaded (see **Evidence gate**).
+- **The ECEF target must take the *primary* slot** — the inverse of `NadirPointing`'s swap (which kept nadir primary and swapped the *secondary*). If momentum stayed primary, the sail plane would stay exactly in the orbit plane and the big-face AoA would equal the full out-of-plane wind angle — the same worst case as the `inertial` reference, i.e. zero benefit. Holding +Y exactly on `v_rel` zeroes the big-face AoA identically; the +Z axis then carries the (physically unavoidable) best-effort residual instead.
+- **Why only `InPlaneTracking`.** The family assessment: `LofAligned`-ecef is physically redundant (this mode up to a fixed body-axis permutation — X↔Y roles, same Z); `LofOffset`-ecef (controlled incidence to the true flow) is the named follow-on, deferred (see **Out of scope**); `SunPointing`'s phasing reference is a best-effort roll about the Sun line where ≤ ~4° is second-order on projected areas; `Inertial` has no velocity concept; `NadirPointing` already shipped; `CustomAttitude` is already the escape hatch.
+- **Evidence gate.** Shipping is contingent on the front-loaded feathered-sail study (below) showing the `inertial` → `ecef` difference is material for the headline sail. If it is negligible even there, the parameter is dropped rather than shipped (the Tier B bar: a coherent, attitude-correlated effect, not noise).
+
+### Details
+
+**API at a glance.**
+
+```python
+@dataclass(frozen=True)
+class InPlaneTracking:
+    """Body +Z on the orbit normal; body +Y on the velocity vector.
+
+    velocity_reference selects the velocity: "inertial" (ECI velocity; exact
+    for all orbits, since the orbit normal is always perpendicular to the
+    inertial velocity) | "ecef" (Earth-relative velocity v − ω⊕×r, the
+    atmosphere-relative flow — feathers a flat body to the true wind; +Y is
+    held exactly on the wind, +Z is best-effort on the orbit normal, off by
+    at most the out-of-plane wind angle, ≤ ~4° in LEO)."""
+    velocity_reference: str = "inertial"   # "inertial" (ECI) | "ecef"
+```
+
+**Axis construction (`ecef`).** At each attitude evaluation, in the propagation frame (EME2000), with `v̂_rel = unit(v − ω⊕×r)` (read exactly off the EME2000→ITRF transform by the shipped `TargetProvider` — not a hardcoded ω⊕, so the ~0.3° pole offset is captured for free) and `ĥ = unit(r×v)` (the inertial orbit normal — `PredefinedTarget.MOMENTUM`, unchanged; the orbit normal has no meaningful "ECEF variant"):
+
+1. **+Y ↦ v̂_rel, exact** (primary). The +Y face is the ram face — the flow arrives along `−v̂_rel` onto it — the same ram-face convention as the `inertial` reference.
+2. **+Z ↦ unit(ĥ − (ĥ·v̂_rel) v̂_rel), best-effort** (secondary). With +Y pinned, the only remaining freedom is roll about the wind axis; `AlignedAndConstrained` places +Z at the direction closest to `ĥ` in the plane ⊥ `v̂_rel` — the orbit normal with its along-wind component removed.
+3. **+X = Y × Z** completes the right-handed triad; for near-circular orbits it sits ≈ on the outward radial (zenith), as in the `inertial` reference.
+
+The ±Z faces (a sail's big faces) therefore contain the wind exactly in their plane — **zero angle of attack, by construction**. The secondary residual is exact and small: `angle(+Z, ĥ) = asin(|ĥ·v̂_rel|) = asin(|ĥ·(ω⊕×r)| / |v_rel|)` — the out-of-plane angle of the co-rotation wind (`ĥ·v = 0` identically, so only the wind term survives). It is 0 for equatorial orbits and oscillates 0 → ~3.8° → 0 per half-orbit on a polar/SSO orbit (max at the equator crossings, zero over the poles). Relative to the `inertial` attitude, the whole frame is re-aimed by `angle(v, v_rel)` ≤ ~3.8°: the wind's in-plane component pitches +Y within the orbit plane (+Z unmoved); its out-of-plane component tilts +Y out of the plane and drags +Z off `ĥ` by the same angle.
+
+**Provider lowering.** The `_to_provider` `InPlaneTracking` branch keeps its `AlignedAndConstrained(Vector3D(0,1,0), <primary>, Vector3D(0,0,1), PredefinedTarget.MOMENTUM, sun, earth)` shape; `<primary>` is `PredefinedTarget.VELOCITY` (`inertial`, bit-identical to today) or `_build_ecef_velocity_target_provider()` (`ecef`, reused verbatim — one new call site, zero changes to the provider). **De-risk item:** the addendum exercised the custom provider only in the *secondary* slot; the primary slot is typed the same (`TargetProvider` — the code already passes `PredefinedTarget.VELOCITY` there), but per the `@JImplements` rule it must be proven inside a real `propagate()` — the primary path may invoke different default-method overloads than the secondary did.
+
+**Attitude rates.** The zero-derivative trick now sits under the *primary* alignment, so the `ecef` branch's attitude *rates* are not faithful — the same accepted consequence class as `NadirPointing`-ecef, and immaterial here: attitude feeds only force cross-sections, never rates, and v1 zeroes attitude rates by design.
+
+**Validation** (at construction — pure-Python, safe before init):
+
+| Condition | Result |
+|---|---|
+| `InPlaneTracking(velocity_reference=…)` not in `("inertial", "ecef")` | `ValueError` (the `NadirPointing` message shape, sharing `_VALID_VELOCITY_REFERENCES`) |
+
+**Failure mode / degenerate domain (verified at build, 2026-07-04).** On an orbit whose ground-relative velocity is ~0 (geostationary-ish) the *primary* target `v_rel = v − ω⊕×r` is physically meaningless. The hard failure the `NadirPointing`-ecef row promised (`NumericalPropagationError`) fires only when `|v_rel|` is **exactly** zero — Hipparchus `normalize()` throws on exact zero only — which floating point never reaches: the EME2000-equator vs true-spin-axis offset alone keeps an EME2000-equatorial GEO orbit at `|v_rel|` ≈ 15 m/s, so a near-GEO propagation **completes without error, carrying a noise-driven attitude** (pinned by `test_in_plane_tracking_ecef_near_geostationary_completes`). Note the primary-slot consequence is *worse* than `NadirPointing`'s: there a degenerate `v_rel` only wobbles the best-effort yaw about a still-pinned nadir, while here the corrupted target is the exact primary, so the **whole body frame** (all drag/SRP cross-sections) becomes noise. LEO is the validated domain; the wrap-up rewording of the features.md failure-modes row must describe this for **both** ecef modes rather than promising an error.
+
+**Metadata.** `in_plane_tracking:vel=inertial` | `in_plane_tracking:vel=ecef` — the `nadir_pointing:vel=…` grammar, **always emitted** (grammar consistency wins; metadata is descriptive output, not parsed input — the default's token changes from the bare `in_plane_tracking`). The recording gate is unchanged (the `attitude` key appears only for a box with a wired surface force).
+
+**Sphere interaction (unchanged).** `InPlaneTracking` with either reference on a sphere has no dynamical effect: the existing one-time attitude/geometry consistency warning + `LofAligned` fallback applies.
+
+**Performance.** `ecef` pays one Python `TargetProvider` crossing per attitude evaluation (value + derivative-2 calls) — the same accepted cost as `NadirPointing`-ecef. `inertial` stays fully native, zero change.
+
+**Out of scope (the rest of the family).**
+
+- **`LofAligned`-ecef** — permanently redundant: `InPlaneTracking`-ecef up to a fixed body-axis permutation.
+- **`LofOffset`-ecef** — the named follow-on (a plate at *controlled incidence to the true flow*, the natural `BoxFaceCd` companion for incidence sweeps). Implementation note for when it's scoped: no wrapper provider is needed — `AlignedAndConstrained` accepts arbitrary body vectors, so a fixed Euler offset is equivalent to aligning the offset-rotated body axes (`R_offset·X̂` → wind target, `R_offset·Ẑ` → momentum); the care points are rotation-sense consistency (the `FRAME_TRANSFORM` vs `VECTOR_OPERATOR` trap documented on the `Inertial` branch) and the exactness structure (native TNW holds both axes exactly; the flow frame is exact-primary/best-effort-secondary). Meanwhile `CustomAttitude` covers the case.
+- **`SunPointing` `phasing_reference="velocity_ecef"`** — mechanically the `NadirPointing` swap (secondary slot), physically second-order; add only for API symmetry if ever wanted.
+
+**Evidence gate** (front-loaded, the build plan's first chunk — STOP/GO). A feathered-sail study, wholly in the conda env (every piece is shipped — no experiment venv): a representative thin-plate box with `BoxFaceCd.default()` on a ~500 km SSO over a multi-day window, `InPlaneTracking(velocity_reference="inertial")` vs `"ecef"`. Report (a) the big-face AoA history (expected: identically ~0 for `ecef`; oscillating 0–~3.8° for `inertial`), (b) the assembled `CdA` history, (c) the along-track divergence. **GO** iff the difference is material by the Tier B bar (coherent, attitude-correlated, not absorbable); otherwise the parameter is dropped.

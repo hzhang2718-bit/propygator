@@ -802,7 +802,8 @@ def test_custom_attitude_completes_real_propagation():
         (LofAligned(), "lof_aligned:TNW"),
         (LofOffset(roll_deg=30.0), "lof_offset:TNW;roll=30.0,pitch=0.0,yaw=0.0"),
         (Inertial(), "inertial:EME2000;roll=0.0,pitch=0.0,yaw=0.0"),
-        (InPlaneTracking(), "in_plane_tracking"),
+        (InPlaneTracking(), "in_plane_tracking:vel=inertial"),
+        (InPlaneTracking(velocity_reference="ecef"), "in_plane_tracking:vel=ecef"),
         (NadirPointing(), "nadir_pointing:vel=inertial"),
         (NadirPointing(velocity_reference="ecef"), "nadir_pointing:vel=ecef"),
         (SunPointing(), "sun_pointing:point=(0,0,1),phase=(1,0,0):orbit_normal"),
@@ -873,13 +874,22 @@ def test_sphere_non_default_attitude_warns_once_and_omits_key():
     assert "attitude" not in traj.metadata
 
 
-def test_sphere_ecef_nadir_attitude_warns_and_falls_back():
-    """An ``ecef`` ``NadirPointing`` on a sphere is ignored like any non-default mode.
+@pytest.mark.parametrize(
+    "attitude",
+    [
+        NadirPointing(velocity_reference="ecef"),
+        InPlaneTracking(velocity_reference="ecef"),
+    ],
+    ids=lambda a: type(a).__name__,
+)
+def test_sphere_ecef_attitude_warns_and_falls_back(attitude):
+    """An ``ecef`` attitude on a sphere is ignored like any non-default mode.
 
     The ecef path lowers to a custom ``TargetProvider``, but a sphere's cross-section
     is orientation-invariant, so ``_resolve_attitude`` warns once and falls back to
-    ``LofAligned`` *before* lowering — the new ecef provider never participates.
-    Confirms workstream A left the sphere short-circuit (features.md §1.1) untouched.
+    ``LofAligned`` *before* lowering — the ecef provider never participates.
+    Confirms the sphere short-circuit (features.md §1.1) is untouched for both ecef
+    consumers (``NadirPointing`` secondary-slot, ``InPlaneTracking`` primary-slot).
     """
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -888,12 +898,59 @@ def test_sphere_ecef_nadir_attitude_warns_and_falls_back():
             600.0,
             output_step=600.0,
             force_models=ForceModelConfig.keplerian(),
-            attitude=NadirPointing(velocity_reference="ecef"),
+            attitude=attitude,
         )
     att_warnings = [w for w in caught if "orientation-independent" in str(w.message)]
     assert len(att_warnings) == 1
     assert isinstance(traj, Trajectory)
     assert "attitude" not in traj.metadata
+
+
+def test_box_in_plane_tracking_ecef_propagates_end_to_end():
+    """A box under ``InPlaneTracking(velocity_reference="ecef")`` completes a real
+    ``propagate()`` — the contract's de-risk item (general-upgrades-1.md "ECEF
+    InPlaneTracking" -> Provider lowering): the custom ECEF ``TargetProvider`` had
+    only ever run in ``AlignedAndConstrained``'s *secondary* slot (NadirPointing),
+    and the ``@JImplements`` default-method traps surface only inside the real call
+    path. A full orbit with drag + SRP wired proves the primary-slot dispatch and
+    records the new metadata token.
+    """
+    traj = propagate_numerical(
+        _leo_state(),
+        5550.0,  # ~1 orbit
+        output_step=600.0,
+        force_models=_BOX_FORCES,
+        spacecraft=_BOX,
+        attitude=InPlaneTracking(velocity_reference="ecef"),
+    )
+    assert isinstance(traj, Trajectory)
+    assert traj.metadata["attitude"] == "in_plane_tracking:vel=ecef"
+    assert "terminated" not in traj.metadata
+
+
+def test_in_plane_tracking_ecef_near_geostationary_completes():
+    """The degenerate near-ground-stationary domain does NOT raise (verified at
+    build, 2026-07-04): the primary wind target ``v_rel = v − ω⊕×r`` is singular
+    only at *exactly* zero (Hipparchus ``normalize()`` throws on exact zero), which
+    floating point never reaches — the EME2000-equator vs true-spin-axis offset
+    alone keeps |v_rel| at ~15 m/s for an EME2000-equatorial GEO orbit. The run
+    completes carrying a physically meaningless attitude; LEO is the validated
+    domain (the failure-mode docs describe the exact-zero singularity, not a
+    guaranteed error — this pins that reading against future Orekit changes).
+    """
+    mu = 3.986004418e14
+    omega = 7.292115e-5
+    a_geo = (mu / omega**2) ** (1.0 / 3.0)
+    traj = propagate_numerical(
+        _state_from_elements(a_m=a_geo, e=0.0, i_deg=0.0),
+        1200.0,
+        output_step=600.0,
+        force_models=ForceModelConfig.keplerian(),
+        spacecraft=_BOX,
+        attitude=InPlaneTracking(velocity_reference="ecef"),
+    )
+    assert isinstance(traj, Trajectory)
+    assert "terminated" not in traj.metadata
 
 
 def test_box_face_cd_constant_matches_total_area_sphere():
@@ -1186,7 +1243,7 @@ def test_features_box_bus_example_runs():
     )
     assert isinstance(traj, Trajectory)
     assert traj.frame is Frame.EME2000
-    assert traj.metadata["attitude"] == "in_plane_tracking"
+    assert traj.metadata["attitude"] == "in_plane_tracking:vel=inertial"
     assert "Cd=table:sphere_default" in traj.metadata["spacecraft"]
 
 

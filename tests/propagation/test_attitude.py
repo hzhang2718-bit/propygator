@@ -62,8 +62,8 @@ def test_nadir_pointing_defaults():
     assert NadirPointing().velocity_reference == "inertial"
 
 
-def test_in_plane_tracking_has_no_params():
-    InPlaneTracking()  # constructs
+def test_in_plane_tracking_defaults():
+    assert InPlaneTracking().velocity_reference == "inertial"
 
 
 def test_custom_attitude_requires_law():
@@ -150,6 +150,18 @@ def test_nadir_pointing_rejects_bad_velocity_reference():
         NadirPointing(velocity_reference="lvlh")
 
 
+def test_in_plane_tracking_accepts_ecef():
+    # 'ecef' constructs here (pure-Python); it lowers to the custom TargetProvider
+    # in the *primary* slot in test_attitude_providers.py (general-upgrades-1.md
+    # "ECEF InPlaneTracking").
+    assert InPlaneTracking(velocity_reference="ecef").velocity_reference == "ecef"
+
+
+def test_in_plane_tracking_rejects_bad_velocity_reference():
+    with pytest.raises(ValueError):
+        InPlaneTracking(velocity_reference="lvlh")
+
+
 def test_custom_attitude_rejects_non_callable():
     with pytest.raises(ValueError):
         CustomAttitude(law=42)  # type: ignore[arg-type]
@@ -171,7 +183,8 @@ def _named_law(state):  # noqa: ARG001
         (SunPointing(), "sun_pointing:point=(0,0,1),phase=(1,0,0):orbit_normal"),
         (NadirPointing(), "nadir_pointing:vel=inertial"),
         (NadirPointing(velocity_reference="ecef"), "nadir_pointing:vel=ecef"),
-        (InPlaneTracking(), "in_plane_tracking"),
+        (InPlaneTracking(), "in_plane_tracking:vel=inertial"),
+        (InPlaneTracking(velocity_reference="ecef"), "in_plane_tracking:vel=ecef"),
         (CustomAttitude(_named_law), "custom:_named_law"),
     ],
 )

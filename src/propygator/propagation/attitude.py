@@ -107,6 +107,20 @@ _VALID_PHASING_REFERENCES = ("orbit_normal", "velocity", "inertial_z")
 _VALID_VELOCITY_REFERENCES = ("inertial", "ecef")
 
 
+def _validate_velocity_reference(mode: str, value: str) -> None:
+    """Raise ``ValueError`` unless ``value`` is a valid ``velocity_reference``.
+
+    Shared by the two ecef-capable modes (``NadirPointing``, ``InPlaneTracking``)
+    so their validation and message shape cannot drift apart — the
+    ``_validate_finite_angles`` precedent applied to this field.
+    """
+    if value not in _VALID_VELOCITY_REFERENCES:
+        raise ValueError(
+            f"{mode}.velocity_reference must be one of "
+            f"{_VALID_VELOCITY_REFERENCES}, got {value!r}"
+        )
+
+
 @dataclass(frozen=True)
 class LofAligned:
     """Body axes follow the TNW local orbital frame: body-X along velocity,
@@ -237,11 +251,7 @@ class NadirPointing:
     velocity_reference: str = "inertial"  # "inertial" (ECI) | "ecef"
 
     def __post_init__(self) -> None:
-        if self.velocity_reference not in _VALID_VELOCITY_REFERENCES:
-            raise ValueError(
-                f"NadirPointing.velocity_reference must be one of "
-                f"{_VALID_VELOCITY_REFERENCES}, got {self.velocity_reference!r}"
-            )
+        _validate_velocity_reference("NadirPointing", self.velocity_reference)
 
     def _metadata_string(self) -> str:
         return f"nadir_pointing:vel={self.velocity_reference}"
@@ -251,11 +261,21 @@ class NadirPointing:
 class InPlaneTracking:
     """Body +Z on the orbit normal; body +Y on the velocity vector.
 
-    Exact for all orbits, since the orbit normal is always perpendicular to
-    velocity. No parameters (features.md §1.1)."""
+    ``velocity_reference`` selects the velocity: ``inertial`` (ECI velocity;
+    exact for all orbits, since the orbit normal is always perpendicular to the
+    inertial velocity) | ``ecef`` (Earth-relative velocity ``v − ω⊕×r``, the
+    atmosphere-relative flow — feathers a flat body to the true wind; +Y is held
+    exactly on the wind, +Z is best-effort on the orbit normal, off by at most
+    the out-of-plane wind angle, ≤ ~4° in LEO). Binding design:
+    general-upgrades-1.md "ECEF InPlaneTracking"."""
+
+    velocity_reference: str = "inertial"  # "inertial" (ECI) | "ecef"
+
+    def __post_init__(self) -> None:
+        _validate_velocity_reference("InPlaneTracking", self.velocity_reference)
 
     def _metadata_string(self) -> str:
-        return "in_plane_tracking"
+        return f"in_plane_tracking:vel={self.velocity_reference}"
 
 
 @dataclass(frozen=True)
@@ -321,10 +341,12 @@ def _to_provider(
     propagation frame (EME2000 in v1) the providers and the ``CustomAttitude`` law
     are referenced against. Six modes map to stock Orekit providers (constructor
     spellings verified against the installed 13.1.x API); ``CustomAttitude`` builds
-    a law-backed provider. ``NadirPointing`` wires both ``velocity_reference``
-    options: ``inertial`` via ``PredefinedTarget.VELOCITY`` and ``ecef`` via a
-    custom Earth-relative velocity ``TargetProvider`` (see
-    :func:`_build_ecef_velocity_target_provider`).
+    a law-backed provider. ``NadirPointing`` and ``InPlaneTracking`` wire both
+    ``velocity_reference`` options: ``inertial`` via ``PredefinedTarget.VELOCITY``
+    and ``ecef`` via a custom Earth-relative velocity ``TargetProvider`` (see
+    :func:`_build_ecef_velocity_target_provider`) — in the *secondary* slot for
+    ``NadirPointing`` (nadir stays primary), the *primary* slot for
+    ``InPlaneTracking`` (the wind alignment is the point of the mode).
     """
     from .._orekit_init import _ensure_started
 
@@ -418,10 +440,22 @@ def _to_provider(
         )
 
     if isinstance(config, InPlaneTracking):
-        # +Y on velocity, +Z on orbital momentum; velocity _|_ momentum so both hold.
+        # Primary +Y on the velocity; secondary +Z on the orbital momentum.
+        # "inertial" tracks the ECI velocity (both axes hold exactly — velocity is
+        # perpendicular to momentum); "ecef" swaps the *primary* target for the
+        # custom Earth-relative velocity provider (general-upgrades-1.md "ECEF
+        # InPlaneTracking"): +Y lands exactly on the wind v_rel = v − ω⊕×r, and +Z
+        # becomes best-effort — off the orbit normal by the out-of-plane wind angle,
+        # since v_rel is NOT perpendicular to momentum. The inverse of
+        # NadirPointing's swap above, which replaced the *secondary* target.
+        velocity_target = (
+            _build_ecef_velocity_target_provider()
+            if config.velocity_reference == "ecef"
+            else PredefinedTarget.VELOCITY
+        )
         return AlignedAndConstrained(
             Vector3D(0.0, 1.0, 0.0),
-            PredefinedTarget.VELOCITY,
+            velocity_target,
             Vector3D(0.0, 0.0, 1.0),
             PredefinedTarget.MOMENTUM,
             _sun(),
@@ -437,13 +471,15 @@ def _to_provider(
 
 def _build_ecef_velocity_target_provider() -> "org.orekit.attitudes.TargetProvider":
     """Build the Earth-relative (ground-track) velocity ``TargetProvider`` for
-    ``NadirPointing(velocity_reference="ecef")``.
+    the ``ecef`` velocity reference — ``NadirPointing`` (secondary slot) and
+    ``InPlaneTracking`` (primary slot).
 
     Implements Orekit's ``TargetProvider`` from Python via ``@JImplements`` (Java
-    classes can't be subclassed; CLAUDE.md) and drops into the ``NadirPointing``
-    ``AlignedAndConstrained`` secondary slot in place of ``PredefinedTarget.VELOCITY``
-    — so the ``ecef`` and ``inertial`` branches share one code path, differing only
-    by the returned target direction (addendum §2.3).
+    classes can't be subclassed; CLAUDE.md) and drops into an
+    ``AlignedAndConstrained`` target slot in place of ``PredefinedTarget.VELOCITY``
+    — so each mode's ``ecef`` and ``inertial`` branches share one code path,
+    differing only by the swapped target (addendum §2.3; general-upgrades-1.md
+    "ECEF InPlaneTracking").
 
     The target is the unit **Earth-relative** velocity ``v_rel = v_inertial − ω⊕ × r``
     expressed back in the propagation frame. It is read off Orekit's inertial→ITRF
@@ -467,7 +503,11 @@ def _build_ecef_velocity_target_provider() -> "org.orekit.attitudes.TargetProvid
     constants built from the value direction — no field calculus. The
     ``FieldUnivariateDerivative2<T>`` field-state overload is never hit by a
     double-precision ``NumericalPropagator``, so it is skipped (mirrors
-    ``_build_law_backed_provider`` skipping the Field ``getAttitude``).
+    ``_build_law_backed_provider`` skipping the Field ``getAttitude``). The same
+    scope note covers ``getDerivative2TargetDirection``'s Field-PV overload
+    (JPype collapses it onto the one Python method, which treats ``pv`` as
+    plain): it is invoked only by a ``FieldNumericalPropagator``, which v1 does
+    not build — a Field propagation would need this proxy extended first.
     """
     from .._orekit_init import _ensure_started
 

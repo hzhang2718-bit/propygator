@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BoxFaceCd table that is shipped with the experiment, supporting BoxFaceCd.default().
 - BoxFaceCd arguments that can be incorporated into propagate_numerical, including a
   default one for the shipped table and options for users to use their custom tables.
+- The option to use ECEF velocity as the reference velocity in InPlaneTracking. An
+  accompanying study shows that the slightly different reference velocity makes a
+  minor but real impact.
 
 ### Changed
 

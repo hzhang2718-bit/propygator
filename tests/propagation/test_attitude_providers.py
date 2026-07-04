@@ -114,6 +114,7 @@ _MODES = [
     SunPointing(phasing_reference="inertial_z"),
     NadirPointing(),  # "inertial"
     InPlaneTracking(),
+    InPlaneTracking(velocity_reference="ecef"),
     CustomAttitude(_trivial_law),
 ]
 
@@ -194,6 +195,96 @@ def test_nadir_ecef_yaws_off_inertial_by_earth_rotation():
     assert yaw_deg(0.0) == pytest.approx(3.08, abs=0.05)
     # Max-latitude apex: the Earth-rotation yaw vanishes.
     assert yaw_deg(90.0) < 0.1
+
+
+# --- InPlaneTracking 'ecef': the primary-slot swap (general-upgrades-1.md) --
+
+_OMEGA_EARTH = 7.292115e-5  # rad/s, for the independent hardcoded-wind anchor
+
+
+def test_in_plane_tracking_ecef_lowers_to_provider():
+    # The custom ECEF TargetProvider's first *primary*-slot consumer (the nadir
+    # addendum only ever exercised the secondary slot); lowering yields a working
+    # provider. The axis geometry is pinned by the construction test below, and
+    # the real-propagate() de-risk lives in test_numerical.py.
+    provider = _to_provider(InPlaneTracking(velocity_reference="ecef"))
+    assert provider is not None
+    epoch = _epoch()
+    att = provider.getAttitude(
+        _orbit(epoch), epoch.to_orekit(), Frame.EME2000.to_orekit()
+    )
+    assert att is not None
+    assert att.getRotation() is not None
+
+
+def test_in_plane_tracking_ecef_axis_construction():
+    """ecef ``InPlaneTracking`` realizes the contract's axis construction exactly
+    (general-upgrades-1.md "ECEF InPlaneTracking"): body +Y lands *exactly* on the
+    Earth-relative wind (the primary), +Z sits off the orbit normal by exactly the
+    out-of-plane wind angle ``asin(|h_hat . v_rel_hat|)`` (the best-effort
+    secondary), and the +Y split vs the ``inertial`` mode equals ``angle(v, v_rel)``
+    — peaking at the equatorial node at the same hand-checked ~3.08 deg anchor as
+    the nadir-ecef yaw test (it is the same ``ω⊕ × r`` term) and vanishing at the
+    max-latitude apex, where the wind is along-track.
+    """
+    from org.hipparchus.geometry.euclidean.threed import Vector3D
+
+    epoch = _epoch()
+    date = epoch.to_orekit()
+    eme = Frame.EME2000.to_orekit()
+    itrf = Frame.ITRF.to_orekit()
+    ecef = _to_provider(InPlaneTracking(velocity_reference="ecef"))
+    inertial = _to_provider(InPlaneTracking())
+
+    def check(true_anomaly_deg: float) -> tuple[float, float]:
+        orbit = _orbit_at_true_anomaly(epoch, true_anomaly_deg=true_anomaly_deg)
+        pv = orbit.getPVCoordinates()
+        # The reference wind, read off the EME2000->ITRF transform (the same
+        # physics the provider implements — here exercised end-to-end through
+        # AlignedAndConstrained's *primary* slot).
+        to_itrf = eme.getTransformTo(itrf, date)
+        v_rel = to_itrf.getRotation().applyInverseTo(
+            to_itrf.transformPVCoordinates(pv).getVelocity()
+        )
+        # Independent anchor: the hardcoded-omega wind v - ω⊕×r about EME2000 +Z
+        # agrees to the ~0.3 deg pole-offset scale (catches a wrong transform).
+        r, v = pv.getPosition(), pv.getVelocity()
+        v_rel_hardcoded = Vector3D(
+            v.getX() + _OMEGA_EARTH * r.getY(),
+            v.getY() - _OMEGA_EARTH * r.getX(),
+            v.getZ(),
+        )
+        assert math.degrees(Vector3D.angle(v_rel, v_rel_hardcoded)) < 0.05
+
+        h_hat = pv.getMomentum().normalize()
+        y_ecef = _body_axis_in_inertial(ecef, orbit, epoch, (0.0, 1.0, 0.0))
+        z_ecef = _body_axis_in_inertial(ecef, orbit, epoch, (0.0, 0.0, 1.0))
+        y_inertial = _body_axis_in_inertial(inertial, orbit, epoch, (0.0, 1.0, 0.0))
+
+        # Primary exact: +Y on the unit wind.
+        assert math.degrees(Vector3D.angle(y_ecef, v_rel)) < 1e-6
+        # Secondary best-effort: +Z off h_hat by exactly the out-of-plane wind
+        # angle (the contract's residual formula).
+        predicted_tilt = math.degrees(
+            math.asin(abs(float(Vector3D.dotProduct(h_hat, v_rel.normalize()))))
+        )
+        actual_tilt = math.degrees(Vector3D.angle(z_ecef, h_hat))
+        assert actual_tilt == pytest.approx(predicted_tilt, abs=1e-6)
+        # The ecef-vs-inertial +Y split is exactly the wind offset angle.
+        split = math.degrees(Vector3D.angle(y_ecef, y_inertial))
+        assert split == pytest.approx(math.degrees(Vector3D.angle(v, v_rel)), abs=1e-6)
+        return split, actual_tilt
+
+    # Equatorial ascending node: wind offset and +Z tilt both peak at ~3.08 deg
+    # (at the node the wind's velocity-perpendicular component is entirely
+    # out-of-plane, so the two angles coincide).
+    split_node, tilt_node = check(0.0)
+    assert split_node == pytest.approx(3.08, abs=0.05)
+    assert tilt_node == pytest.approx(3.08, abs=0.05)
+    # Max-latitude apex: the wind is along-track; both vanish (+Z back on h_hat).
+    split_apex, tilt_apex = check(90.0)
+    assert split_apex < 0.1
+    assert tilt_apex < 0.1
 
 
 # --- CustomAttitude: the body->inertial direction check ---------------------
