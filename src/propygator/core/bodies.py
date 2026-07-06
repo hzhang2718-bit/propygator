@@ -3,7 +3,13 @@
 The Orekit body models reused across Feature 1.1: the WGS84 Earth ellipsoid (for
 geodetic lat/lon/alt, the conical SRP shadow, and the drag atmosphere body shape)
 and the Sun/Moon celestial bodies (third-body attraction, SRP, Sun-relative
-attitude).
+attitude), plus the seven planets other than Earth (the pinned set behind
+``ForceModelConfig.planets_third_body`` — general-upgrades-1.md "Planetary
+Third-Body & Earth Radiation Pressure"). The Sun/Moon/planet accessors resolve
+from the JPL DE ephemeris already bundled in orekit-data (the WGS84 ellipsoid
+below never touches it), so the planets add no new data dependency; a trimmed
+install missing them fails inside the factory exactly as a missing Sun/Moon
+would.
 
 These accessors return Orekit Java objects and are therefore **module-internal**
 (leading underscore): no Orekit type ever appears on a public propygator
@@ -94,3 +100,73 @@ def _moon() -> "org.orekit.bodies.CelestialBody":
     from org.orekit.bodies import CelestialBodyFactory
 
     return CelestialBodyFactory.getMoon()
+
+
+def _mercury() -> "org.orekit.bodies.CelestialBody":
+    """Return Mercury as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getMercury()
+
+
+def _venus() -> "org.orekit.bodies.CelestialBody":
+    """Return Venus as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getVenus()
+
+
+def _mars() -> "org.orekit.bodies.CelestialBody":
+    """Return Mars as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getMars()
+
+
+def _jupiter() -> "org.orekit.bodies.CelestialBody":
+    """Return Jupiter as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getJupiter()
+
+
+def _saturn() -> "org.orekit.bodies.CelestialBody":
+    """Return Saturn as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getSaturn()
+
+
+def _uranus() -> "org.orekit.bodies.CelestialBody":
+    """Return Uranus as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getUranus()
+
+
+def _neptune() -> "org.orekit.bodies.CelestialBody":
+    """Return Neptune as an Orekit ``CelestialBody`` (lumped planetary third body)."""
+    from .._orekit_init import _ensure_started
+
+    _ensure_started()
+    from org.orekit.bodies import CelestialBodyFactory
+
+    return CelestialBodyFactory.getNeptune()

@@ -29,6 +29,7 @@ def test_defaults():
     assert c.gravity_field == "EIGEN-6S"
     assert c.sun_third_body is True
     assert c.moon_third_body is True
+    assert c.planets_third_body is False
     assert c.drag is True
     assert c.atmosphere_model == "NRLMSISE-00"
     assert c.srp is True
@@ -56,6 +57,7 @@ def test_geo_default():
     assert c.drag is False
     assert c.srp is True
     assert c.sun_third_body is True and c.moon_third_body is True
+    assert c.planets_third_body is False
     assert c.solid_tides is False and c.ocean_tides is False and c.relativity is False
 
 
@@ -63,6 +65,7 @@ def test_keplerian():
     c = ForceModelConfig.keplerian()
     assert (c.gravity_degree, c.gravity_order) == (0, 0)
     assert c.sun_third_body is False and c.moon_third_body is False
+    assert c.planets_third_body is False
     assert c.drag is False and c.srp is False
     assert c.solid_tides is False and c.ocean_tides is False and c.relativity is False
 
@@ -119,16 +122,34 @@ def test_metadata_keplerian_is_point_mass():
 
 def test_metadata_token_order_is_fixed():
     # Everything on: the full fixed order, both tides emitted independently.
-    c = ForceModelConfig(solid_tides=True, ocean_tides=True, relativity=True)
+    c = ForceModelConfig(
+        planets_third_body=True, solid_tides=True, ocean_tides=True, relativity=True
+    )
     assert c._metadata_tokens() == [
         "gravity:EIGEN-6S:70x70",
         "third_body:sun",
         "third_body:moon",
+        "third_body:planets",
         "drag:NRLMSISE-00",
         "srp",
         "tides:solid",
         "tides:ocean",
         "relativity",
+    ]
+
+
+def test_metadata_planets_is_one_lumped_token():
+    # The pinned seven-planet set serializes as ONE token in the slot after the
+    # moon (general-upgrades-1.md "Planetary Third-Body & Earth Radiation
+    # Pressure") — never per-planet tokens.
+    c = ForceModelConfig(planets_third_body=True)
+    assert c._metadata_tokens() == [
+        "gravity:EIGEN-6S:70x70",
+        "third_body:sun",
+        "third_body:moon",
+        "third_body:planets",
+        "drag:NRLMSISE-00",
+        "srp",
     ]
 
 
@@ -152,6 +173,7 @@ def test_serializer_is_driven_by_facts_not_config():
         gravity_order=70,
         sun_third_body=False,
         moon_third_body=False,
+        planets_third_body=False,
         drag=False,
         atmosphere_model="NRLMSISE-00",
         srp=False,

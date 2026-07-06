@@ -1,0 +1,550 @@
+diff --git a/src/propygator/propagation/force_models.py b/src/propygator/propagation/force_models.py
+index 0af1b41..2788fd1 100644
+--- a/src/propygator/propagation/force_models.py
++++ b/src/propygator/propagation/force_models.py
+@@ -39,6 +39,7 @@ def _serialize_force_models(
+     drag: bool,
+     atmosphere_model: str,
+     srp: bool,
++    earth_radiation: bool,
+     solid_tides: bool,
+     ocean_tides: bool,
+     relativity: bool,
+@@ -46,12 +47,15 @@ def _serialize_force_models(
+     """Build the deterministic ``force_models`` metadata token list.
+ 
+     Fixed token order (features.md §1.1): gravity, ``third_body:sun``,
+-    ``third_body:moon``, ``third_body:planets``, drag, ``srp``, ``tides:solid``,
+-    ``tides:ocean``, ``relativity``. A disabled force emits no token; gravity is
+-    always present (point mass is ``gravity:<field>:0x0``). ``third_body:planets``
+-    is a single lumped token — its meaning (the pinned seven-planet set) lives in
+-    features.md §1.1 (general-upgrades-1.md "Planetary Third-Body & Earth
+-    Radiation Pressure").
++    ``third_body:moon``, ``third_body:planets``, drag, ``srp``,
++    ``earth_radiation``, ``tides:solid``, ``tides:ocean``, ``relativity``. A
++    disabled force emits no token; gravity is always present (point mass is
++    ``gravity:<field>:0x0``). ``third_body:planets`` is a single lumped token —
++    its meaning (the pinned seven-planet set) lives in features.md §1.1.
++    ``earth_radiation`` is a bare token: its lit-cap angular resolution is a
++    version-pinned constant, not encoded here (the ocean-tides truncation
++    precedent; general-upgrades-1.md "Planetary Third-Body & Earth Radiation
++    Pressure").
+ 
+     Driven by explicit facts rather than a :class:`ForceModelConfig` so
+     ``propagate_numerical`` can serialize the forces it *actually wired* into the
+@@ -70,6 +74,8 @@ def _serialize_force_models(
+         tokens.append(f"drag:{atmosphere_model}")
+     if srp:
+         tokens.append("srp")
++    if earth_radiation:
++        tokens.append("earth_radiation")
+     if solid_tides:
+         tokens.append("tides:solid")
+     if ocean_tides:
+@@ -95,6 +101,13 @@ class ForceModelConfig:
+     Planetary accelerations on an Earth orbiter are ~1e-10–1e-13 of central
+     gravity (Venus and Jupiter dominate): a completeness option for
+     high-precision or long-arc work — it will not visibly move a LEO trajectory.
++
++    ``earth_radiation`` adds Knocke's rediffused Earth radiation pressure —
++    reflected sunlight (albedo) **and** Earth's thermal-infrared re-emission,
++    bundled (Orekit ships only the combined model) — through the same optical
++    coefficients as SRP. Most relevant for low, high-area-to-mass craft (largest
++    for sails); it sums radiation over Earth's visible cap every integrator
++    substep, so it costs real wall-clock time.
+     """
+ 
+     gravity_degree: int = 70
+@@ -106,6 +119,7 @@ class ForceModelConfig:
+     drag: bool = True
+     atmosphere_model: str = "NRLMSISE-00"  # | "Harris-Priester" | "DTM-2000"
+     srp: bool = True
++    earth_radiation: bool = False
+     solid_tides: bool = False
+     ocean_tides: bool = False
+     relativity: bool = False
+@@ -179,6 +193,7 @@ class ForceModelConfig:
+             drag=self.drag,
+             atmosphere_model=self.atmosphere_model,
+             srp=self.srp,
++            earth_radiation=self.earth_radiation,
+             solid_tides=self.solid_tides,
+             ocean_tides=self.ocean_tides,
+             relativity=self.relativity,
+diff --git a/src/propygator/propagation/numerical.py b/src/propygator/propagation/numerical.py
+index e2c8886..0762b82 100644
+--- a/src/propygator/propagation/numerical.py
++++ b/src/propygator/propagation/numerical.py
+@@ -3,13 +3,15 @@
+ The full propagator (build-plan chunks 7-9): integrator selection + tolerances, the
+ gravity force, the full perturbation set (Sun/Moon third body plus an optional lumped
+ seven-planet third body, drag with a fixed or :class:`VariableCd` coefficient,
+-conical-shadow SRP, solid/ocean tides, relativity)
++conical-shadow SRP, Knocke Earth albedo + thermal-IR radiation pressure, solid/ocean
++tides, relativity)
+ acting on either the **sphere** or the **box** (``BoxAndSolarArraySpacecraft``)
+ geometry, the full seven-mode attitude family, output-step ephemeris sampling, the
+ ``Trajectory`` + metadata assembly, input validation, and ``NumericalPropagationError``.
+ 
+ **Geometry + attitude (chunk 9).** A ``box_and_panels`` geometry builds one
+-``BoxAndSolarArraySpacecraft`` driving both drag and SRP; a box :class:`VariableCd`
++``BoxAndSolarArraySpacecraft`` driving every wired surface force (drag, SRP, Earth
++radiation); a box :class:`VariableCd`
+ is routed through a custom ``DragSensitive`` that delegates the attitude-driven
+ projected-area computation to the box and overrides only the scalar Cd (via the
+ box's "global drag factor"). The :data:`AttitudeConfig` is lowered to a native
+@@ -26,10 +28,10 @@ and is wired only when enabled. The ``force_models`` metadata is driven by *what
+ was actually wired* (:class:`_WiredForces`), never by the config booleans, so the
+ recorded metadata never claims a force that is not acting (features.md §1.1) — the
+ ``keplerian`` preset records just the point-mass gravity token. The ``spacecraft``
+-metadata key is emitted only when a surface force that consumes it (drag or SRP)
+-was wired, and the ``attitude`` key only when geometry is a box *and* a surface
+-force was wired — the same "reflect what's acting" rule (so ``keplerian`` omits
+-both, and a sphere never records ``attitude``).
++metadata key is emitted only when a surface force that consumes it (drag, SRP, or
++Earth radiation) was wired, and the ``attitude`` key only when geometry is a box
++*and* a surface force was wired — the same "reflect what's acting" rule (so
++``keplerian`` omits both, and a sphere never records ``attitude``).
+ 
+ **Architecture invariants** (CLAUDE.md / architecture §10): no Orekit type appears
+ on the public signature (``initial`` and the return ``Trajectory`` are propygator
+@@ -112,6 +114,16 @@ _KNOWN_ATMOSPHERE_MODELS = ("NRLMSISE-00", "Harris-Priester", "DTM-2000")
+ _OCEAN_TIDE_DEGREE = 4
+ _OCEAN_TIDE_ORDER = 4
+ 
++# Knocke Earth-radiation lit-cap discretization (radians): how finely the model sums
++# albedo + thermal-IR over Earth's visible cap each integrator substep — finer costs
++# wall-clock time. PROVISIONAL 15-degree placeholder: the resolution benchmark
++# (experiments/earth-radiation/, build-plan chunk 3) picks the final value as the
++# coarsest converged rung (general-upgrades-1.md "Planetary Third-Body & Earth
++# Radiation Pressure"). Not a ForceModelConfig field by design (the models-vs-
++# coefficients split); pinned per release by propygator_version, like the ocean-tide
++# truncation above.
++_EARTH_RADIATION_ANGULAR_RESOLUTION = math.radians(15.0)
++
+ # A run "terminated early" (a guard's Action.STOP fired) iff the planned end is more
+ # than this many seconds past the achieved ephemeris span. A normal propagate(end)
+ # lands getMaxDate() == end (durationFrom == 0), so this is the common-path test for
+@@ -307,6 +319,7 @@ class _WiredForces:
+     planets_third_body: bool
+     drag: bool
+     srp: bool
++    earth_radiation: bool
+     solid_tides: bool
+     ocean_tides: bool
+     relativity: bool
+@@ -438,7 +451,8 @@ def _build_box_spacecraft(
+ ) -> "org.orekit.forces.BoxAndSolarArraySpacecraft":
+     """Build the ``BoxAndSolarArraySpacecraft`` for a **box** ``geometry`` (chunk 9).
+ 
+-    One object drives **both** drag and SRP (it implements ``DragSensitive`` and
++    One object drives **every wired surface force** — drag, SRP, and Earth
++    radiation (it implements ``DragSensitive`` and
+     ``RadiationSensitive``), so the caller builds it once and shares it. The 10-arg
+     ctor is ``(x, y, z, sun, arrayArea, arrayAxis, dragCoeff, liftRatio, absorption,
+     specular)``; lift ratio is ``0.0`` (v1 models no aerodynamic lift). The base drag
+@@ -576,8 +590,8 @@ def _build_box_face_drag_force(
+     **independent sum of its six per-face contributions** — which a single uniform Cd
+     cannot represent, so this does **not** route through
+     ``BoxAndSolarArraySpacecraft.dragAcceleration`` (the box object is still built, but
+-    only to drive SRP). Each substep the accel closure rotates the incoming-flow
+-    direction into the body frame, forms every face's flow angle θ, looks up that
++    only to drive the radiation forces). Each substep the accel closure rotates the
++    incoming-flow direction into the body frame, forms every face's flow angle θ, looks up that
+     face's Cd, and assembles ``CdA = Σ Cd_i · A_i`` over the **full** face areas — the
+     incidence projection (the ``cos θ`` pressure falloff *and* the tangential-shear
+     floor) is already baked into ``Cd_i``, so the areas are **not** re-projected. The
+@@ -667,6 +681,52 @@ def _build_srp_force(
+     return SolarRadiationPressure(sun, earth, box)
+ 
+ 
++def _build_earth_radiation_force(
++    geometry: SpacecraftGeometry,
++    sun: "org.orekit.utils.ExtendedPositionProvider",
++    box: "org.orekit.forces.BoxAndSolarArraySpacecraft | None",
++) -> "org.orekit.forces.ForceModel":
++    """Build the Knocke Earth-radiation ``ForceModel`` (albedo + thermal IR).
++
++    ``KnockeRediffusedForceModel`` sums reflected sunlight *and* Earth's thermal
++    infrared re-emission over the visible cap, discretized at the version-pinned
++    :data:`_EARTH_RADIATION_ANGULAR_RESOLUTION` (general-upgrades-1.md "Planetary
++    Third-Body & Earth Radiation Pressure"). The spacecraft optics are **the SRP
++    optics, reused**: a sphere builds its own
++    ``IsotropicRadiationSingleCoefficient`` (stateless, same coefficients as
++    :func:`_build_srp_force`); a box reuses the shared ``box``, which then drives up
++    to three forces. The 4-arg constructor's default time scale serves the model's
++    periodic albedo terms; no shadow wiring — Earth IR acts in eclipse and the model
++    computes the lit cap itself. ``box`` is ``None`` for a sphere.
++    """
++    from org.orekit.forces.radiation import (
++        IsotropicRadiationSingleCoefficient,
++        KnockeRediffusedForceModel,
++    )
++    from org.orekit.utils import Constants
++
++    if geometry.kind == "sphere":
++        assert geometry.area_m2 is not None
++        assert geometry.reflectivity_coefficient is not None
++        radiation = IsotropicRadiationSingleCoefficient(
++            float(geometry.area_m2), float(geometry.reflectivity_coefficient)
++        )
++        return KnockeRediffusedForceModel(
++            sun,
++            radiation,
++            Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
++            _EARTH_RADIATION_ANGULAR_RESOLUTION,
++        )
++
++    assert box is not None  # built by the caller whenever geometry is a box
++    return KnockeRediffusedForceModel(
++        sun,
++        box,
++        Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
++        _EARTH_RADIATION_ANGULAR_RESOLUTION,
++    )
++
++
+ def _ut1() -> "org.orekit.time.UT1Scale":
+     """Orekit's EOP-backed UT1 scale (IERS 2010), for the tide models.
+ 
+@@ -743,7 +803,7 @@ def _add_perturbation_forces(
+     SRP, tides, relativity) and the wired facts returned so the metadata reflects
+     exactly what acts. The celestial bodies and Earth come from ``core/bodies.py``
+     (the canonical WGS84 ellipsoid + Orekit body singletons).
+-    A **box** geometry drives both drag and SRP from one shared
++    A **box** geometry drives drag, SRP, and Earth radiation from one shared
+     ``BoxAndSolarArraySpacecraft``, built once here when a surface force will use it.
+     """
+     from org.orekit.forces.gravity import Relativity, ThirdBodyAttraction
+@@ -763,11 +823,12 @@ def _add_perturbation_forces(
+ 
+     fm = force_models
+     geometry = spacecraft.geometry
+-    # One box drives both drag and SRP; build it once when a surface force needs it.
+-    # A sphere uses no shared object (box stays None and each builder handles its own).
++    # One box drives drag, SRP, and Earth radiation; build it once when any surface
++    # force needs it. A sphere uses no shared object (box stays None and each builder
++    # handles its own).
+     box = (
+         _build_box_spacecraft(geometry, _sun())
+-        if geometry.kind == "box" and (fm.drag or fm.srp)
++        if geometry.kind == "box" and (fm.drag or fm.srp or fm.earth_radiation)
+         else None
+     )
+ 
+@@ -794,6 +855,8 @@ def _add_perturbation_forces(
+         propagator.addForceModel(_build_drag_force(geometry, atmosphere, box))
+     if fm.srp:
+         propagator.addForceModel(_build_srp_force(geometry, _sun(), _earth(), box))
++    if fm.earth_radiation:
++        propagator.addForceModel(_build_earth_radiation_force(geometry, _sun(), box))
+     if fm.solid_tides:
+         propagator.addForceModel(_build_solid_tides(provider, _sun(), _moon()))
+     if fm.ocean_tides:
+@@ -807,6 +870,7 @@ def _add_perturbation_forces(
+         planets_third_body=fm.planets_third_body,
+         drag=fm.drag,
+         srp=fm.srp,
++        earth_radiation=fm.earth_radiation,
+         solid_tides=fm.solid_tides,
+         ocean_tides=fm.ocean_tides,
+         relativity=fm.relativity,
+@@ -911,9 +975,11 @@ def propagate_numerical(
+     lumped behind one toggle, the seven other planets — a tiny completeness term), drag
+     (every path — sphere or box, fixed Cd or a :class:`VariableCd` table — routes
+     through one custom ``DragSensitive`` so the §6.2 free-molecular-floor warn-once
+-    hook is shared), conical-shadow SRP, solid/ocean tides, relativity. The
+-    ``force_models`` metadata lists only the forces actually wired, and ``spacecraft``
+-    is recorded only when drag or SRP (which consume it) is wired. Because all drag
++    hook is shared), conical-shadow SRP, Knocke Earth radiation pressure (albedo +
++    thermal IR bundled, through the same optics as SRP, at a version-pinned lit-cap
++    resolution), solid/ocean tides, relativity. The ``force_models`` metadata lists
++    only the forces actually wired, and ``spacecraft`` is recorded only when drag,
++    SRP, or Earth radiation (which consume it) is wired. Because all drag
+     flows through that one proxy it exposes no drag ``ParameterDriver``: that is
+     invisible to forward/backward-in-time propagation and to TLE fitting (which reads
+     only the propagated *states* and estimates the TLE's own elements + B*), and would
+@@ -922,11 +988,12 @@ def propagate_numerical(
+ 
+     **Geometry + attitude.** A ``sphere`` geometry uses the custom drag
+     ``DragSensitive`` (an ``IsotropicDrag``-equivalent formula) and
+-    ``IsotropicRadiationSingleCoefficient`` for SRP; a ``box_and_panels`` geometry
+-    builds one ``BoxAndSolarArraySpacecraft`` driving both drag and SRP, with drag
++    ``IsotropicRadiationSingleCoefficient`` for SRP and Earth radiation; a
++    ``box_and_panels`` geometry builds one ``BoxAndSolarArraySpacecraft`` driving
++    every wired surface force (drag, SRP, Earth radiation), with drag
+     routed through that same custom ``DragSensitive`` (a box ``BoxFaceCd`` instead
+     drives a per-face free-molecular drag sum through that proxy — the box object then
+-    feeds SRP only). The
++    feeds only the radiation forces). The
+     ``attitude`` argument is lowered to a native Orekit provider and wired into the
+     propagator; a non-default attitude on a sphere has no dynamical effect, so it
+     emits a one-time consistency warning and falls back to ``LofAligned``. The
+@@ -969,6 +1036,11 @@ def propagate_numerical(
+     Spacecraft-model limitations (v1):
+       * Solar radiation pressure uses uniform optical coefficients across the
+         whole spacecraft. Per-face optical properties are not modeled.
++      * Earth radiation pressure (earth_radiation) uses Knocke's low-order zonal
++        Earth albedo + thermal-infrared model, applied through the same uniform
++        optical coefficients as SRP, on a lit-cap discretization fixed at a
++        version-pinned angular resolution. Per-face optical properties and
++        higher-fidelity Earth radiation models are not included.
+       * Drag acts on the projected cross-section but produces no torque, and
+         aerodynamic lift is not modeled; attitude is not perturbed by drag.
+       * The drag coefficient is a fixed value, a (geocentric radius, density)
+@@ -1276,6 +1348,7 @@ def _build_metadata(
+         drag=wired.drag,
+         atmosphere_model=force_models.atmosphere_model,
+         srp=wired.srp,
++        earth_radiation=wired.earth_radiation,
+         solid_tides=wired.solid_tides,
+         ocean_tides=wired.ocean_tides,
+         relativity=wired.relativity,
+@@ -1305,13 +1378,17 @@ def _build_metadata(
+         "created_at": datetime.now(timezone.utc).isoformat(),
+     }
+     # Spacecraft (mass + geometry coefficients) only influences the result through
+-    # drag/SRP; record it exactly when one of those was wired.
+-    if wired.drag or wired.srp:
++    # the surface forces — drag, SRP, or Earth radiation; record it exactly when one
++    # of those was wired.
++    if wired.drag or wired.srp or wired.earth_radiation:
+         metadata["spacecraft"] = spacecraft._metadata_string()
+     # Attitude only shapes the result through a non-spherical cross-section under a
+-    # surface force; record it exactly for a box with drag or SRP wired (same gate as
+-    # spacecraft, restricted to box geometry). A sphere / force-free box omits it.
+-    if spacecraft.geometry.kind == "box" and (wired.drag or wired.srp):
++    # surface force; record it exactly for a box with drag, SRP, or Earth radiation
++    # wired (same gate as spacecraft, restricted to box geometry). A sphere /
++    # force-free box omits it.
++    if spacecraft.geometry.kind == "box" and (
++        wired.drag or wired.srp or wired.earth_radiation
++    ):
+         metadata["attitude"] = _serialize_attitude(attitude)
+     if name is not None:
+         metadata["name"] = name
+diff --git a/tests/propagation/test_force_models.py b/tests/propagation/test_force_models.py
+index 678b803..061e229 100644
+--- a/tests/propagation/test_force_models.py
++++ b/tests/propagation/test_force_models.py
+@@ -33,6 +33,7 @@ def test_defaults():
+     assert c.drag is True
+     assert c.atmosphere_model == "NRLMSISE-00"
+     assert c.srp is True
++    assert c.earth_radiation is False
+     assert c.solid_tides is False
+     assert c.ocean_tides is False
+     assert c.relativity is False
+@@ -58,6 +59,7 @@ def test_geo_default():
+     assert c.srp is True
+     assert c.sun_third_body is True and c.moon_third_body is True
+     assert c.planets_third_body is False
++    assert c.earth_radiation is False
+     assert c.solid_tides is False and c.ocean_tides is False and c.relativity is False
+ 
+ 
+@@ -67,6 +69,7 @@ def test_keplerian():
+     assert c.sun_third_body is False and c.moon_third_body is False
+     assert c.planets_third_body is False
+     assert c.drag is False and c.srp is False
++    assert c.earth_radiation is False
+     assert c.solid_tides is False and c.ocean_tides is False and c.relativity is False
+ 
+ 
+@@ -123,7 +126,11 @@ def test_metadata_keplerian_is_point_mass():
+ def test_metadata_token_order_is_fixed():
+     # Everything on: the full fixed order, both tides emitted independently.
+     c = ForceModelConfig(
+-        planets_third_body=True, solid_tides=True, ocean_tides=True, relativity=True
++        planets_third_body=True,
++        earth_radiation=True,
++        solid_tides=True,
++        ocean_tides=True,
++        relativity=True,
+     )
+     assert c._metadata_tokens() == [
+         "gravity:EIGEN-6S:70x70",
+@@ -132,6 +139,7 @@ def test_metadata_token_order_is_fixed():
+         "third_body:planets",
+         "drag:NRLMSISE-00",
+         "srp",
++        "earth_radiation",
+         "tides:solid",
+         "tides:ocean",
+         "relativity",
+@@ -153,6 +161,21 @@ def test_metadata_planets_is_one_lumped_token():
+     ]
+ 
+ 
++def test_metadata_earth_radiation_is_bare_token_after_srp():
++    # Bare token in the slot after srp: the lit-cap angular resolution is a
++    # version-pinned constant, deliberately NOT encoded (the ocean-tides
++    # truncation precedent; general-upgrades-1.md).
++    c = ForceModelConfig(earth_radiation=True)
++    assert c._metadata_tokens() == [
++        "gravity:EIGEN-6S:70x70",
++        "third_body:sun",
++        "third_body:moon",
++        "drag:NRLMSISE-00",
++        "srp",
++        "earth_radiation",
++    ]
++
++
+ def test_metadata_is_deterministic():
+     c = ForceModelConfig.leo_default()
+     assert c._metadata_tokens() == c._metadata_tokens()
+@@ -177,6 +200,7 @@ def test_serializer_is_driven_by_facts_not_config():
+         drag=False,
+         atmosphere_model="NRLMSISE-00",
+         srp=False,
++        earth_radiation=False,
+         solid_tides=False,
+         ocean_tides=False,
+         relativity=False,
+diff --git a/tests/propagation/test_numerical.py b/tests/propagation/test_numerical.py
+index ba061cc..b289947 100644
+--- a/tests/propagation/test_numerical.py
++++ b/tests/propagation/test_numerical.py
+@@ -492,6 +492,32 @@ def test_spacecraft_metadata_present_when_surface_force_wired():
+     assert "attitude" not in leo.metadata
+ 
+ 
++def test_earth_radiation_only_records_spacecraft_and_token():
++    """Earth radiation alone (no drag, no SRP) consumes the spacecraft.
++
++    ERP is the third surface force, so the widened ``spacecraft`` gate must open
++    for an ERP-only run, and the bare ``earth_radiation`` token sits in its fixed
++    slot (general-upgrades-1.md "Planetary Third-Body & Earth Radiation Pressure").
++    ``earth_radiation=True, srp=False`` is deliberately valid — the toggles are
++    independent (Knocke needs the Sun position and the optics, not the SRP force).
++    """
++    erp_only = ForceModelConfig(
++        gravity_degree=8,
++        gravity_order=8,
++        sun_third_body=False,
++        moon_third_body=False,
++        drag=False,
++        srp=False,
++        earth_radiation=True,
++    )
++    traj = propagate_numerical(
++        _leo_state(), 600.0, output_step=600.0, force_models=erp_only
++    )
++    assert traj.metadata["force_models"] == ["gravity:EIGEN-6S:8x8", "earth_radiation"]
++    assert traj.metadata["spacecraft"] == "sphere:A=1.0;m=1000.0,Cd=2.2,Cr=1.5"
++    assert "attitude" not in traj.metadata  # a sphere never records attitude
++
++
+ def test_metadata_required_and_optional_keys():
+     traj = propagate_numerical(
+         _keplerian_state(),
+@@ -698,6 +724,44 @@ def test_planets_third_body_negligible_in_leo():
+     assert divergence_m < 1.0
+ 
+ 
++def test_earth_radiation_effect_is_real_and_below_srp():
++    """ERP moves a high area-to-mass sphere measurably, but less than direct SRP.
++
++    A sail-like A/m = 2 m^2/kg sphere at ~500 km over 6 h; three runs differing
++    only in the radiation forces. |erp_on - base| pins the Knocke effect nonzero
++    far above integrator noise; |base - srp_off| measures the same-config
++    direct-SRP effect, which must dominate (ERP is a fraction of SRP in this
++    regime — the honest fraction is the resolution study's deliverable,
++    general-upgrades-1.md "Evidence deliverables" 2).
++    """
++    sail_like = SpacecraftConfig(
++        mass_kg=0.5, geometry=SpacecraftGeometry.sphere(area_m2=1.0)
++    )
++    shared = dict(
++        gravity_degree=8,
++        gravity_order=8,
++        sun_third_body=False,
++        moon_third_body=False,
++        drag=False,
++    )
++    common = dict(duration=21600.0, output_step=600.0, spacecraft=sail_like)
++    base = propagate_numerical(
++        _leo_state(), force_models=ForceModelConfig(srp=True, **shared), **common
++    )
++    erp_on = propagate_numerical(
++        _leo_state(),
++        force_models=ForceModelConfig(srp=True, earth_radiation=True, **shared),
++        **common,
++    )
++    srp_off = propagate_numerical(
++        _leo_state(), force_models=ForceModelConfig(srp=False, **shared), **common
++    )
++    div_erp_m = float(np.linalg.norm(erp_on.positions[-1] - base.positions[-1]))
++    div_srp_m = float(np.linalg.norm(base.positions[-1] - srp_off.positions[-1]))
++    assert div_erp_m > 1.0  # a real force, far above integrator noise
++    assert div_erp_m < div_srp_m  # ... but a fraction of direct SRP
++
++
+ def test_variable_cd_differs_from_fixed_and_clamps_once():
+     """A table-Cd sphere differs from fixed-Cd and warns exactly once out-of-grid.
+ 
+@@ -901,6 +965,63 @@ def test_box_attitude_metadata_gated_on_surface_force():
+     assert "spacecraft" not in traj.metadata  # no surface force consumes it either
+ 
+ 
++def test_box_earth_radiation_three_forces_and_attitude_gate():
++    """A box drives drag + SRP + Earth radiation off ONE shared object; ERP alone
++    opens the box gates.
++
++    The three-force run exercises the shared ``BoxAndSolarArraySpacecraft`` feeding
++    all three surface forces simultaneously inside a real ``propagate()`` — the
++    contract's shared-optics design. The ERP-only run pins the widened ``attitude``
++    gate: a box under Earth radiation alone is attitude-dependent, so both optional
++    keys must record (general-upgrades-1.md "Metadata").
++    """
++    three_forces = ForceModelConfig(
++        gravity_degree=8,
++        gravity_order=8,
++        sun_third_body=False,
++        moon_third_body=False,
++        drag=True,
++        srp=True,
++        earth_radiation=True,
++    )
++    traj = propagate_numerical(
++        _leo_state(),
++        1200.0,
++        output_step=600.0,
++        force_models=three_forces,
++        spacecraft=_BOX,
++        attitude=InPlaneTracking(),
++    )
++    assert isinstance(traj, Trajectory)
++    assert traj.metadata["force_models"] == [
++        "gravity:EIGEN-6S:8x8",
++        "drag:NRLMSISE-00",
++        "srp",
++        "earth_radiation",
++    ]
++    assert traj.metadata["attitude"] == "in_plane_tracking:vel=inertial"
++
++    erp_only = ForceModelConfig(
++        gravity_degree=8,
++        gravity_order=8,
++        sun_third_body=False,
++        moon_third_body=False,
++        drag=False,
++        srp=False,
++        earth_radiation=True,
++    )
++    traj = propagate_numerical(
++        _leo_state(),
++        600.0,
++        output_step=600.0,
++        force_models=erp_only,
++        spacecraft=_BOX,
++        attitude=InPlaneTracking(),
++    )
++    assert "spacecraft" in traj.metadata
++    assert traj.metadata["attitude"] == "in_plane_tracking:vel=inertial"
++
++
+ def test_sphere_non_default_attitude_warns_once_and_omits_key():
+     """A non-default attitude on a sphere warns exactly once and is ignored.
+ 

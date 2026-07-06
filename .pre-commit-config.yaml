@@ -8,12 +8,16 @@
 # conda env (the mypy hook below uses the env's interpreter and dependencies).
 
 repos:
-  # File hygiene.
+  # File hygiene. .patch files are excluded from the two rewriting hooks: a
+  # unified diff's empty context lines are a significant single space, so
+  # stripping them corrupts the patch (experiments/earth-radiation/ parks one).
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: '\.patch$'
       - id: end-of-file-fixer
+        exclude: '\.patch$'
       - id: check-yaml
       - id: check-toml
 

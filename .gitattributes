@@ -1,0 +1,7 @@
+# A unified diff's bytes are significant (empty context lines are a single
+# space; hunks must match the target byte-for-byte), so .patch files must
+# never be eol-normalized on commit/checkout — with core.autocrlf=true git
+# would otherwise rewrite them and `git apply` of the parked
+# experiments/earth-radiation/erp-runtime-chunk2.patch could fail on a fresh
+# clone. Companion to the .patch excludes in .pre-commit-config.yaml.
+*.patch -text

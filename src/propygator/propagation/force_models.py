@@ -35,6 +35,7 @@ def _serialize_force_models(
     gravity_order: int,
     sun_third_body: bool,
     moon_third_body: bool,
+    planets_third_body: bool,
     drag: bool,
     atmosphere_model: str,
     srp: bool,
@@ -45,9 +46,12 @@ def _serialize_force_models(
     """Build the deterministic ``force_models`` metadata token list.
 
     Fixed token order (features.md §1.1): gravity, ``third_body:sun``,
-    ``third_body:moon``, drag, ``srp``, ``tides:solid``, ``tides:ocean``,
-    ``relativity``. A disabled force emits no token; gravity is always present
-    (point mass is ``gravity:<field>:0x0``).
+    ``third_body:moon``, ``third_body:planets``, drag, ``srp``, ``tides:solid``,
+    ``tides:ocean``, ``relativity``. A disabled force emits no token; gravity is
+    always present (point mass is ``gravity:<field>:0x0``). ``third_body:planets``
+    is a single lumped token — its meaning (the pinned seven-planet set) lives in
+    features.md §1.1 (general-upgrades-1.md "Planetary Third-Body & Earth
+    Radiation Pressure").
 
     Driven by explicit facts rather than a :class:`ForceModelConfig` so
     ``propagate_numerical`` can serialize the forces it *actually wired* into the
@@ -60,6 +64,8 @@ def _serialize_force_models(
         tokens.append("third_body:sun")
     if moon_third_body:
         tokens.append("third_body:moon")
+    if planets_third_body:
+        tokens.append("third_body:planets")
     if drag:
         tokens.append(f"drag:{atmosphere_model}")
     if srp:
@@ -83,6 +89,12 @@ class ForceModelConfig:
     individual booleans from there. Immutable; field validation runs in
     :meth:`__post_init__` (no Orekit calls). See the module docstring for why the
     ``gravity_field`` / ``atmosphere_model`` strings are validated later.
+
+    ``planets_third_body`` lumps third-body gravity from the seven planets other
+    than Earth (Mercury–Neptune, off the DE ephemeris already in orekit-data).
+    Planetary accelerations on an Earth orbiter are ~1e-10–1e-13 of central
+    gravity (Venus and Jupiter dominate): a completeness option for
+    high-precision or long-arc work — it will not visibly move a LEO trajectory.
     """
 
     gravity_degree: int = 70
@@ -90,6 +102,7 @@ class ForceModelConfig:
     gravity_field: str = "EIGEN-6S"
     sun_third_body: bool = True
     moon_third_body: bool = True
+    planets_third_body: bool = False
     drag: bool = True
     atmosphere_model: str = "NRLMSISE-00"  # | "Harris-Priester" | "DTM-2000"
     srp: bool = True
@@ -162,6 +175,7 @@ class ForceModelConfig:
             gravity_order=self.gravity_order,
             sun_third_body=self.sun_third_body,
             moon_third_body=self.moon_third_body,
+            planets_third_body=self.planets_third_body,
             drag=self.drag,
             atmosphere_model=self.atmosphere_model,
             srp=self.srp,

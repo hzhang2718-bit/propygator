@@ -66,7 +66,8 @@ initial = pgr.State(
 )
 
 # Propagate 1 day at 60-second cadence (default leo_default force model:
-# gravity field + Sun/Moon + drag + SRP + tides). Returns a Trajectory.
+# 70x70 gravity + Sun/Moon third body + drag + SRP; tides, relativity, and a
+# lumped seven-planet third body are opt-in booleans). Returns a Trajectory.
 traj = pgr.propagate_numerical(initial, duration=86400, output_step=60)
 
 # Inspect: indexes/iterates as States, converts frames, gives osculating elements.

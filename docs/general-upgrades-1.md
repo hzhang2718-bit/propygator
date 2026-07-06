@@ -338,3 +338,155 @@ The ±Z faces (a sail's big faces) therefore contain the wind exactly in their p
 - **`SunPointing` `phasing_reference="velocity_ecef"`** — mechanically the `NadirPointing` swap (secondary slot), physically second-order; add only for API symmetry if ever wanted.
 
 **Evidence gate** (front-loaded, the build plan's first chunk — STOP/GO). A feathered-sail study, wholly in the conda env (every piece is shipped — no experiment venv): a representative thin-plate box with `BoxFaceCd.default()` on a ~500 km SSO over a multi-day window, `InPlaneTracking(velocity_reference="inertial")` vs `"ecef"`. Report (a) the big-face AoA history (expected: identically ~0 for `ecef`; oscillating 0–~3.8° for `inertial`), (b) the assembled `CdA` history, (c) the along-track divergence. **GO** iff the difference is material by the Tier B bar (coherent, attitude-correlated, not absorbable); otherwise the parameter is dropped.
+
+
+## Planetary Third-Body & Earth Radiation Pressure
+
+> Adds two opt-in perturbations to `propagate_numerical` — **`planets_third_body`**
+> (lumped third-body gravity from the seven planets other than Earth) and
+> **`earth_radiation`** (Knocke's rediffused Earth albedo + thermal-infrared radiation
+> pressure) — the fourth general upgrade feeding v0.5.0 (one branch,
+> `feature/additional-perturbations`, both chunks; realizing items 1–2 of
+> `docs/prospective-forces-and-progress-findings.md` — item 3, progress reporting, stays
+> unscoped and that doc remains its reference). Both ride inside `ForceModelConfig` — the
+> designed extension point — so the frozen `propagate_numerical` signature is untouched;
+> both are **off in every preset** (default runs stay bit-identical); and both wire
+> **stock Orekit force models** (no `@JImplements` proxies, so the JPype default-method
+> trap does not apply). The headline user for `earth_radiation` is the solar-sail regime
+> the last two upgrades built toward: ERP scales with area-to-mass and, for a box, acts
+> through the attitude-dependent `BoxAndSolarArraySpacecraft` cross-section, so it
+> composes with `BoxFaceCd` + ECEF `InPlaneTracking` for free. This section is the
+> **binding contract**: config fields and placement, the pinned planet set, wiring,
+> metadata grammar, the resolution constant, validation, docstrings, and the evidence
+> deliverables. It supersedes only the enumerated `features.md` §1.1 /
+> `architecture.md` spots below; everything else stands.
+>
+> **Outcome (2026-07-05): planets shipped in full; `earth_radiation` blocked on
+> upstream.** `planets_third_body` landed per this contract (build-plan Chunk 1; GEO
+> effect pin ~0.15 m / 3 d at the fixed test epoch, LEO ~5e-4 m / 1 d) and its
+> Supercessions are **folded back** into `features.md` §1.1 / `architecture.md` §13.
+> The ERP runtime was **fully built and then reverted, unshipped**: its
+> effect-envelope test exposed a defect in Orekit's `KnockeRediffusedForceModel` —
+> every released Orekit through 13.1.5 bounds the visible-cap integration with
+> `asin(R/r)` instead of `acos(R/r)`, making ERP ~2.4–3× hot at LEO (even in
+> eclipse) and ~10–20× cold at GEO; the fix shipped in **Orekit 13.1.6 (2026-06-03)**
+> but no installable orekit_jpype wrapper ≥ 13.1.6 exists yet (conda-forge: 13.1.4.0;
+> PyPI: 13.1.5.0). Evidence, the parked Chunk-2 patch, and the resume recipe live in
+> `experiments/earth-radiation/`. A second finding recorded there: the model
+> converges only for `angularResolution` ≲ 2°, and the fix changes the LEO cap, so
+> the resolution benchmark must run fresh after the upgrade. The ERP parts of the
+> Supercessions below (the `earth_radiation` field, its token, the widened
+> `spacecraft`/`attitude` gates, the model-limitations bullet) are **pending, not
+> folded back** — this section remains their binding design for the resumed build.
+
+### Supercessions
+
+- **`features.md` §1.1, `ForceModelConfig` dataclass** — gains `planets_third_body: bool = False` (inserted after `moon_third_body`) and `earth_radiation: bool = False` (inserted after `srp`). Fields are **inserted in metadata-grammar order, not appended**: the dataclass reads in the same fixed order as the grammar. This shifts the positional index of every later field — accepted deliberately (0.x semver; every §1.1/§9 example constructs by keyword, and an 11-field config constructed positionally was already unreadable).
+- **`features.md` §1.1, preset table + prose** — the table gains a `planets_third_body` / `earth_radiation` row (False / False / False across all three presets); the "Tides and relativity are off in all presets" sentence extends to cover both new fields, plus the two honesty caveats in **Details → Docstrings** (planetary magnitudes; ERP cost/regime).
+- **`features.md` §1.1, `force_models` grammar paragraph + example** — the fixed token order becomes: gravity, `third_body:sun`, `third_body:moon`, **`third_body:planets`**, drag, srp, **`earth_radiation`**, `tides:solid`, `tides:ocean`, relativity (see **Details → Metadata**).
+- **`features.md` §1.1, optional-physics-keys paragraph** — the `spacecraft` gate "appears when **drag or SRP** was wired" becomes "drag, SRP, or Earth radiation" (all three consume mass/area/coefficients); the `attitude` gate "box **and** drag or SRP" becomes "box **and** drag, SRP, or Earth radiation".
+- **`features.md` §1.1, model-limitations docstring** — gains the Earth-radiation bullet in **Details → Docstrings**.
+- **`architecture.md` §13, decisions log** — gains a resolved "Force inventory extended (v0.5.0)" bullet at fold-back: lumped seven-planet third body + Knocke Earth radiation, both opt-in, both stock Orekit.
+- **Code** — the migration touches, at minimum: `core/bodies.py` (seven planet accessors, verbatim `_moon()` clones); `propagation/force_models.py` (the two fields in grammar position; `_serialize_force_models` gains two **required** keyword params + token emission; `_metadata_tokens` passes them; the module-docstring token-order sentence); `propagation/numerical.py` (`_WiredForces` two fields; `_add_perturbation_forces` — the planets loop after the Moon block, the ERP force after SRP, the box-build condition gains `or fm.earth_radiation`; a new `_build_earth_radiation_force` beside `_build_srp_force`; a new `_EARTH_RADIATION_ANGULAR_RESOLUTION` constant beside `_OCEAN_TIDE_DEGREE`; the `_serialize_force_models` call site; the `spacecraft`/`attitude` metadata gates and their "only drag/SRP consume mass/geometry" comments; the `propagate_numerical` docstring); the consuming tests (`tests/propagation/test_force_models.py` grammar/preset pins, `test_numerical.py` wiring/metadata); and `README.md` / `CLAUDE.md` force-inventory mentions. (Detailed sequencing is the build plan's job; this lists the surface so none is missed.)
+
+### Context
+
+The decision record (condensed from `docs/prospective-forces-and-progress-findings.md` §2–§3; Orekit-API claims there were confirmed against the installed orekit_jpype 13.1.x by direct introspection on 2026-06-20):
+
+- **Planetary gravity ships as completeness, honestly scoped.** Planetary accelerations on an Earth orbiter are ~1e-10–1e-13 of central gravity (Venus and Jupiter dominate) — this will never visibly move a LEO trajectory, and the contract says so out loud. It ships anyway because the cost is trivial: the Sun/Moon third-body path is cloned verbatim, `CelestialBodyFactory` already exposes every planet, and the JPL DE ephemeris **already bundled in orekit-data answers for all of them** (probed: `getJupiter()` resolves and returns a µ) — no new data dependency, no resolver work. At that price, "full third-body completeness" is worth having for high-precision GEO / long-arc work.
+- **One lumped toggle, not per-planet booleans.** At these magnitudes, per-planet selection is false granularity — no one has a physical reason to want "just Saturn", and seven booleans (or a names-tuple) would bloat the config and the metadata grammar for zero information. A single `planets_third_body` boolean with a **pinned** planet set keeps the config readable, the grammar token deterministic, and the intent honest ("completeness on/off"). (The findings doc leaned toward a couple of explicit booleans; this contract supersedes that lean.)
+- **Earth radiation pressure ships on domain fit, not completeness.** ERP is a recognized term in precise LEO orbit determination, largest for low, high-area-to-mass craft — exactly the solar/drag-sail regime propygator's maintainer targets and the last two upgrades (`BoxFaceCd`, ECEF `InPlaneTracking`) built toward. For a representative sail it is roughly 10–25 % of direct SRP (albedo ~0.3 of the solar constant plus Earth IR, geometry-dependent) — a real force-budget term where radiation pressure is the point. For a box it rides the attitude-dependent `BoxAndSolarArraySpacecraft`, so a feathered or Sun-pointing sail sees it on the correct projected area with zero extra wiring.
+- **Named `earth_radiation`, not `earth_albedo`.** Knocke's "rediffused" model bundles reflected sunlight (visible albedo) *with* Earth's own thermal-infrared re-emission, and Orekit ships only the combined model. The name and docs must say albedo + IR — a contract decision, not a code one.
+- **The resolution knob is a hardcoded constant, not a config field.** `KnockeRediffusedForceModel`'s `angularResolution` is a continuous tuning knob; a field for it on `ForceModelConfig` would reopen the models-vs-coefficients split the config deliberately keeps clean. It lands as a module constant (`_EARTH_RADIATION_ANGULAR_RESOLUTION`, the `_OCEAN_TIDE_DEGREE` precedent), with its value chosen by a small front-loaded benchmark (see **Evidence deliverables**) rather than guessed in this contract.
+- **No go/no-go gate this time.** Tier B and ECEF `InPlaneTracking` carried STOP/GO evidence gates because shipping hinged on an unmeasured effect being material. Here the magnitudes are already understood (the findings-doc probe + the published ERP literature): planets ship *despite* being tiny (completeness at trivial cost — the tiny magnitude is the documented caveat, not a ship-blocker), and ERP ships on domain grounds. The evidence work below is **selection and characterization** (pick the resolution constant; measure and record the honest magnitudes), not a ship gate.
+
+### Details
+
+**API at a glance** (the full post-upgrade `ForceModelConfig`; both new fields marked):
+
+```python
+@dataclass(frozen=True)
+class ForceModelConfig:
+    gravity_degree: int = 70
+    gravity_order: int = 70
+    gravity_field: str = "EIGEN-6S"
+    sun_third_body: bool = True
+    moon_third_body: bool = True
+    planets_third_body: bool = False   # NEW — the seven other planets, lumped
+    drag: bool = True
+    atmosphere_model: str = "NRLMSISE-00"
+    srp: bool = True
+    earth_radiation: bool = False      # NEW — Knocke Earth albedo + thermal IR
+    solid_tides: bool = False
+    ocean_tides: bool = False
+    relativity: bool = False
+```
+
+**The planet set (pinned).** `planets_third_body=True` wires third-body point-mass attraction from exactly the **seven planets other than Earth** — Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune — added in that (heliocentric) order immediately after the Moon block in `_add_perturbation_forces` (the force sum is order-independent; a pinned order keeps the wiring deterministic and reviewable). Pluto is excluded (not a planet; effect beyond negligible); the barycenter accessors (`getSolarSystemBarycenter` / `getEarthMoonBarycenter`) are not third bodies for this purpose. Pinning the set is what makes the single `third_body:planets` metadata token deterministic forever.
+
+**Planets wiring.** Seven accessors in `core/bodies.py` (`_mercury()` … `_neptune()`), each a verbatim clone of `_moon()` over the matching `CelestialBodyFactory` getter (module-internal, lazy-JVM, same docstring shape). `_add_perturbation_forces` adds seven `ThirdBodyAttraction`s. The bundled DE ephemeris covers all seven — **no new data dependency**; a nonstandard, trimmed orekit-data missing planetary ephemerides fails inside the factory exactly as a missing Sun/Moon would (same failure class; no new handling).
+
+**Earth-radiation wiring.** A new `_build_earth_radiation_force(geometry, sun, box)` parallel to `_build_srp_force`, added immediately after SRP (force-addition order = token order):
+
+```python
+KnockeRediffusedForceModel(_sun(), radiation_sensitive,
+                           Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
+                           _EARTH_RADIATION_ANGULAR_RESOLUTION)
+```
+
+- **Optics are the SRP optics, reused.** Sphere → an `IsotropicRadiationSingleCoefficient(area_m2, reflectivity_coefficient)` with the same coefficients as SRP (the object is stateless, so building a second instance is fine; the build may hoist to share one). Box → the **shared `BoxAndSolarArraySpacecraft`**, which then drives up to **three** forces (drag + SRP + Earth radiation): the box-build condition in `_add_perturbation_forces` gains `or fm.earth_radiation`. No new coefficients, no new spacecraft-config surface.
+- **The 4-arg constructor** (default time scale for the model's periodic albedo terms); the 5-arg `TimeScale` overload exists if the build finds a concrete need — using it is an implementation detail, not a contract change.
+- **Independent of `srp`.** Knocke needs the Sun position and the optics, not the SRP force: `earth_radiation=True, srp=False` is valid (physically odd, but no coupling validation — consistent with every other independent toggle).
+- **No shadow wiring.** Earth IR acts in eclipse too, and the model computes the lit cap itself — there is no eclipse/shadow configuration to add or record.
+- **Sphere + attitude interaction unchanged.** ERP on a sphere is attitude-invariant; the existing one-time "attitude has no effect on orientation-independent geometry" warning path is untouched.
+
+**`_EARTH_RADIATION_ANGULAR_RESOLUTION`.** A module constant in `numerical.py` beside `_OCEAN_TIDE_DEGREE`, radians, controlling how finely Knocke discretizes Earth's visible cap. Its **value is not pinned by this contract** — it is chosen by the front-loaded resolution benchmark (Evidence deliverable 1) as the coarsest resolution whose orbit-level ERP effect is converged for the reference cases, and lands with a comment citing that study. Changing it later is a behavior change pinned by `propygator_version` (see Metadata).
+
+**Metadata.**
+
+- **Grammar** (fixed token order, extended): gravity, `third_body:sun`, `third_body:moon`, **`third_body:planets`**, drag (`drag:<model>`), `srp`, **`earth_radiation`**, `tides:solid`, `tides:ocean`, `relativity`. `third_body:planets` is **one token** — the lumped config produces a lumped token whose meaning (the pinned seven-planet set) lives in features.md; per-planet tokens would bloat every metadata block for zero information. `earth_radiation` is a **bare token**: the resolution constant is *not* encoded, on the ocean-tides precedent (the 4×4 truncation isn't in `tides:ocean` either) — the recorded `propygator_version` pins both constants. Example (everything the LEO preset has, plus both new forces):
+
+```python
+["gravity:EIGEN-6S:70x70", "third_body:sun", "third_body:moon", "third_body:planets",
+ "drag:NRLMSISE-00", "srp", "earth_radiation"]
+```
+
+- **Serializer.** `_serialize_force_models` gains two **required** keyword params (`planets_third_body`, `earth_radiation`) — required, not defaulted, so no call site can silently omit them; `_WiredForces` gains the matching fields; `propagate_numerical` serializes from the wired facts, never the config booleans, exactly as today. A run with both fields off emits byte-identical metadata to a pre-upgrade run.
+- **Optional-key gates.** `spacecraft` records when **drag, SRP, or Earth radiation** was wired; `attitude` when geometry is a box **and** any of those three was wired. (Both code comments saying "only drag/SRP consume mass/geometry/coefficients" are updated — ERP is now the third such force.)
+
+**Validation.** None new at construction: both fields are plain booleans with no invalid states and no coupling constraints; `__post_init__` is untouched. All three presets are **unchanged** (both fields False everywhere), so preset construction and serialization stay bit-identical.
+
+**Failure modes.** None new. Both forces are stock Orekit classes wired through existing seams: no Python-implemented Java interfaces (no default-method trap), no new data resolution, no new degenerate domains. The only genuinely new failure surface is a broken/trimmed orekit-data install (planets), which fails in the same class as a missing Sun/Moon.
+
+**Performance (honest accounting).** Planets: seven extra point-mass evaluations + DE-ephemeris lookups per integrator substep, all Java-side — negligible next to a single NRLMSISE-00 density query; no measurable wall-clock change expected on a drag-on run. Earth radiation: Knocke integrates over the discretized visible cap **every substep** — a real, resolution-dependent cost (quantified by the benchmark), but entirely Java-side (no per-substep JPype crossing, unlike the drag proxy). Both default off, so the default-path cost is exactly zero.
+
+**Docstrings.** Two honesty caveats are part of the contract:
+
+- *Planetary magnitudes* (features.md preset prose + the `planets_third_body` field doc): "Planetary third-body accelerations on an Earth orbiter are ~1e-10–1e-13 of central gravity (Venus and Jupiter dominate); `planets_third_body` is a completeness option for high-precision or long-arc work — it will not visibly move a LEO trajectory."
+- *Earth radiation* (a new bullet in the `propagate_numerical` model-limitations note, after the SRP bullet):
+
+```
+* Earth radiation pressure (earth_radiation) uses Knocke's low-order zonal
+  Earth albedo + thermal-infrared model, applied through the same uniform
+  optical coefficients as SRP, on a lit-cap discretization fixed at a
+  version-pinned angular resolution. Per-face optical properties and
+  higher-fidelity Earth radiation models are not included.
+```
+
+**Evidence deliverables** (front-loaded where they inform the build; characterization, **not** a ship gate):
+
+1. **ERP resolution benchmark** (`experiments/earth-radiation/`, wholly in the conda env — every piece is shipped, no experiment venv): sweep `angularResolution` over a coarse-to-fine ladder (e.g. 90° → 45° → 30° → 15° → 10° → 5° → 2.5°) for the reference sail (the ECEF study's 1 m² / 0.5 kg at 500 km SSO) over a multi-day arc, with the finest grid as truth. Pick the **coarsest** resolution whose along-track ERP effect agrees with truth to well within the model's own uncertainty (a few % of the effect), and report wall-clock overhead per rung. The chosen value lands as `_EARTH_RADIATION_ANGULAR_RESOLUTION` with a comment citing this study.
+2. **ERP magnitude characterization** (same experiment): with/without `earth_radiation` for (a) the reference sail and (b) a conventional bus (the 1000 kg / 1 m² default sphere) in LEO; report the ERP-vs-SRP acceleration fraction and the along-track divergence, plus a direction sanity check (mostly radially outward). These are the honest numbers that feed the docstring/CHANGELOG framing.
+3. **Planets effect pin**: with/without `planets_third_body` on a multi-day GEO arc (drag off, so it runs fast), asserting a small nonzero divergence in the expected envelope, and a LEO arc showing the effect is negligible there. Small enough to live as a test rather than an experiment (build plan decides the home).
+4. **Tests** (beyond the pins above): grammar token order/presence for both tokens; preset bit-identity (all three presets carry both fields False; default-config serialization unchanged); the metadata-gate changes (an ERP-only run — drag and SRP off — records `spacecraft`; a box + ERP run records `attitude`); and a box + ERP smoke through a real `propagate()` (three forces driven off one shared box object).
+
+**Out of scope.**
+
+- **Per-planet toggles / an `extra_third_bodies` names-tuple** — false granularity at these magnitudes; the lumped boolean is the API. If a genuine per-body need ever materializes, an additive tuple field can coexist with the lumped toggle.
+- **Pluto and the barycenter accessors** — excluded from the pinned set (see above).
+- **An `angular_resolution` field on `ForceModelConfig`** — would reopen the models-vs-coefficients split; the constant is the v1 shape (ocean-tides precedent).
+- **Separate albedo-only / IR-only switches** — Orekit ships only the combined Knocke model; the honest combined name is the feature.
+- **Per-face optical properties** (a radiation analog of `BoxFaceCd`) — not modeled; stays in the model-limitations note.
+- **Progress reporting** (findings doc §4) — deferred, unscoped; the findings doc stays in `docs/` as its reference.
+
+**Build shape** (one branch, `feature/additional-perturbations`; detailed sequencing is the build plan's job): planets chunk first (afternoon-scale; exercises the config/grammar/`_WiredForces` seams end-to-end), then the ERP runtime + tests (with a **provisional** resolution constant), then the ERP experiment (deliverables 1–2 — run *through the shipped path* by overriding the module constant per rung, which is why the runtime lands first; it finalizes `_EARTH_RADIATION_ANGULAR_RESOLUTION` before any doc quotes a number), then docs fold-back + wrap-up — Supercessions folded into `features.md` §1.1 / `architecture.md` §13 / `README.md` / `CLAUDE.md`; a status note added to `docs/prospective-forces-and-progress-findings.md` marking items 1–2 realized (the doc stays put for item 3); CHANGELOG `[Unreleased]` entry per `docs/changelog-guidelines.md` (maintainer-authored); squash-merge to `main`, **no tag** (v0.5.0 is tagged once, after all general upgrades land).

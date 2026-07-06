@@ -645,6 +645,59 @@ def test_geo_default_runs_and_stays_near_geo():
     assert np.all(np.abs(radii - 42164e3) < 100e3)  # bounded near GEO; no drag decay
 
 
+def test_planets_third_body_geo_effect_and_metadata():
+    """The lumped seven-planet toggle acts (tiny but real at GEO) and serializes.
+
+    Differential (only ``planets_third_body`` differs, the shared Sun/Moon/gravity
+    wobble cancels) over 3 days at GEO. The planetary tidal differential depends on
+    where the planets actually are: at this fixed test epoch the measured divergence
+    is ~0.15 m (an effective ~1e-11 m/s^2 — Venus and Jupiter dominate; a
+    closest-approach geometry would give roughly an order of magnitude more). The
+    band pins it nonzero far above the integrator noise floor (the LEO control below
+    measures ~5e-4 m for the same run pair) yet small in absolute terms — the
+    contract's honesty caveat (general-upgrades-1.md). Also pins the end-to-end
+    ``third_body:planets`` slot: after the moon token.
+    """
+    geo = _state_from_elements(a_m=42164e3, e=1e-4, i_deg=0.1)
+    shared = dict(gravity_degree=8, gravity_order=8, drag=False, srp=False)
+    common = dict(duration=3 * 86400.0, output_step=3600.0)
+    on = propagate_numerical(
+        geo, force_models=ForceModelConfig(planets_third_body=True, **shared), **common
+    )
+    off = propagate_numerical(geo, force_models=ForceModelConfig(**shared), **common)
+    assert on.metadata["force_models"] == [
+        "gravity:EIGEN-6S:8x8",
+        "third_body:sun",
+        "third_body:moon",
+        "third_body:planets",
+    ]
+    divergence_m = float(np.linalg.norm(on.positions[-1] - off.positions[-1]))
+    assert 0.02 < divergence_m < 10e3
+
+
+def test_planets_third_body_negligible_in_leo():
+    """In LEO the planetary term is lost in the noise — the honest scoping pin.
+
+    The same differential at ~500 km over 1 day: the planetary tidal acceleration
+    scales with geocentric radius (~6x smaller than GEO) while central gravity is
+    ~40x stronger, so the measured divergence is ~5e-4 m at this test epoch — five
+    thousand times under the sub-meter bound. Documents that ``planets_third_body``
+    is not a LEO-relevant force (features.md §1.1 caveat).
+    """
+    shared = dict(gravity_degree=8, gravity_order=8, drag=False, srp=False)
+    common = dict(duration=86400.0, output_step=3600.0)
+    on = propagate_numerical(
+        _leo_state(),
+        force_models=ForceModelConfig(planets_third_body=True, **shared),
+        **common,
+    )
+    off = propagate_numerical(
+        _leo_state(), force_models=ForceModelConfig(**shared), **common
+    )
+    divergence_m = float(np.linalg.norm(on.positions[-1] - off.positions[-1]))
+    assert divergence_m < 1.0
+
+
 def test_variable_cd_differs_from_fixed_and_clamps_once():
     """A table-Cd sphere differs from fixed-Cd and warns exactly once out-of-grid.
 

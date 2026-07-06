@@ -1,5 +1,16 @@
 # Prospective additions — planetary gravity, Earth radiation pressure, progress reporting
 
+> **Status update (2026-07-05):** items 1–2 were scoped into
+> `general-upgrades-1.md` "Planetary Third-Body & Earth Radiation Pressure" (build
+> plan archived at `docs/history/build-plan-additional-perturbations.md`). **Item 1
+> (planetary gravity) shipped** as the lumped `planets_third_body` toggle — this doc's
+> §2.3 per-planet-booleans lean was superseded by the contract. **Item 2 (Earth
+> radiation) is blocked on upstream**: §3's `KnockeRediffusedForceModel` is defective
+> in every installable Orekit (≤ 13.1.5 — wrong visible-cap horizon bound, fixed in
+> Orekit 13.1.6); the fully-built runtime is parked in `experiments/earth-radiation/`
+> with the evidence and resume recipe. **Item 3 (progress reporting) remains
+> unscoped** — §4 is still the live reference for it.
+
 > **Status: FINDINGS / ANALYSIS — not a design contract and not a build plan.** A
 > standalone feasibility/difficulty assessment of three candidate enhancements to the
 > numerical propagator, written to capture the reasoning before any build decision. It

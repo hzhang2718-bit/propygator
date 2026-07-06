@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The option to use ECEF velocity as the reference velocity in InPlaneTracking. An
   accompanying study shows that the slightly different reference velocity makes a
   minor but real impact.
+- Gravity perturbations from Solar System planets now available in the force model.
 
 ### Changed
 

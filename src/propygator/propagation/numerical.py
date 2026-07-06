@@ -1,8 +1,9 @@
 """``propagate_numerical`` — the numerical orbit propagator (Feature 1.1).
 
 The full propagator (build-plan chunks 7-9): integrator selection + tolerances, the
-gravity force, the full perturbation set (Sun/Moon third body, drag with a fixed or
-:class:`VariableCd` coefficient, conical-shadow SRP, solid/ocean tides, relativity)
+gravity force, the full perturbation set (Sun/Moon third body plus an optional lumped
+seven-planet third body, drag with a fixed or :class:`VariableCd` coefficient,
+conical-shadow SRP, solid/ocean tides, relativity)
 acting on either the **sphere** or the **box** (``BoxAndSolarArraySpacecraft``)
 geometry, the full seven-mode attitude family, output-step ephemeris sampling, the
 ``Trajectory`` + metadata assembly, input validation, and ``NumericalPropagationError``.
@@ -303,6 +304,7 @@ class _WiredForces:
 
     sun_third_body: bool
     moon_third_body: bool
+    planets_third_body: bool
     drag: bool
     srp: bool
     solid_tides: bool
@@ -737,15 +739,27 @@ def _add_perturbation_forces(
     """Add the enabled perturbation forces to ``propagator`` (chunks 8-9).
 
     Gravity is already wired by the caller. Forces are added in the ``force_models``
-    metadata-token order (third body, drag, SRP, tides, relativity) and the wired
-    facts returned so the metadata reflects exactly what acts. Sun/Moon/Earth come
-    from ``core/bodies.py`` (the canonical WGS84 ellipsoid + Orekit body singletons).
+    metadata-token order (third body — Sun, Moon, then the lumped planets — drag,
+    SRP, tides, relativity) and the wired facts returned so the metadata reflects
+    exactly what acts. The celestial bodies and Earth come from ``core/bodies.py``
+    (the canonical WGS84 ellipsoid + Orekit body singletons).
     A **box** geometry drives both drag and SRP from one shared
     ``BoxAndSolarArraySpacecraft``, built once here when a surface force will use it.
     """
     from org.orekit.forces.gravity import Relativity, ThirdBodyAttraction
 
-    from ..core.bodies import _earth, _moon, _sun
+    from ..core.bodies import (
+        _earth,
+        _jupiter,
+        _mars,
+        _mercury,
+        _moon,
+        _neptune,
+        _saturn,
+        _sun,
+        _uranus,
+        _venus,
+    )
 
     fm = force_models
     geometry = spacecraft.geometry
@@ -761,6 +775,20 @@ def _add_perturbation_forces(
         propagator.addForceModel(ThirdBodyAttraction(_sun()))
     if fm.moon_third_body:
         propagator.addForceModel(ThirdBodyAttraction(_moon()))
+    if fm.planets_third_body:
+        # The pinned seven-planet set in heliocentric order (general-upgrades-1.md
+        # "Planetary Third-Body & Earth Radiation Pressure"): one lumped toggle, one
+        # lumped metadata token.
+        for planet in (
+            _mercury(),
+            _venus(),
+            _mars(),
+            _jupiter(),
+            _saturn(),
+            _uranus(),
+            _neptune(),
+        ):
+            propagator.addForceModel(ThirdBodyAttraction(planet))
     if fm.drag:
         atmosphere = _resolve_atmosphere(fm.atmosphere_model, _sun(), _earth())
         propagator.addForceModel(_build_drag_force(geometry, atmosphere, box))
@@ -776,6 +804,7 @@ def _add_perturbation_forces(
     return _WiredForces(
         sun_third_body=fm.sun_third_body,
         moon_third_body=fm.moon_third_body,
+        planets_third_body=fm.planets_third_body,
         drag=fm.drag,
         srp=fm.srp,
         solid_tides=fm.solid_tides,
@@ -878,7 +907,8 @@ def propagate_numerical(
 
     **Force model.** Gravity is always wired (point-mass for the ``keplerian`` preset
     ``0 x 0``, a Holmes-Featherstone field otherwise); each enabled
-    ``ForceModelConfig`` toggle adds its Orekit force — Sun/Moon third body, drag
+    ``ForceModelConfig`` toggle adds its Orekit force — Sun/Moon third body (and,
+    lumped behind one toggle, the seven other planets — a tiny completeness term), drag
     (every path — sphere or box, fixed Cd or a :class:`VariableCd` table — routes
     through one custom ``DragSensitive`` so the §6.2 free-molecular-floor warn-once
     hook is shared), conical-shadow SRP, solid/ocean tides, relativity. The
@@ -1242,6 +1272,7 @@ def _build_metadata(
         gravity_order=force_models.gravity_order,
         sun_third_body=wired.sun_third_body,
         moon_third_body=wired.moon_third_body,
+        planets_third_body=wired.planets_third_body,
         drag=wired.drag,
         atmosphere_model=force_models.atmosphere_model,
         srp=wired.srp,

@@ -45,6 +45,7 @@ class ForceModelConfig:
     gravity_field: str = "EIGEN-6S"
     sun_third_body: bool = True
     moon_third_body: bool = True
+    planets_third_body: bool = False        # lumped: the seven planets other than Earth
     drag: bool = True
     atmosphere_model: str = "NRLMSISE-00"   # "NRLMSISE-00" | "Harris-Priester" | "DTM-2000"
     srp: bool = True
@@ -68,11 +69,14 @@ class ForceModelConfig:
 |---|---|---|---|
 | `gravity_degree, gravity_order` | 70, 70 | 12, 12 | 0, 0 (point mass) |
 | `sun_third_body` / `moon_third_body` | True / True | True / True | False / False |
+| `planets_third_body` | False | False | False |
 | `drag` | True (`NRLMSISE-00`) | False | False |
 | `srp` | True | True | False |
 | `solid_tides` / `ocean_tides` / `relativity` | False | False | False |
 
-LEO is gravity- and drag-dominated; GEO is gravity-degree-limited with negligible drag and SRP as a leading perturbation; Keplerian is the bit-exact analytical comparison case for tests (§11). Tides and relativity are off in all presets (rarely needed for v1 orbits, and they cost wall-clock time); users flip the boolean. Defaults are "good general-purpose starting points," not "best possible physics."
+LEO is gravity- and drag-dominated; GEO is gravity-degree-limited with negligible drag and SRP as a leading perturbation; Keplerian is the bit-exact analytical comparison case for tests (§11). Tides, relativity, and the lumped planetary third body are off in all presets (rarely needed for v1 orbits, and tides cost wall-clock time); users flip the boolean. Defaults are "good general-purpose starting points," not "best possible physics."
+
+**Planetary third body (v0.5.0).** `planets_third_body=True` wires third-body point-mass attraction from exactly the **seven planets other than Earth** (Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune — the pinned set; Pluto and the barycenters excluded), resolved from the JPL DE ephemeris already bundled in orekit-data (no new data dependency). It is deliberately **one lumped toggle**, not per-planet booleans: planetary accelerations on an Earth orbiter are ~1e-10–1e-13 of central gravity (Venus and Jupiter dominate), so per-planet selection is false granularity. A completeness option for high-precision or long-arc work — it will not visibly move a LEO trajectory (general-upgrades-1.md "Planetary Third-Body & Earth Radiation Pressure").
 
 **Gravity field source.** `gravity_field` names a file Orekit loads via `GravityFieldFactory` (e.g. `EIGEN-6S`, `EGM2008`, `EGM96`), shipped in the orekit-data zip. Because config construction is on the safe-before-init surface (architecture §10), `gravity_field` and `atmosphere_model` are stored as plain strings and validated at the top of `propagate_numerical` (before integration), raising `ValueError` with a known-name list if a string doesn't resolve.
 
@@ -329,7 +333,7 @@ A pre-flight cap rejects pathological grids: if the computed sample count exceed
 
 The optional physics keys are emitted only when they actually shaped the trajectory ("reflect what's acting", not the config booleans): `spacecraft` appears when **drag or SRP** was wired (the only forces that consume mass/geometry/coefficients), so a `keplerian` run omits it; `attitude` appears only when geometry is a **box and** drag or SRP was wired (orientation affects the result solely through a non-spherical cross-section under a surface force) — a sphere, or a force-free box, omits it. `name` appears only when supplied.
 
-**`force_models` grammar.** Deterministic, greppable strings in fixed token order — gravity, `third_body:sun`, `third_body:moon`, drag, srp, tides (`tides:solid` / `tides:ocean` emitted independently), relativity — so the same config yields byte-identical metadata. Example (LEO + solid tides):
+**`force_models` grammar.** Deterministic, greppable strings in fixed token order — gravity, `third_body:sun`, `third_body:moon`, `third_body:planets`, drag, srp, tides (`tides:solid` / `tides:ocean` emitted independently), relativity — so the same config yields byte-identical metadata. `third_body:planets` is a **single lumped token** whose meaning is the pinned seven-planet set above; per-planet tokens are never emitted. Example (LEO + solid tides):
 
 ```python
 ["gravity:EIGEN-6S:70x70", "third_body:sun", "third_body:moon",
