@@ -35,6 +35,12 @@ The ``scale`` field is only a *presentation* tag for output (``to_iso`` /
 without touching the count). A timezone-aware input fixes the instant, with
 ``scale`` choosing presentation; a naive ISO string is interpreted in ``scale``.
 
+Civil US display zones live here too (``USTimeZone`` + ``_resolve_tz``, the
+v0.5.0 civil-time upgrade) but stay strictly *outside* the physics-scale model:
+a zone is applied via ``datetime.astimezone`` at the formatting boundary of a
+display verb (``live_track``'s readout clock), never stored on an ``Epoch`` and
+never a ``TimeScale``.
+
 UT1 is deferred. UT1<->TAI needs continuously-varying Earth-orientation (EOP)
 data that only orekit-data provides, so UT1 is outside the pure-Python surface
 and raises ``NotImplementedError`` until Feature 1 wires it to the JVM
@@ -46,11 +52,13 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from enum import Enum
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import _leap_seconds
+from .exceptions import PropygatorError
 
 if TYPE_CHECKING:
     # Type-only; the org.orekit.* namespace is a runtime JPype stub with no
@@ -70,6 +78,57 @@ class TimeScale(Enum):
     TAI = "TAI"
     TT = "TT"
     UT1 = "UT1"
+
+
+class USTimeZone(Enum):
+    """US civil time zones for *display* formatting (the v0.5.0 civil-time upgrade).
+
+    Each member names the IANA key its zone lowers to (via :func:`_resolve_tz` →
+    ``zoneinfo.ZoneInfo``), so DST is handled by the IANA database — "Pacific"
+    renders PDT in July and PST in January with no caller code change. The set is
+    deliberately US-only to stay discoverable; non-US callers pass a raw
+    ``datetime.tzinfo`` (e.g. ``ZoneInfo("Europe/Paris")``) wherever a
+    ``USTimeZone`` is accepted. This is civil *display* time — a formatting-boundary
+    offset, never a :class:`TimeScale` (see the module docstring).
+    """
+
+    EASTERN = "America/New_York"
+    CENTRAL = "America/Chicago"
+    MOUNTAIN = "America/Denver"
+    PACIFIC = "America/Los_Angeles"
+    ALASKA = "America/Anchorage"
+    HAWAII = "Pacific/Honolulu"  # no DST
+    ARIZONA = "America/Phoenix"  # Mountain clock, no DST
+
+
+def _resolve_tz(tz: USTimeZone | tzinfo | None) -> tzinfo:
+    """Lower a user-facing ``tz`` argument to a concrete ``tzinfo``.
+
+    ``None`` → ``timezone.utc`` (the unchanged default); a ``tzinfo`` passes
+    through as-is (the non-US escape hatch); a :class:`USTimeZone` member lowers
+    to ``ZoneInfo(member.value)``. Display verbs call this **once** at entry, not
+    per frame, so a bad argument fails fast and the frame loop pays nothing.
+    """
+    if tz is None:
+        return timezone.utc
+    if isinstance(tz, tzinfo):
+        return tz
+    if isinstance(tz, USTimeZone):
+        try:
+            return ZoneInfo(tz.value)
+        except ZoneInfoNotFoundError as exc:
+            # A stripped tz database (zoneinfo has no system copy on Windows and
+            # no tzdata module). Actionable message, never a raw traceback.
+            raise PropygatorError(
+                f"IANA time zone {tz.value!r} not found: the zoneinfo database "
+                "is missing or incomplete. Install the tzdata package into this "
+                "environment ('pip install tzdata', or conda-forge "
+                "'python-tzdata') and retry."
+            ) from exc
+    raise TypeError(
+        "tz must be a USTimeZone member, a datetime.tzinfo, or None (UTC); "
+        f"got {type(tz).__name__}"
+    )
 
 
 # TT - TAI is fixed by definition.

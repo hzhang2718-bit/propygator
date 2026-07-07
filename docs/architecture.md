@@ -1071,6 +1071,8 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 Applications opt in to seeing logs via `logging.basicConfig(level=...)` or by setting the level on the `propygator` logger directly. Users control verbosity.
 
+**Sanctioned exception — progress output (v0.5.0, general-upgrades-1 Part B).** The long-running verbs (`propagate_numerical` today; `find_passes` / `fit_tle` when they ship) may emit transient progress status lines outside the logging system, under a narrow carve-out: **stderr only** (never stdout), **TTY-gated** (a non-TTY stderr — pytest, CI, redirects, notebooks — coarsens to sparse 25/50/75 milestones so logs stay clean), **opt-out** (`progress=False`), transient (no persistent state, no root-logger handler), and ASCII-only. `logger.info` milestones are still emitted regardless of the mode, so handler-configured users lose nothing. The carve-out is implemented once, in `core/progress.py` (`_ProgressReporter`), behind each verb's `progress` parameter; any console output outside that reporter remains a bug.
+
 ### Reproducibility
 
 `Trajectory.metadata` (a `TrajectoryMetadata` TypedDict — see §6) is the in-memory source of truth for reproducibility info. The required fields (`propygator_version`, `orekit_version`, `propagator`) are populated automatically at construction; optional fields are populated when applicable. The required keys are enforced at runtime by `Trajectory.__post_init__`, so the export pipeline can rely on them.

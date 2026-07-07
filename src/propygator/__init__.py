@@ -13,6 +13,10 @@ The Feature 1.1 surface is re-exported here: the data-model types, the
 ``BoxFaceCd`` (the per-face, convex-box Tier-B drag table) is re-exported beside
 ``VariableCd``. Feature 1.3 adds the ``TLE`` type, the ``propagate_tle``
 verb, and the CelesTrak ``fetch_tle`` path (``TLE.from_norad_id`` rides on it).
+Feature 1.4 adds the realtime verbs (``current_state`` /
+``current_ground_position`` / ``live_track``). The v0.5.0 general upgrades add
+``USTimeZone`` (the ``live_track`` ``tz=`` civil display zones) and
+``ProgressCallback`` (the type of a long-running verb's ``progress=`` callable).
 """
 
 import logging
@@ -39,8 +43,9 @@ from .core.observation import (
     moon_look_angles,
     sun_look_angles,
 )
+from .core.progress import ProgressCallback
 from .core.states import Orientation, State, Trajectory, _propygator_version
-from .core.time import Epoch, TimeScale
+from .core.time import Epoch, TimeScale, USTimeZone
 from .core.tle import TLE
 from .io import export_all, export_csv
 from .plotting import (
@@ -94,6 +99,7 @@ __all__ = [
     "StaleTLEWarning",
     "Epoch",
     "TimeScale",
+    "USTimeZone",
     "Frame",
     "State",
     "Trajectory",
@@ -106,6 +112,7 @@ __all__ = [
     "AzElRange",
     # Feature 1.1 — numerical propagator
     "propagate_numerical",
+    "ProgressCallback",
     "ForceModelConfig",
     "IntegratorConfig",
     "SpacecraftConfig",

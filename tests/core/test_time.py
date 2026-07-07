@@ -7,10 +7,12 @@ surface (architecture §10). ``test_no_jvm_started`` guards that invariant.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pytest
 
-from propygator import Epoch, TimeScale
+from propygator import Epoch, PropygatorError, TimeScale, USTimeZone
+from propygator.core.time import _resolve_tz
 
 # Scales whose construction is supported pure-Python (UT1 is deferred).
 _SUPPORTED_SCALES = [TimeScale.UTC, TimeScale.TAI, TimeScale.TT]
@@ -285,3 +287,77 @@ def test_to_iso_carries_near_one_fraction():
 def test_to_iso_high_precision_fraction_not_lost():
     e = Epoch.from_iso("2024-06-01T12:00:00.9999999996", scale=TimeScale.TT)
     assert e.to_iso() == "2024-06-01T12:00:01"
+
+
+# --- USTimeZone / _resolve_tz (civil display zones; v0.5.0) ------------------
+# Pure-Python like everything above: zoneinfo is stdlib and JVM-free.
+
+
+def test_ustimezone_is_exactly_the_pinned_seven():
+    # The contract (general-upgrades-1 "Civil Time Zones & Progress Reporting")
+    # pins the member set AND the IANA keys verbatim.
+    assert {m.name: m.value for m in USTimeZone} == {
+        "EASTERN": "America/New_York",
+        "CENTRAL": "America/Chicago",
+        "MOUNTAIN": "America/Denver",
+        "PACIFIC": "America/Los_Angeles",
+        "ALASKA": "America/Anchorage",
+        "HAWAII": "Pacific/Honolulu",
+        "ARIZONA": "America/Phoenix",
+    }
+
+
+def test_resolve_tz_none_is_utc():
+    assert _resolve_tz(None) is timezone.utc
+
+
+def test_resolve_tz_tzinfo_passes_through():
+    fixed = timezone(timedelta(hours=-7))
+    assert _resolve_tz(fixed) is fixed
+
+
+def test_resolve_tz_member_lowers_to_zoneinfo():
+    resolved = _resolve_tz(USTimeZone.EASTERN)
+    assert isinstance(resolved, ZoneInfo)
+    assert resolved.key == "America/New_York"
+
+
+@pytest.mark.parametrize(
+    ("member", "month", "offset_h", "abbrev"),
+    [
+        (USTimeZone.EASTERN, 7, -4, "EDT"),  # DST
+        (USTimeZone.EASTERN, 1, -5, "EST"),
+        (USTimeZone.PACIFIC, 7, -7, "PDT"),  # DST
+        (USTimeZone.PACIFIC, 1, -8, "PST"),
+        (USTimeZone.ARIZONA, 7, -7, "MST"),  # Mountain clock, no DST
+        (USTimeZone.ARIZONA, 1, -7, "MST"),
+        (USTimeZone.HAWAII, 7, -10, "HST"),  # no DST
+        (USTimeZone.HAWAII, 1, -10, "HST"),
+    ],
+)
+def test_resolve_tz_dst_pins(member, month, offset_h, abbrev):
+    # Summer/winter instants pin that DST comes from the IANA database, not a
+    # fixed offset (a fixed offset would be wrong half the year).
+    local = datetime(2026, month, 15, 18, 0, tzinfo=timezone.utc).astimezone(
+        _resolve_tz(member)
+    )
+    assert local.utcoffset() == timedelta(hours=offset_h)
+    assert local.tzname() == abbrev
+
+
+def test_resolve_tz_rejects_other_types():
+    with pytest.raises(TypeError, match="USTimeZone"):
+        _resolve_tz("America/New_York")
+
+
+def test_resolve_tz_missing_tzdata_is_actionable(monkeypatch):
+    # A stripped tz database surfaces as PropygatorError naming the tzdata
+    # remedy, never a raw ZoneInfoNotFoundError traceback.
+    from propygator.core import time as core_time
+
+    def _raise(key):
+        raise ZoneInfoNotFoundError(key)
+
+    monkeypatch.setattr(core_time, "ZoneInfo", _raise)
+    with pytest.raises(PropygatorError, match="tzdata"):
+        _resolve_tz(USTimeZone.PACIFIC)

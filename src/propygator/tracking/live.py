@@ -48,7 +48,7 @@ import numpy as np
 from ..core.exceptions import StaleTLEWarning
 from ..core.frames import Frame
 from ..core.observation import look_angles_track
-from ..core.time import Epoch
+from ..core.time import Epoch, USTimeZone, _resolve_tz
 from ..core.tle import TLE
 from ..tle.propagator import propagate_tle
 from ..tle.sources import _TTL_REALTIME_S, fetch_tle
@@ -349,12 +349,15 @@ _TWILIGHT_NIGHT = "#0b1233"
 def _format_clock(epoch: Epoch, *, tz: tzinfo = timezone.utc) -> str:
     """Format ``epoch`` as a civil wall-clock string in ``tz`` (UTC by default).
 
-    The features.md §1.4 tz-ready clock seam: ``Epoch.to_datetime()`` returns a
+    The features.md §1.4 tz-ready clock seam, now fed by ``live_track``'s ``tz=``
+    (the v0.5.0 civil-time upgrade): ``Epoch.to_datetime()`` returns a
     timezone-aware UTC ``datetime``, and ``.astimezone(tz)`` re-expresses it as civil
     local time (DST included) — a pure *display* offset, never a ``TimeScale`` change,
-    so it never touches the leap-second / deferred-UT1 machinery. v1 always renders UTC;
-    a future ``tz=`` parameter on ``live_track`` flows straight through here with no
-    core change (it adds a ``tzdata`` dependency on Windows — out of scope for 1.4).
+    so it never touches the leap-second / deferred-UT1 machinery. ``live_track``
+    resolves its ``tz=`` once at entry (``core.time._resolve_tz``; a ``USTimeZone``
+    member lowers to ``zoneinfo.ZoneInfo``, which needs the declared ``tzdata``
+    package on Windows) and threads the result here; the ``%Z`` token renders the
+    active zone abbreviation ("UTC", "EST"/"EDT") so the offset self-documents.
     """
     return epoch.to_datetime().astimezone(tz).strftime("%Y-%m-%d %H:%M:%S %Z")
 
@@ -486,6 +489,7 @@ def live_track(
     output_step: float = 10.0,
     half_window_s: float = 2700.0,
     refresh_s: float = 1.0,
+    tz: USTimeZone | tzinfo | None = None,
 ) -> FuncAnimation:
     """Launch a live, self-updating dashboard tracking ``target`` in real time.
 
@@ -510,6 +514,14 @@ def live_track(
     survives every redraw *and* every buffer rebuild (the v0.5.0 mutate-in-place
     upgrade; blitting stays a named later optimization).
 
+    ``tz`` localizes the **suptitle readout clock only** (the v0.5.0 civil-time
+    upgrade; a pure display offset, never a ``TimeScale`` change): ``None`` keeps
+    the UTC default (byte-identical to before), a
+    :class:`~propygator.core.time.USTimeZone` member renders DST-correct US civil
+    time (the ``%Z`` token shows the active abbreviation, so ``PDT``/``PST`` flips
+    automatically), and a raw ``tzinfo`` is the non-US escape hatch. Every other
+    panel is elapsed-hours or spatial, so nothing else has a wall clock to localize.
+
     Returns the native ``FuncAnimation`` (consistent with "every ``plot_*`` returns its
     native figure", architecture §10). **You must keep a reference to it** —
     ``anim = live_track(...)`` — or matplotlib garbage-collects the animation and it
@@ -521,6 +533,10 @@ def live_track(
     neither starts the JVM nor adds any matplotlib import beyond what the top-level
     ``plot_*`` verbs already load.
     """
+    # Resolve tz ONCE at entry (contract: Part A -> Resolution) -- a bad value
+    # fails fast, before any fetch/propagation or figure work.
+    tz_resolved = _resolve_tz(tz)
+
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
     from matplotlib.collections import PathCollection
@@ -805,11 +821,12 @@ def live_track(
             sky.sat.set_offsets([_sky_glyph_offset(sat_ae)])
             sky.ax.set_facecolor(_twilight_facecolor(sun_ae.elevation_deg))
 
-        # Live readout: sub-satellite position, altitude, both speeds, and UTC clock.
+        # Live readout: sub-satellite position, altitude, both speeds, and the
+        # wall clock (UTC by default; tz-localized when live_track got a tz=).
         readout.set_text(
             f"{_format_latlon(geo)} · alt {geo.altitude_m / 1000.0:.0f} km · "
             f"{v_inertial_kms:.2f} km/s (gnd {v_ground_kms:.2f}) · "
-            f"{_format_clock(now)}"
+            f"{_format_clock(now, tz=tz_resolved)}"
         )
         return dynamic
 

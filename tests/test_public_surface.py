@@ -52,6 +52,9 @@ EXPECTED_NAMES = [
     "plot_speed",
     "export_csv",
     "export_all",
+    # v0.5.0 general upgrades (ux-improvements)
+    "USTimeZone",
+    "ProgressCallback",
 ]
 
 _MU = 3.986004418e14  # WGS84, matches the propagator's Earth GM

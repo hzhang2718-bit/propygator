@@ -7,7 +7,8 @@ fixed and :class:`VariableCd` coefficients, SRP, tides, relativity — and the c
 **box geometry + full attitude family**: box drag/SRP via
 ``BoxAndSolarArraySpacecraft``, a box ``VariableCd``, each attitude mode end-to-end, the
 attitude/geometry consistency warning, the Tier B per-face ``BoxFaceCd`` box drag
-runtime, and the ``force_models`` / ``spacecraft`` / ``attitude`` metadata grammar. Like
+runtime, the ``force_models`` / ``spacecraft`` / ``attitude`` metadata grammar, and
+the v0.5.0 ``progress`` wiring (the step-handler proxy inside a real propagate). Like
 ``test_conversions`` / ``test_stack_compat``, every test starts the JVM once via the
 session-scoped ``orekit`` fixture (the pure-Python config tests live in
 ``test_force_models`` / ``test_integrators`` / ``test_spacecraft`` / ``test_attitude``
@@ -22,6 +23,7 @@ import numpy as np
 import pytest
 
 from propygator import (
+    AltitudeLimits,
     Epoch,
     Frame,
     KeplerianElements,
@@ -1326,3 +1328,88 @@ def test_features_solar_sail_example_runs():
     )
     assert isinstance(traj, Trajectory)
     assert traj.metadata["attitude"] == "lof_offset:TNW;roll=30.0,pitch=0.0,yaw=0.0"
+
+
+# --- progress reporting (general-upgrades-1 Part B; v0.5.0) ------------------
+#
+# The reporter itself is unit-tested headlessly in tests/core/test_progress.py;
+# these pin the propagate_numerical wiring inside a REAL propagate(). Under
+# pytest the captured stderr is non-TTY, so the built-in printer takes the
+# coarse cadence (start + 25/50/75 + done) — the fine TTY cadence is asserted at
+# the reporter level and eyeballed at the build plan's Checkpoint A.
+
+
+def _quick_run(**kwargs) -> Trajectory:
+    """A cheap 1-h point-mass run (61 samples) for the progress wiring tests."""
+    return propagate_numerical(
+        _keplerian_state(),
+        3600.0,
+        output_step=60.0,
+        force_models=ForceModelConfig.keplerian(),
+        **kwargs,
+    )
+
+
+def test_progress_default_prints_coarse_lines_to_stderr_only(capsys):
+    _quick_run()  # progress defaulted True — the deliberate v0.5.0 behavior change
+    captured = capsys.readouterr()
+    assert captured.out == ""  # never stdout
+    lines = [ln for ln in captured.err.splitlines() if ln]
+    assert lines[0].startswith("propagate_numerical: start | 1.0 h | ")
+    assert lines[0].endswith("| 61 samples")
+    assert lines[-1].startswith("propagate_numerical: done | 1.0 h | ")
+    assert lines[-1].endswith("| 61 samples")
+    # Captured (non-TTY) stderr coarsens to exactly the quartile milestones.
+    percent_lines = [ln for ln in lines if "%" in ln]
+    assert [ln.split("%")[0].split()[-1] for ln in percent_lines] == ["25", "50", "75"]
+
+
+def test_progress_false_is_fully_silent(capsys):
+    _quick_run(progress=False)
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out == ""
+
+
+def test_progress_callable_gets_fractions_and_prints_nothing(capsys):
+    seen: list[float] = []
+    _quick_run(progress=seen.append)
+    captured = capsys.readouterr()
+    assert captured.err == ""  # callable mode: the library prints nothing
+    assert captured.out == ""
+    assert seen == sorted(seen)  # monotonic 0 -> 1
+    assert all(0.0 <= f <= 1.0 for f in seen)
+    assert seen[-1] == pytest.approx(1.0)  # the realized-span denominator hits 1.0
+
+
+def test_progress_junk_argument_raises_typeerror():
+    with pytest.raises(TypeError, match="progress must be"):
+        _quick_run(progress="yes")
+
+
+def test_progress_guard_stop_prints_stopped_line(capsys):
+    # Mirror test_guards_runtime.test_user_min_crossing_stops_and_reports: an
+    # eccentric two-body descent from apogee (~522 km) through a 350 km user
+    # floor — the run terminates early, and the final stderr line must be the
+    # honest reason-bearing "stopped at NN%" (not "done", never dangling).
+    mu = 3.986004418e14
+    r_apo, r_per = 6.9e6, 6.65e6
+    v_apo = float((mu * (2.0 / r_apo - 1.0 / (0.5 * (r_apo + r_per)))) ** 0.5)
+    state = State(
+        _EPOCH,
+        np.array([r_apo, 0.0, 0.0]),
+        np.array([0.0, v_apo, 0.0]),
+        Frame.EME2000,
+    )
+    traj = propagate_numerical(
+        state,
+        3000.0,
+        output_step=30.0,
+        force_models=ForceModelConfig.keplerian(),
+        limits=AltitudeLimits(min_altitude_km=350.0),
+    )
+    assert traj.metadata["termination_reason"] == "user_min"
+    lines = [ln for ln in capsys.readouterr().err.splitlines() if ln]
+    assert lines[-1].startswith("propagate_numerical: stopped at ")
+    assert "| user_min at t+" in lines[-1]
+    assert lines[-1].endswith("samples (partial)")

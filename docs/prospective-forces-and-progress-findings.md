@@ -8,8 +8,14 @@
 > radiation) is blocked on upstream**: §3's `KnockeRediffusedForceModel` is defective
 > in every installable Orekit (≤ 13.1.5 — wrong visible-cap horizon bound, fixed in
 > Orekit 13.1.6); the fully-built runtime is parked in `experiments/earth-radiation/`
-> with the evidence and resume recipe. **Item 3 (progress reporting) remains
-> unscoped** — §4 is still the live reference for it.
+> with the evidence and resume recipe. **Item 3 (progress reporting) shipped
+> (2026-07-06)** — scoped by `general-upgrades-1.md` §"Civil Time Zones &
+> Progress Reporting" (Part B) and built on `feature/ux-improvements`: the §4
+> step-handler mechanism as probed, behind a `progress: bool | ProgressCallback
+> = True` parameter (option (b)'s signature edit **plus** default-on stderr
+> lines — beyond option (a), since the `NullHandler` makes log-only invisible
+> by default; §4.3's option weighing is superseded by that contract). §4 stays
+> the mechanism reference.
 
 > **Status: FINDINGS / ANALYSIS — not a design contract and not a build plan.** A
 > standalone feasibility/difficulty assessment of three candidate enhancements to the

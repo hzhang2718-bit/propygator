@@ -52,6 +52,7 @@ import numpy as np
 
 from .._orekit_init import _ensure_started, _orekit_version
 from ..core.frames import Frame
+from ..core.progress import ProgressCallback, _ProgressReporter
 from ..core.sampling import _output_offsets, _validate_sampling
 from ..core.states import Trajectory, _propygator_version
 from .attitude import LofAligned, _serialize_attitude, _to_provider
@@ -885,6 +886,45 @@ def _resolve_attitude(
     return config
 
 
+def _make_progress_step_handler(start_date, span_s: float, reporter):
+    """Build the read-only ``OrekitFixedStepHandler`` feeding ``reporter``.
+
+    Implements the interface from Python via ``@JImplements`` (Java classes can't
+    be subclassed; CLAUDE.md). All THREE methods are implemented — ``init`` /
+    ``handleStep`` / ``finish`` — because a Python proxy does not inherit Java
+    ``default`` methods (the known JPype trap; findings §5.3). ``handleStep``
+    reports ``durationFrom(start)/span`` — monotonic 0 → 1 over the realized
+    span. ``finish`` forwards the *actual* final state's fraction: the step
+    normalizer does not guarantee a handleStep tick at the exact endpoint
+    (verified: a completed run's last tick can land short of 100%), and on a
+    guard stop the honest last fraction is the stop point — so a ``progress``
+    callable always receives the true final fraction (1.0 on completion).
+    Registered on the step multiplexer it coexists with the ephemeris generator
+    (probed: findings §4.1).
+    """
+    import jpype
+    from org.orekit.propagation.sampling import OrekitFixedStepHandler
+
+    def _fraction_of(state) -> float:  # noqa: ANN001 - Orekit SpacecraftState
+        return float(state.getDate().durationFrom(start_date)) / span_s
+
+    @jpype.JImplements(OrekitFixedStepHandler)  # type: ignore[attr-defined]
+    class _ProgressStepHandler:
+        @jpype.JOverride  # type: ignore[attr-defined]
+        def init(self, s0, t, step):  # noqa: ANN001, ANN202 - Java signature
+            pass
+
+        @jpype.JOverride  # type: ignore[attr-defined]
+        def handleStep(self, state):  # noqa: ANN001, ANN202 - Java signature
+            reporter.update(_fraction_of(state))
+
+        @jpype.JOverride  # type: ignore[attr-defined]
+        def finish(self, final_state):  # noqa: ANN001, ANN202 - Java signature
+            reporter.update(_fraction_of(final_state))
+
+    return _ProgressStepHandler()
+
+
 def propagate_numerical(
     initial: State,
     duration: float,
@@ -896,6 +936,7 @@ def propagate_numerical(
     integrator: IntegratorConfig | None = None,
     limits: AltitudeLimits | None = None,
     name: str | None = None,
+    progress: bool | ProgressCallback = True,
 ) -> Trajectory:
     """Numerically propagate ``initial`` forward by ``duration`` seconds.
 
@@ -956,10 +997,27 @@ def propagate_numerical(
     left ``None`` means the system backstops only; ``name``, if given, is recorded in
     the trajectory metadata.
 
+    **Progress reporting (v0.5.0).** ``progress`` drives the run's live status
+    channel: ``True`` (the default) prints plain, ASCII-only, throttled status
+    lines to **stderr** (never stdout) — a start line immediately, a line per new
+    10% or ~5 s of wall clock on a TTY (a non-TTY stderr — pytest, CI, a redirect,
+    a notebook — coarsens to the 25/50/75 milestones so logs stay clean), and an
+    honest final line (``done ...``, ``stopped at NN% | <reason> ...`` on a guard
+    stop, or ``failed at NN%`` when an error is raised). ``False`` is silent. A
+    callable — :data:`~propygator.core.progress.ProgressCallback`, re-exported
+    top-level — receives the 0 → 1 completed fraction on each throttled tick and
+    nothing is printed (the seam for tqdm / a GUI bar; the callable runs inside
+    the integration loop, so an exception it raises aborts the run and surfaces
+    as ``NumericalPropagationError`` carrying its message). ``logger.info``
+    milestones are emitted regardless of the mode. This is the one sanctioned,
+    narrow exception to the "logging, never prints" convention (architecture
+    §Logging).
+
     Raises ``ValueError`` for invalid inputs (non-inertial frame, non-positive or
     mis-ordered ``duration`` / ``output_step``, unknown ``integrator.type``,
     ``gravity_field``, or ``atmosphere_model``, ``ClassicalRK4`` without
-    ``fixed_step_s``); and
+    ``fixed_step_s``); ``TypeError`` for a ``progress`` that is neither a bool nor
+    a callable; and
     :class:`~propygator.core.exceptions.NumericalPropagationError` if the integrator
     fails and the failure is **not** a drag-driven re-entry (a too-tight tolerance, a
     bad setup, or any non-low-altitude stiffness) — carrying the Orekit message only
@@ -1017,222 +1075,291 @@ def propagate_numerical(
         n_samples,
     )
 
-    _ensure_started()
-    import jpype
-    from org.orekit.orbits import CartesianOrbit, OrbitType
-    from org.orekit.propagation import SpacecraftState
-    from org.orekit.propagation.numerical import NumericalPropagator
+    # Progress reporter (general-upgrades-1 Part B), constructed BEFORE the JVM
+    # section: a junk `progress` fails fast (TypeError, raised in the reporter and
+    # shared by every consumer), and the start line prints before JVM startup —
+    # the first slow step a user would otherwise stare at. span_s is the REALIZED
+    # propagation span (the actual propagate() target, which the sample grid
+    # floors to <= the requested duration) — the denominator the 0->1 fraction
+    # runs over, so it genuinely reaches 1.0 (contract: Mechanism).
+    span_s = float((n_samples - 1) * output_step)
+    reporter = _ProgressReporter("propagate_numerical", progress, span_s=span_s)
+    reporter.start(f"{span_s / 3600.0:.1f} h | {integrator.type} | {n_samples} samples")
 
-    from ..core.exceptions import NumericalPropagationError
-    from ..core.time import _epoch_from_orekit
-    from .guards import (
-        _altitude_km_to_radius_m,
-        _classify_termination,
-        _escape_radius_m,
-        _impact_radius_m,
-        _is_reentry_failure,
-        _make_radius_stop_detector,
-        _reentry_floor_radius_m,
-    )
-
-    eme2000 = Frame.EME2000.to_orekit()
-    start_date = initial.epoch.to_orekit()
-
-    # Gravity provider + force (also the source of the central mu the orbit uses,
-    # so the orbit and the gravity force share one consistent mu).
-    provider = _resolve_gravity_provider(force_models.gravity_field, degree, order)
-    mu = float(provider.getMu())
-    gravity = _build_gravity_force(provider, degree, order)
-
-    orbit = CartesianOrbit(
-        initial.to_orekit().getPVCoordinates(), eme2000, start_date, mu
-    )
-
-    integrator_obj = _build_integrator(integrator, orbit)
-    propagator = NumericalPropagator(integrator_obj)
-    propagator.setOrbitType(OrbitType.CARTESIAN)
-    propagator.addForceModel(gravity)
-    # Enabled perturbations (third body, drag, SRP, tides, relativity) on the sphere
-    # or box geometry; `wired` records exactly what was added, for honest metadata.
-    wired = _add_perturbation_forces(propagator, force_models, spacecraft, provider)
-    # Attitude provider (resolved above): the supplied mode for a box, LofAligned for
-    # a sphere. For a sphere the cross-section is orientation-invariant, so this has no
-    # effect on the dynamics; for a box it drives the drag/SRP projected area.
-    propagator.setAttitudeProvider(_to_provider(attitude_config))
-    # Mass drives drag/SRP per-unit-mass acceleration (gravity is mass-independent).
-    propagator.setInitialState(SpacecraftState(orbit, float(spacecraft.mass_kg)))
-
-    # Terminal radius backstops (addendum §6.1/§6.3): stop & report at Earth impact
-    # and at lunar-gravity-parity escape. Both always active, independent of the force
-    # config. `termination_specs` (radius -> reason) also drives reason classification
-    # after the run. The system backstops stay FIRST in the list so the
-    # nearest-threshold classifier resolves a degenerate exact tie with a user limit in
-    # favor of the system reason (min_altitude_km == 0 -> "impact"; max_altitude_km at
-    # the escape-parity altitude -> "escape").
-    termination_specs = [
-        (_impact_radius_m(), "impact"),
-        (_escape_radius_m(), "escape"),
-    ]
-    # Optional user altitude limits (addendum §6.4/§6.6): lower each supplied bound
-    # once to a geocentric radius via the *same* altitude->radius reference the escape
-    # backstop uses, and register it as another terminal stop. A reasonable limit is
-    # guaranteed (by AltitudeLimits.__post_init__) to nest inside the backstops, so it
-    # can only tighten termination — on a descent the inner user_min radius is reached
-    # before R⊕, on a climb the user_max radius before escape, so the first crossing
-    # wins with no explicit tightest-of arithmetic. An unreasonable limit raised a
-    # ValueError at construction, so none reaches here. (features.md §1.1 failure-modes
-    # table gains that construction-time ValueError row in the Chunk-11 reconciliation.)
-    if limits is not None:
-        if limits.min_altitude_km is not None:
-            termination_specs.append(
-                (_altitude_km_to_radius_m(limits.min_altitude_km), "user_min")
-            )
-        if limits.max_altitude_km is not None:
-            termination_specs.append(
-                (_altitude_km_to_radius_m(limits.max_altitude_km), "user_max")
-            )
-    for threshold_radius, _ in termination_specs:
-        propagator.addEventDetector(_make_radius_stop_detector(threshold_radius))
-
-    last_offset = float((n_samples - 1) * output_step)
-    end_date = start_date.shiftedBy(last_offset)
-
-    t0 = time.perf_counter()
-    generator = propagator.getEphemerisGenerator()
-    # A propagation failure (a JException) is no longer always fatal (addendum §6.6). A
-    # drag-driven decay stiffens until it fails — the adaptive step saturates min_step_s
-    # or, with looser tolerances, the atmosphere model rejects the sub-surface query
-    # ("point is inside ellipsoid"). Both surface as a JException; we catch it, recover
-    # the ephemeris built so far, and CLASSIFY by physical state (drag + descending +
-    # osculating perigee), not by the message. The impact detector registered above is
-    # the drag-OFF counterpart: with no atmosphere query it stops cleanly at R⊕ as
-    # "impact" (addendum §8), so a drag-on decay routes here as "reentry" instead.
-    failure_msg: str | None = None
     try:
-        propagator.propagate(end_date)
-    except jpype.JException as exc:  # type: ignore[attr-defined]
-        # Capture the Java *message* only (no raw stack trace; architecture §3) and
-        # leave the except block before recovering, so a recovery failure cannot chain.
-        failure_msg = str(exc.getMessage())
+        _ensure_started()
+        import jpype
+        from org.orekit.orbits import CartesianOrbit, OrbitType
+        from org.orekit.propagation import SpacecraftState
+        from org.orekit.propagation.numerical import NumericalPropagator
 
-    if failure_msg is not None:
-        ephemeris = _recover_ephemeris(generator)
-        if ephemeris is None:
-            # No usable steps recovered (edge a): fail loudly with no partial attached.
-            raise NumericalPropagationError(
-                f"numerical propagation failed: {failure_msg}"
-            ) from None
-    else:
-        ephemeris = generator.getGeneratedEphemeris()
-
-    # A terminal detector firing — or a recovered partial — shortens the realized span
-    # below the planned end, so clamp the sampling grid to the achieved span (addendum
-    # §6.3): sampling past getMaxDate() would raise. A normal run achieves the full span
-    # (realized == n_samples), so the common path is unchanged.
-    max_date = ephemeris.getMaxDate()
-    max_offset = float(max_date.durationFrom(start_date))
-    realized = _realized_sample_count(max_offset, output_step, n_samples)
-
-    # Sample the (possibly partial) ephemeris at exactly output_step. The Orekit lookup
-    # date and the propygator Epoch share the same offset, so they denote one instant.
-    offsets = _output_offsets(realized, output_step)
-    # A terminal stop inside the first output_step clamps to one on-grid sample
-    # (the start). Append the achieved-span endpoint so the partial Trajectory keeps
-    # the >= 2 samples every downstream verb (at/plot/export) needs — the floor a
-    # normal run gets from output_step <= duration. The endpoint is exactly
-    # getMaxDate(), so the lookup stays inside the ephemeris.
-    if len(offsets) < 2 and max_offset > 0.0:
-        offsets.append(max_offset)
-    positions = np.empty((len(offsets), 3), dtype=np.float64)
-    velocities = np.empty((len(offsets), 3), dtype=np.float64)
-    epochs = []
-    for k, offset in enumerate(offsets):
-        pv = ephemeris.propagate(start_date.shiftedBy(offset)).getPVCoordinates()
-        p = pv.getPosition()
-        v = pv.getVelocity()
-        positions[k, 0], positions[k, 1], positions[k, 2] = p.getX(), p.getY(), p.getZ()
-        velocities[k, 0], velocities[k, 1], velocities[k, 2] = (
-            v.getX(),
-            v.getY(),
-            v.getZ(),
+        from ..core.exceptions import NumericalPropagationError
+        from ..core.time import _epoch_from_orekit
+        from .guards import (
+            _altitude_km_to_radius_m,
+            _classify_termination,
+            _escape_radius_m,
+            _impact_radius_m,
+            _is_reentry_failure,
+            _make_radius_stop_detector,
+            _reentry_floor_radius_m,
         )
-        epochs.append(initial.epoch.shifted_by(offset))
 
-    # Termination decision (addendum §6.6). Three outcomes feed the single metadata +
-    # Trajectory build below:
-    #   * propagation failure -> classify: a drag-driven re-entry stops & reports
-    #     "reentry"; anything else is a genuine error to re-raise (with the partial).
-    #   * a terminal detector fired -> classify the reason by nearest threshold radius.
-    #   * normal completion -> no termination keys (byte-identical to a pre-guard run).
-    terminated = False
-    termination_reason: str | None = None
-    termination_epoch: str | None = None
-    reraise = False
-    if failure_msg is not None:
-        last_state = ephemeris.propagate(max_date)
-        if _is_reentry_failure(
-            drag_enabled=wired.drag,
-            radial_velocity_m_s=_radial_velocity_m_s(last_state),
-            perigee_radius_m=_osculating_perigee_radius_m(last_state),
-            floor_radius_m=_reentry_floor_radius_m(),
-        ):
-            terminated = True
-            termination_reason = "reentry"
+        eme2000 = Frame.EME2000.to_orekit()
+        start_date = initial.epoch.to_orekit()
+
+        # Gravity provider + force (also the source of the central mu the orbit uses,
+        # so the orbit and the gravity force share one consistent mu).
+        provider = _resolve_gravity_provider(force_models.gravity_field, degree, order)
+        mu = float(provider.getMu())
+        gravity = _build_gravity_force(provider, degree, order)
+
+        orbit = CartesianOrbit(
+            initial.to_orekit().getPVCoordinates(), eme2000, start_date, mu
+        )
+
+        integrator_obj = _build_integrator(integrator, orbit)
+        propagator = NumericalPropagator(integrator_obj)
+        propagator.setOrbitType(OrbitType.CARTESIAN)
+        propagator.addForceModel(gravity)
+        # Enabled perturbations (third body, drag, SRP, tides, relativity) on the sphere
+        # or box geometry; `wired` records exactly what was added, for honest metadata.
+        wired = _add_perturbation_forces(propagator, force_models, spacecraft, provider)
+        # Attitude provider (resolved above): the supplied mode for a box, LofAligned
+        # for a sphere. For a sphere the cross-section is orientation-invariant, so this
+        # has no effect on the dynamics; for a box it drives the drag/SRP projected
+        # area.
+        propagator.setAttitudeProvider(_to_provider(attitude_config))
+        # Mass drives drag/SRP per-unit-mass acceleration (gravity is mass-independent).
+        propagator.setInitialState(SpacecraftState(orbit, float(spacecraft.mass_kg)))
+
+        # Terminal radius backstops (addendum §6.1/§6.3): stop & report at Earth impact
+        # and at lunar-gravity-parity escape. Both always active, independent of the
+        # force config. `termination_specs` (radius -> reason) also drives reason
+        # classification after the run. The system backstops stay FIRST in the list so
+        # the nearest-threshold classifier resolves a degenerate exact tie with a user
+        # limit in favor of the system reason (min_altitude_km == 0 -> "impact";
+        # max_altitude_km at the escape-parity altitude -> "escape").
+        termination_specs = [
+            (_impact_radius_m(), "impact"),
+            (_escape_radius_m(), "escape"),
+        ]
+        # Optional user altitude limits (addendum §6.4/§6.6): lower each supplied bound
+        # once to a geocentric radius via the *same* altitude->radius reference the
+        # escape backstop uses, and register it as another terminal stop. A reasonable
+        # limit is guaranteed (by AltitudeLimits.__post_init__) to nest inside the
+        # backstops, so it can only tighten termination — on a descent the inner
+        # user_min radius is reached before R⊕, on a climb the user_max radius before
+        # escape, so the first crossing wins with no explicit tightest-of arithmetic. An
+        # unreasonable limit raised a ValueError at construction, so none reaches here.
+        # (features.md §1.1 failure-modes table gains that construction-time ValueError
+        # row in the Chunk-11 reconciliation.)
+        if limits is not None:
+            if limits.min_altitude_km is not None:
+                termination_specs.append(
+                    (_altitude_km_to_radius_m(limits.min_altitude_km), "user_min")
+                )
+            if limits.max_altitude_km is not None:
+                termination_specs.append(
+                    (_altitude_km_to_radius_m(limits.max_altitude_km), "user_max")
+                )
+        for threshold_radius, _ in termination_specs:
+            propagator.addEventDetector(_make_radius_stop_detector(threshold_radius))
+
+        end_date = start_date.shiftedBy(span_s)
+
+        # Progress step handler (contract: Mechanism): a read-only fixed-step observer
+        # feeding the reporter a monotonic fraction of the realized span. The handler
+        # step caps the JPype crossings at ~1000 — negligible next to one substep's
+        # force evaluations — while staying fine enough that the reporter's wall-clock
+        # heartbeat has fresh fractions on slow runs (the reporter throttles output).
+        # span_s == 0 can't reach here (output_step <= duration is validated), but the
+        # guard keeps the degenerate case safe: start/done lines only, no handler.
+        if span_s > 0.0:
+            propagator.getMultiplexer().add(
+                span_s / 1000.0,
+                _make_progress_step_handler(start_date, span_s, reporter),
+            )
+
+        t0 = time.perf_counter()
+        generator = propagator.getEphemerisGenerator()
+        # A propagation failure (a JException) is no longer always fatal (addendum
+        # §6.6). A drag-driven decay stiffens until it fails — the adaptive step
+        # saturates min_step_s or, with looser tolerances, the atmosphere model rejects
+        # the sub-surface query ("point is inside ellipsoid"). Both surface as a
+        # JException; we catch it, recover the ephemeris built so far, and CLASSIFY by
+        # physical state (drag + descending + osculating perigee), not by the message.
+        # The impact detector registered above is the drag-OFF counterpart: with no
+        # atmosphere query it stops cleanly at R⊕ as "impact" (addendum §8), so a
+        # drag-on decay routes here as "reentry" instead.
+        failure_msg: str | None = None
+        try:
+            propagator.propagate(end_date)
+        except jpype.JException as exc:  # type: ignore[attr-defined]
+            # Capture the Java *message* only (no raw stack trace; architecture §3) and
+            # leave the except block before recovering, so a recovery failure cannot
+            # chain.
+            failure_msg = str(exc.getMessage())
+
+        if failure_msg is not None:
+            ephemeris = _recover_ephemeris(generator)
+            if ephemeris is None:
+                # No usable steps recovered (edge a): fail loudly with no partial
+                # attached.
+                raise NumericalPropagationError(
+                    f"numerical propagation failed: {failure_msg}"
+                ) from None
         else:
-            # Not a re-entry (drag off, climbing, or perigee still above the floor): a
-            # genuine numeric/config failure -> re-raise (invariant: prefer a false
-            # re-raise over a false reentry). The partial built below is attached to it.
-            reraise = True
-    else:
-        terminated = float(end_date.durationFrom(max_date)) > _TERMINATION_TIME_TOL_S
-        if terminated:
-            r_final = float(ephemeris.propagate(max_date).getPosition().getNorm())
-            termination_reason = _classify_termination(r_final, termination_specs)
-            # A clean impact-detector stop with drag ON is a drag-driven re-entry, not a
-            # geometric impact: the impact detector can fire at R⊕ before the atmosphere
-            # model throws (the usual "reentry" route via the min-step catch), and §8
-            # reserves "impact" for a drag-OFF sub-surface orbit. Relabel here so the
-            # reported reason is robust to that integrator-vs-atmosphere race.
-            if termination_reason == "impact" and wired.drag:
-                termination_reason = "reentry"
-    # The crossing instant is the same in either branch, so format the ISO-8601 UTC
-    # termination_epoch once here — keeping the "+ Z" UTC-suffix convention in a single
-    # place (Epoch.to_iso() deliberately emits no zone suffix).
-    if terminated:
-        termination_epoch = _epoch_from_orekit(max_date).to_iso() + "Z"
+            ephemeris = generator.getGeneratedEphemeris()
 
-    metadata = _build_metadata(
-        force_models,
-        wired,
-        integrator,
-        output_step,
-        spacecraft,
-        attitude_config,
-        name,
-        terminated=terminated,
-        termination_reason=termination_reason,
-        termination_epoch=termination_epoch,
-    )
-    traj = Trajectory.from_arrays(
-        epochs,
-        positions,
-        velocities,
-        Frame.EME2000,
-        metadata=metadata,
-    )
-    if reraise:
-        # Fail loudly, but carry the samples computed before the failure for advanced
-        # recovery (addendum §6.6) — a non-terminated partial (no termination keys).
-        err = NumericalPropagationError(f"numerical propagation failed: {failure_msg}")
-        err.partial_trajectory = traj
-        raise err from None
-    logger.info(
-        "propagate_numerical: done — %d samples in %.3fs wall%s",
-        len(epochs),
-        time.perf_counter() - t0,
-        f" (terminated: {termination_reason})" if terminated else "",
-    )
-    return traj
+        # A terminal detector firing — or a recovered partial — shortens the realized
+        # span below the planned end, so clamp the sampling grid to the achieved span
+        # (addendum §6.3): sampling past getMaxDate() would raise. A normal run achieves
+        # the full span (realized == n_samples), so the common path is unchanged.
+        max_date = ephemeris.getMaxDate()
+        max_offset = float(max_date.durationFrom(start_date))
+        realized = _realized_sample_count(max_offset, output_step, n_samples)
+
+        # Sample the (possibly partial) ephemeris at exactly output_step. The Orekit
+        # lookup date and the propygator Epoch share the same offset, so they denote one
+        # instant.
+        offsets = _output_offsets(realized, output_step)
+        # A terminal stop inside the first output_step clamps to one on-grid sample
+        # (the start). Append the achieved-span endpoint so the partial Trajectory keeps
+        # the >= 2 samples every downstream verb (at/plot/export) needs — the floor a
+        # normal run gets from output_step <= duration. The endpoint is exactly
+        # getMaxDate(), so the lookup stays inside the ephemeris.
+        if len(offsets) < 2 and max_offset > 0.0:
+            offsets.append(max_offset)
+        positions = np.empty((len(offsets), 3), dtype=np.float64)
+        velocities = np.empty((len(offsets), 3), dtype=np.float64)
+        epochs = []
+        for k, offset in enumerate(offsets):
+            pv = ephemeris.propagate(start_date.shiftedBy(offset)).getPVCoordinates()
+            p = pv.getPosition()
+            v = pv.getVelocity()
+            positions[k, 0], positions[k, 1], positions[k, 2] = (
+                p.getX(),
+                p.getY(),
+                p.getZ(),
+            )
+            velocities[k, 0], velocities[k, 1], velocities[k, 2] = (
+                v.getX(),
+                v.getY(),
+                v.getZ(),
+            )
+            epochs.append(initial.epoch.shifted_by(offset))
+
+        # Termination decision (addendum §6.6). Three outcomes feed the single metadata
+        # + Trajectory build below:
+        #   * propagation failure -> classify: a drag-driven re-entry stops & reports
+        #     "reentry"; anything else is a genuine error to re-raise (with the
+        #     partial).
+        #   * a terminal detector fired -> classify the reason by nearest threshold
+        #     radius.
+        #   * normal completion -> no termination keys (byte-identical to a pre-guard
+        #     run).
+        terminated = False
+        termination_reason: str | None = None
+        termination_epoch: str | None = None
+        reraise = False
+        if failure_msg is not None:
+            last_state = ephemeris.propagate(max_date)
+            if _is_reentry_failure(
+                drag_enabled=wired.drag,
+                radial_velocity_m_s=_radial_velocity_m_s(last_state),
+                perigee_radius_m=_osculating_perigee_radius_m(last_state),
+                floor_radius_m=_reentry_floor_radius_m(),
+            ):
+                terminated = True
+                termination_reason = "reentry"
+            else:
+                # Not a re-entry (drag off, climbing, or perigee still above the floor):
+                # a genuine numeric/config failure -> re-raise (invariant: prefer a
+                # false re-raise over a false reentry). The partial built below is
+                # attached to it.
+                reraise = True
+        else:
+            terminated = (
+                float(end_date.durationFrom(max_date)) > _TERMINATION_TIME_TOL_S
+            )
+            if terminated:
+                r_final = float(ephemeris.propagate(max_date).getPosition().getNorm())
+                termination_reason = _classify_termination(r_final, termination_specs)
+                # A clean impact-detector stop with drag ON is a drag-driven re-entry,
+                # not a geometric impact: the impact detector can fire at R⊕ before the
+                # atmosphere model throws (the usual "reentry" route via the min-step
+                # catch), and §8 reserves "impact" for a drag-OFF sub-surface orbit.
+                # Relabel here so the reported reason is robust to that
+                # integrator-vs-atmosphere race.
+                if termination_reason == "impact" and wired.drag:
+                    termination_reason = "reentry"
+        # The crossing instant is the same in either branch, so format the ISO-8601 UTC
+        # termination_epoch once here — keeping the "+ Z" UTC-suffix convention in a
+        # single place (Epoch.to_iso() deliberately emits no zone suffix).
+        if terminated:
+            termination_epoch = _epoch_from_orekit(max_date).to_iso() + "Z"
+
+        metadata = _build_metadata(
+            force_models,
+            wired,
+            integrator,
+            output_step,
+            spacecraft,
+            attitude_config,
+            name,
+            terminated=terminated,
+            termination_reason=termination_reason,
+            termination_epoch=termination_epoch,
+        )
+        traj = Trajectory.from_arrays(
+            epochs,
+            positions,
+            velocities,
+            Frame.EME2000,
+            metadata=metadata,
+        )
+        if reraise:
+            # Fail loudly, but carry the samples computed before the failure for
+            # advanced recovery (addendum §6.6) — a non-terminated partial (no
+            # termination keys). The finally's reporter.close() prints the
+            # 'failed at NN%' line on the way out.
+            err = NumericalPropagationError(
+                f"numerical propagation failed: {failure_msg}"
+            )
+            err.partial_trajectory = traj
+            raise err from None
+        logger.info(
+            "propagate_numerical: done — %d samples in %.3fs wall%s",
+            len(epochs),
+            time.perf_counter() - t0,
+            f" (terminated: {termination_reason})" if terminated else "",
+        )
+        # The final line quotes reporter.elapsed_s (wall since the start line,
+        # JVM startup included) — the same time base as the progress ticks — not
+        # the integration-only t0 timer the log line above keeps.
+        if terminated:
+            # The achieved fraction from the achieved span (exact — the handler's
+            # last tick may lag its coarse step behind the actual stop point).
+            stopped_pct = int(100.0 * max_offset / span_s) if span_s > 0.0 else 100
+            reporter.finish(
+                f"stopped at {stopped_pct}% | {termination_reason} at "
+                f"t+{max_offset / 3600.0:.1f} h | {reporter.elapsed_s:.1f} s | "
+                f"{len(epochs)} samples (partial)"
+            )
+        else:
+            reporter.finish(
+                f"done | {span_s / 3600.0:.1f} h | {reporter.elapsed_s:.1f} s | "
+                f"{len(epochs)} samples"
+            )
+        return traj
+    finally:
+        # Every exit path ends with one honest final line (contract:
+        # "Composition with the guard system"): finish() already ran on the
+        # clean/stopped paths (close() is then a no-op); an escaping exception
+        # -- the re-raise, a failed recovery, anything unexpected -- gets the
+        # reasonless 'failed at NN%' fallback here.
+        reporter.close()
 
 
 def _build_metadata(

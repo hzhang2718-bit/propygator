@@ -68,6 +68,8 @@ initial = pgr.State(
 # Propagate 1 day at 60-second cadence (default leo_default force model:
 # 70x70 gravity + Sun/Moon third body + drag + SRP; tides, relativity, and a
 # lumped seven-planet third body are opt-in booleans). Returns a Trajectory.
+# Prints throttled progress lines to stderr while it runs (silence with
+# progress=False, or pass a callable to drive your own bar).
 traj = pgr.propagate_numerical(initial, duration=86400, output_step=60)
 
 # Inspect: indexes/iterates as States, converts frames, gives osculating elements.
@@ -128,6 +130,8 @@ pgr.plot_sky_track(traj, durham)                  # geometry-only polar sky view
 
 # Live dashboard — keep the returned reference, under a GUI / %matplotlib widget backend.
 anim = pgr.live_track("ISS", durham)              # 4-panel; pgr.live_track("ISS") for 3
+# Readout clock in US civil time (DST-correct; default stays UTC):
+# pgr.live_track("ISS", durham, tz=pgr.USTimeZone.EASTERN)
 ```
 
 A walkthrough lives in

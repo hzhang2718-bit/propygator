@@ -10,6 +10,9 @@ dependencies:
   - pandas=3
   - matplotlib
   - plotly
+  # IANA tz database module for zoneinfo (Windows ships no system copy); the
+  # PyPI name is "tzdata" — plain conda "tzdata" is the raw data, no module.
+  - python-tzdata
   - jupyterlab=4.5.*
   - pip
   - pip:

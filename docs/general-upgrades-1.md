@@ -490,3 +490,145 @@ KnockeRediffusedForceModel(_sun(), radiation_sensitive,
 - **Progress reporting** (findings doc §4) — deferred, unscoped; the findings doc stays in `docs/` as its reference.
 
 **Build shape** (one branch, `feature/additional-perturbations`; detailed sequencing is the build plan's job): planets chunk first (afternoon-scale; exercises the config/grammar/`_WiredForces` seams end-to-end), then the ERP runtime + tests (with a **provisional** resolution constant), then the ERP experiment (deliverables 1–2 — run *through the shipped path* by overriding the module constant per rung, which is why the runtime lands first; it finalizes `_EARTH_RADIATION_ANGULAR_RESOLUTION` before any doc quotes a number), then docs fold-back + wrap-up — Supercessions folded into `features.md` §1.1 / `architecture.md` §13 / `README.md` / `CLAUDE.md`; a status note added to `docs/prospective-forces-and-progress-findings.md` marking items 1–2 realized (the doc stays put for item 3); CHANGELOG `[Unreleased]` entry per `docs/changelog-guidelines.md` (maintainer-authored); squash-merge to `main`, **no tag** (v0.5.0 is tagged once, after all general upgrades land).
+
+
+## Civil Time Zones & Progress Reporting
+
+> Two user-experience upgrades feeding v0.5.0 (the fifth general upgrade, its own
+> branch): **(A)** an optional `tz=` on `live_track` that re-expresses the dashboard's
+> readout clock in a **US civil time zone** (default unchanged — UTC), and **(B)**
+> **default-on progress reporting** for the long-running verbs — plain, throttled stderr
+> status lines so a user never stares at a seemingly frozen terminal. (B) realizes item 3
+> of `docs/prospective-forces-and-progress-findings.md` (§4), which that doc left
+> unscoped; §4 stays its mechanism reference until this ships. Part A rides the tz-ready
+> `_format_clock` seam already built into `tracking/live.py` (features.md §1.4 named it),
+> so the core time model is untouched; Part B adds one keyword-with-default to the frozen
+> `propagate_numerical` signature — the **one deliberate §1.1 signature edit** among the
+> general upgrades — plus a narrow, documented exception to the "logging, never prints"
+> convention. Neither changes any existing default *output* except that a bare
+> `propagate_numerical(...)` now prints progress. This section is the **binding
+> contract**: the `tz=` surface and resolution, the `USTimeZone` set, the `progress`
+> surface and reporter behavior, the sanctioned-exception carve-out, and the blast radius
+> for both. It supersedes only the enumerated `features.md` §1.1 / §1.4,
+> `architecture.md`, and `CLAUDE.md` spots below; everything else stands.
+>
+> **Outcome (2026-07-06): shipped in full — both parts** (branch
+> `feature/ux-improvements`; build plan archived at
+> `docs/history/build-plan-ux-improvements.md`). Supercessions folded back into
+> `features.md` §1.1 (the `progress` signature edit + a "Progress reporting"
+> section) / §1.4 (the `tz=` signature line, the readout-clock paragraph, the
+> realized time-zone bullet), `architecture.md` §Logging + `CLAUDE.md` (the
+> sanctioned-exception carve-out), and the findings doc's item-3 status. Two
+> mechanism facts learned at build (both pinned in code + tests): the step
+> normalizer does **not** guarantee a `handleStep` tick at the exact endpoint, so
+> the proxy's `finish(final_state)` forwards the true final fraction (1.0 on
+> completion, the stop fraction on a guard stop); and the `try/finally` was
+> widened to start immediately after `reporter.start()`, so even a *setup*
+> failure (e.g. missing orekit-data) ends with the honest `failed at NN%` line.
+> The final line quotes the reporter's own elapsed clock (JVM startup included)
+> for consistency with the tick lines.
+
+### Supercessions
+
+**Part A — time zones:**
+
+- **`features.md` §1.4, ground-track-panel paragraph** — "a **UTC clock** (formatted through a tz-ready seam — UTC now, additive `tz=` later, no core changes)" becomes: the readout clock is UTC by default and re-expressed in a US civil zone when `live_track(..., tz=)` is supplied (a pure display offset, DST-correct; not a `TimeScale` change).
+- **`features.md` §1.4, "Still open / deferred → Time-zone exposure" bullet** — the `live_track` `tz=` half is **realized here**; the "eventual general UTC → US-zone tools" half maps onto Feature 1.5 `find_passes` (its `Pass` rise/culmination/set epochs), which inherits the same `USTimeZone` / `_resolve_tz` surface and stays future.
+- **`features.md` §1.4, `live_track` signature** — gains a trailing keyword-only `tz: USTimeZone | tzinfo | None = None` (additive, backward-compatible; `None` → UTC, bit-identical to today). The three buffer magnitudes are unchanged.
+- **`tracking/live.py`, `_format_clock` docstring** — the "v1 always renders UTC; a future `tz=` … out of scope for 1.4 (adds a `tzdata` dependency on Windows)" note is rewritten to describe the shipped `tz=` path; `tzdata` is now a declared dependency (see **Code**).
+- **Code** — a new `USTimeZone` enum + `_resolve_tz(...)` helper in `core/time.py`, `USTimeZone` re-exported at the top level; the `tz` parameter on `live_track` resolved **once** at entry and threaded into the existing `_format_clock(now, tz=...)` call (no change to `_format_clock`'s body); `tzdata` **declared** in `environment.yml` (conda-forge name **`python-tzdata`** — the conda package named plain `tzdata` is the raw IANA database and does *not* provide the importable Python module `zoneinfo` needs on Windows) + `pyproject` runtime deps (PyPI name `tzdata`; today it is only a transitive pandas dep); tests; `README.md` / `CLAUDE.md` / `features.md` §1.4.
+
+**Part B — progress reporting:**
+
+- **`features.md` §1.1, `propagate_numerical` signature** — gains a trailing `progress: bool | ProgressCallback = True` (keyword-with-default; `ProgressCallback = Callable[[float], None]`). This is the single deliberate edit to the frozen §1.1 signature; it is additive and backward-compatible (existing calls are unaffected), but the **default changes observable behavior** — a bare `propagate_numerical(...)` now emits progress to stderr.
+- **`features.md` §1.1, a new "Progress reporting" paragraph** — documents the default-on plain-line reporter, the `progress=False` opt-out, and the `progress=<callable>` seam.
+- **`architecture.md` §Logging ("never bare prints") + `CLAUDE.md` "Architecture invariants" ("Logging, never prints")** — gain a **sanctioned-exception** clause: transient progress output may go to **stderr** provided it is TTY-gated, opt-out (`progress=False`), never written to stdout, and never attached to the root logger. (`logger.info` progress milestones are still emitted for handler-configured users.)
+- **`docs/prospective-forces-and-progress-findings.md`, status header** — item 3 (progress reporting) moves from "remains unscoped — §4 is still the live reference" to "scoped by general-upgrades-1 §Civil Time Zones & Progress Reporting"; §4 stays the mechanism reference.
+- **Features 1.5 `find_passes` / 1.2 `fit_tle` (NOT STARTED)** — their eventual signatures carry the same `progress` parameter from birth (a forward commitment, not an edit to existing text, so the reporter has three consumers).
+- **Code** — a new `core/progress.py` (`_ProgressReporter`: determinate + indeterminate modes, the TTY gate, the 10-percent/heartbeat throttle, ASCII-only rendering, the callable pass-through; plus the public `ProgressCallback` alias — it names a public parameter type, so it is defined here and re-exported at the top level); `propagation/numerical.py` — an `OrekitFixedStepHandler` `@JImplements` proxy (all three of `init`/`handleStep`/`finish`), registered via `propagator.getMultiplexer().add(step, handler)`, the reporter finalized in a `finally`; the `progress` parameter and its wiring; tests; `README.md` / `CLAUDE.md`.
+
+### Context
+
+The decision record:
+
+- **Time zones are display-only; the core time model must not learn civil zones.** `Epoch`/`TimeScale` carry *physics* scales (UTC/TAI/TT, leap seconds, deferred UT1) — a civil US zone with DST is a `datetime.astimezone(ZoneInfo(...))` applied to `Epoch.to_datetime()` (already tz-aware UTC), at the *formatting* boundary. So `tz=` lives on the display verb and threads into `_format_clock`; `Epoch` gains nothing. Only the suptitle readout localizes — the altitude/speed panels are elapsed-hours and the ground/sky panels are spatial, so there is no other wall-clock to touch.
+- **Default UTC, not system-local.** Keeping UTC the default is backward-compatible (matches the §1.4 "UTC clock" description and every snapshot) and keeps output machine-independent. Local time is one keyword away; auto-detecting the host zone was considered and rejected (surprising, non-reproducible).
+- **US-only via a curated enum + a `tzinfo` escape hatch.** `USTimeZone` (Eastern/Central/Mountain/Pacific/Alaska/Hawaii, plus Arizona — Mountain-clock/no-DST) keeps the US scope discoverable and off the full IANA surface; power users / non-US callers pass a raw `tzinfo` (`ZoneInfo(...)`). DST correctness *requires* `zoneinfo` (a fixed UTC offset is wrong half the year), which on Windows needs the `tzdata` package — hence declaring it.
+- **`tzdata` is present, but only incidentally.** Probed in the `propygator` env: `python-tzdata` 2026.2 is installed (pandas pulls it) and `ZoneInfo("America/New_York")` resolves DST-correctly (→ EDT). The feature works today, but the plan **declares** `tzdata` so a future pandas change can't silently break tz on the maintainer's own (Windows) platform.
+- **Progress must be default-on and visible — which forces stderr.** The requirement is that a user never wonders whether a long propagation has frozen. The repo's top-level `NullHandler` makes `logger.info` silent by default, so log-only (findings §4 option a) shows nothing out of the box and fails the requirement. Default-on visibility therefore requires writing to the console — reconciled with "logging, never prints" by treating a progress indicator as the **standard narrow carve-out** that `pip`/`git`/`tqdm` all take: stderr only, TTY-gated, opt-out, transient, never the root logger, never stdout. The TTY gate is load-bearing — pytest, CI, `conda run`, and the redirected `experiments/` scripts are all non-TTY, so they drop to the coarse milestone cadence (coarse, **not silent** — see Reporter behavior; that same choice keeps notebook runs informative, since Jupyter's captured stderr is non-TTY too). Interactive batch loops (a propagate-and-`export_all` script run at a terminal) *are* TTYs — they opt out with `progress=False` (see Default-on implications).
+- **Plain milestone lines — no dependency, no hand-rolled bar.** Options weighed: a hard `tqdm` dep (best bar, but a genuinely new dependency — probed: tqdm is **not** installed and nothing pulls it in); a hand-rolled `\r` bar (no dep but ~40–60 lines re-implementing tqdm and its edge cases); and plain milestone stderr lines (no dep, ~15 lines). The stated goal ("know it's not frozen") is fully met by plain lines, so that ships. Because the reporter is an internal detail behind the `progress` param, promoting to tqdm later is a zero-API-change swap — the decision is low-stakes and reversible.
+- **This is the one upgrade that edits the frozen §1.1 signature — deliberately.** The earlier general upgrades rode `ForceModelConfig` to stay signature-free; progress is not a force and has no such extension point, so it adds one keyword-with-default. The findings doc (§5.2) already flagged this as a conscious doc edit, not a silent add. It is the reusable seam Features 1.5 and 1.2 consume.
+
+### Part A — time zones (details)
+
+**`USTimeZone` (the pinned set).** A frozen enum in `core/time.py`, re-exported top-level, mapping a friendly US-zone name to its IANA key (DST handled by `zoneinfo`):
+
+```python
+class USTimeZone(Enum):
+    EASTERN  = "America/New_York"
+    CENTRAL  = "America/Chicago"
+    MOUNTAIN = "America/Denver"
+    PACIFIC  = "America/Los_Angeles"
+    ALASKA   = "America/Anchorage"
+    HAWAII   = "Pacific/Honolulu"   # no DST
+    ARIZONA  = "America/Phoenix"    # Mountain clock, no DST
+```
+
+**Resolution.** `_resolve_tz(tz: USTimeZone | tzinfo | None) -> tzinfo`: `None → timezone.utc` (the unchanged default); a `tzinfo` is returned as-is (escape hatch); a `USTimeZone` is lowered to `ZoneInfo(member.value)`. A `ZoneInfoNotFoundError` (a stripped tz database) is re-raised as an actionable message naming `tzdata` — never a raw traceback (the repo's error-surface rule). Resolved **once** at `live_track` entry, not per frame.
+
+**Threading.** `live_track` gains `tz: USTimeZone | tzinfo | None = None`; the resolved `tzinfo` is passed to the existing `_format_clock(now, tz=...)` call in `update()`. `_format_clock` already does `.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S %Z")`, so the `%Z` token self-documents the offset ("EDT" / "EST" / "UTC") and DST is automatic — **no change to `_format_clock`'s body**, only its docstring.
+
+**User-visible change.** `tz=None` (default) → readout `… · 2026-07-05 18:42:03 UTC`, byte-identical to today. `live_track("ISS", tz=USTimeZone.PACIFIC)` → `… · 2026-07-05 11:42:03 PDT` (and "PST" in winter, automatically). Only the readout clock changes; every panel is unchanged.
+
+**Dependency.** Declare it in `environment.yml` as conda-forge's **`python-tzdata`** (the conda package named plain `tzdata` is the raw IANA database — it does *not* provide the importable Python module `zoneinfo` falls back to on Windows) and in `pyproject` runtime deps under its PyPI name **`tzdata`**. It is a tiny pure-data package, already present transitively; declaring it makes the tz path deterministic across platforms rather than reliant on pandas' transitive pull.
+
+**Feature 1.5 inheritance (forward note, not built here).** `find_passes` will accept the same `tz=` and apply `_resolve_tz` when it formats the `Pass` rise/culmination/set epochs — the "eventual UTC → US-zone tools" the §1.4 deferred bullet named. No 1.5 code lands in this section.
+
+**Out of scope (Part A).** Non-US zones as first-class enum members (use a raw `tzinfo`); localizing the CSV `epoch_utc` column (a §1.1-named archival UTC column — if ever wanted, an additive `local` column *group* on the `io/exports.py` registry, never a conversion of the canonical column); any change to `Epoch` / `TimeScale` / `to_iso` (civil zones stay out of the physics-scale model).
+
+### Part B — progress reporting (details)
+
+**Surface.** `propagate_numerical(..., progress: bool | ProgressCallback = True)` where `ProgressCallback = Callable[[float], None]` (fraction 0.0 → 1.0):
+
+| `progress` | Behavior |
+|---|---|
+| `True` (default) | The built-in plain-line reporter (below) |
+| `False` | Silent |
+| a callable | Called with the 0→1 fraction each throttled tick; the library prints **nothing** (the seam for tqdm / a GUI / a log line) |
+
+**Reporter behavior (`_ProgressReporter`, `core/progress.py`).** Plain, ASCII-only status lines to **stderr** (never stdout), one per throttled tick — no `\r` redraw:
+
+- A `start` line prints **immediately** (before the first slow substep — the real "it began" signal).
+- A progress line on each new **10%** *or* every **~5 wall-clock seconds**, whichever first (short runs aren't spammy; long runs get a heartbeat so they never look frozen).
+- A `done` line with the final wall-clock and sample count.
+- **TTY gate:** the fine cadence applies only when `sys.stderr.isatty()`; a non-TTY (piped, CI, redirected — the `experiments/` scripts, pytest) coarsens to `start` + 25/50/75 + `done` so log files stay clean. (Probed: under `conda run`, `stderr.isatty()` is `False`, confirming batch runs take the coarse cadence.)
+- **ASCII-only** glyphs / separators (`|`, `-`, `#`) — dodges the Windows cp1252 stderr `UnicodeEncodeError` class the `experiments/` scripts already hit.
+- **Determinate + indeterminate modes.** `propagate_numerical` and `find_passes` (1.5) drive a determinate 0→1 fraction; `fit_tle` (1.2), whose differential correction early-exits on convergence, drives the indeterminate mode (per-iteration `iter N | rms …` lines, no fake percentage).
+- `logger.info` milestones are still emitted regardless (free for users who configure logging).
+
+Format (illustrative, not literal):
+
+```
+propagate_numerical: start | 168.0 h | DOP853 | 60481 samples
+propagate_numerical:  10% | t+16.8/168.0 h | 3.1 s
+...
+propagate_numerical: done | 168.0 h | 29.4 s | 60481 samples
+```
+
+On early termination the final line is honest, e.g. `propagate_numerical: stopped at 61% | reentry at t+102.4 h | 18.3 s | 6148 samples (partial)`.
+
+**Mechanism (1.1).** An `OrekitFixedStepHandler` `@JImplements` proxy registered via `propagator.getMultiplexer().add(step_s, handler)` before `propagate()` (findings §4, probed). `handleStep(state)` computes `fraction = state.getDate().durationFrom(start_date) / span`, where `span = end_date.durationFrom(start_date)` — the **realized** propagation span `(n_samples − 1) · output_step`, which the sample grid floors to ≤ the requested `duration` (dividing by `duration` would top out below 1.0 whenever `duration` isn't a step multiple) — monotonic 0 → 1 — and calls `reporter.update(fraction)`. (The degenerate single-sample run has `span == 0`; the reporter guards it — `start`/`done` lines only, no fraction ticks.) The proxy must implement **all three** interface methods (`init` / `handleStep` / `finish`) — the JPype default-method trap (`guards.py`'s detectors dodge it via `FunctionalDetector`; here the three-method implement is simplest, per findings §5.3).
+
+**Composition with the guard system.** The handler is read-only; on early termination (impact / escape / reentry) or the failure / partial-recovery path (`numerical.py` try/except) it simply stops firing. The reporter is finalized in a `finally` that spans propagation **through termination classification** (the reason in the `stopped at NN% | reentry …` line is known only after the guard system classifies, well past `propagate()` itself), so every exit path ends with an honest final line rather than a tick dangling at the achieved fraction — `done` on a clean run, the reason-bearing `stopped` line on a guard stop, and a reasonless `failed at NN%` on the re-raise path. The post-propagation sampling loop is not covered (rarely the bottleneck).
+
+**Sanctioned exception (the convention-level decision).** Progress output narrowly bends "logging, never prints": it is stderr-only, TTY-gated, opt-out via `progress=False`, transient (no persistent state, no root-logger handler), and never touches stdout. `architecture.md` and `CLAUDE.md` gain this carve-out so the rule and its one exception are both explicit.
+
+**Default-on implications.** A bare `propagate_numerical(...)` now prints — a deliberate, visible behavior change (CHANGELOG-noted). Loop callers (`export_all` batch, benefit studies) should pass `progress=False`; the TTY gate already silences the redirected `experiments/` scripts and CI / pytest.
+
+**Features 1.5 / 1.2 (forward commitment, not built here).** Both take the same `progress` parameter from their first implementation — 1.5 a determinate window-scan fraction (`scanned / total`), 1.2 the indeterminate iteration mode (what the *callable* form receives in the indeterminate mode — `Callable[[float], None]` has no natural iteration semantics — is pinned by 1.2's own contract, not here). Designing the reporter for both now means the seam has three consumers and never needs reshaping.
+
+**Out of scope (Part B).** A hard `tqdm` / `rich` dependency (the reporter is swappable behind `progress`, so tqdm can be promoted later with no API change); a `\r` animated bar (plain lines are the shape); covering the post-propagation sampling loop or `propagate_tle` (fast, analytic — no bar); a progress signal on any non-long-running verb.
+
+### Build shape
+
+(one branch feeding v0.5.0; detailed sequencing is the build plan's job.) Two independent parts, either orderable first. **Part A** — `USTimeZone` + `_resolve_tz` in `core/time.py`, top-level export, `tz=` on `live_track` threaded to `_format_clock`, declare `tzdata`, tests, then a manual GUI smoke of the localized readout via `run/live_dashboard_demo.py`. **Part B** — the `core/progress.py` reporter (with headless unit tests over both modes and the TTY gate), then the `OrekitFixedStepHandler` proxy + `progress` param in `propagate_numerical` (tested inside a real `propagate()`), the `finally` finalize, and the guard-path partial line, then the `architecture.md` / `CLAUDE.md` convention carve-out. **Wrap-up** — fold both Supercessions back into `features.md` §1.1 / §1.4, `architecture.md`, `CLAUDE.md`, `README.md`; flip the findings-doc item-3 status; CHANGELOG `[Unreleased]` (maintainer-authored); squash-merge to `main`, **no tag** (v0.5.0 is tagged once, after all general upgrades land).

@@ -31,7 +31,7 @@ from matplotlib.collections import LineCollection, PathCollection
 
 import propygator as pgr
 from propygator import TLE, GroundStation
-from propygator.core.time import Epoch
+from propygator.core.time import Epoch, USTimeZone, _resolve_tz
 from propygator.tracking.live import (
     _format_clock,
     _twilight_facecolor,
@@ -331,6 +331,17 @@ def test_format_clock_tz_shifts_civil_time():
     # same instant, different civil offset -> different wall-clock string.
     shifted = _format_clock(epoch, tz=timezone(timedelta(hours=5)))
     assert shifted != utc_text
+
+
+def test_format_clock_us_zone_renders_dst_correctly():
+    # The shipped tz= path end-to-end (resolution + seam): a July instant renders
+    # PDT, a January instant PST — the DST flip needs no caller code change. The
+    # July string is the contract's worked example, pinned byte-for-byte.
+    pacific = _resolve_tz(USTimeZone.PACIFIC)
+    july = Epoch.from_iso("2026-07-05T18:42:03", scale=pgr.TimeScale.UTC)
+    january = Epoch.from_iso("2026-01-05T18:42:03", scale=pgr.TimeScale.UTC)
+    assert _format_clock(july, tz=pacific) == "2026-07-05 11:42:03 PDT"
+    assert _format_clock(january, tz=pacific) == "2026-01-05 10:42:03 PST"
 
 
 def test_twilight_facecolor_spans_day_to_night():

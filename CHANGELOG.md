@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-07
+
 ### Added
 
 - BoxFaceCd experiments demonstrating how it may be useful, but only for satellites
@@ -18,17 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accompanying study shows that the slightly different reference velocity makes a
   minor but real impact.
 - Gravity perturbations from Solar System planets now available in the force model.
+- Printed progress messages that appear while the numerical propagator runs. These
+  are on by default and can be turned off.
+- The ability to display U.S. time zones in the live dashboard. UTC is still the
+  default.
 
 ### Changed
 
-- Elevation markers in live dashboard's sky view are corrected to have 90 degrees
-  correspond to zenith.
 - Instead of erasing every frame, TLE live dashboard now preserves zoom.
 
 ### Removed
 
 - IncidenceVariableCd skeleton has been removed and replaced with BoxFaceCd table
   because solar array shadowing makes simple Cd table interpolation impossible.
+
+### Fixed
+
+- Elevation markers in live dashboard's sky view are corrected to have 90 degrees
+  correspond to zenith.
 
 ## [0.4.0] - 2026-06-24
 
