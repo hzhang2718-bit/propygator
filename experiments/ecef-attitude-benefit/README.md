@@ -1,7 +1,7 @@
 # ECEF InPlaneTracking benefit study (build-plan Chunk 1 + Chunk 4 evidence)
 
 Evidence for `docs/history/build-plan-ecef-attitudes.md` (binding contract:
-`docs/general-upgrades-1.md` "ECEF InPlaneTracking" -> Evidence gate): what
+`docs/history/general-upgrades-1.md` "ECEF InPlaneTracking" -> Evidence gate): what
 does `InPlaneTracking(velocity_reference="ecef")` buy for the headline
 feathered sail?
 

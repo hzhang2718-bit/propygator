@@ -22,7 +22,7 @@ which is *not* shipped and is fetched separately via
   against thermospheric density uncertainty), so raw-linear interpolation is kept.
 
 - **`box_face_cd_default.npz`** — the shipped per-face drag-coefficient table loaded by
-  `BoxFaceCd.default()` (Tier B drag, `docs/general-upgrades-1.md` "Tier B Drag"). A
+  `BoxFaceCd.default()` (Tier B drag, `docs/history/general-upgrades-1.md` "Tier B Drag"). A
   `(geocentric radius, total density, face-flow angle θ)` grid of free-molecular **box
   face** Cd values (Schaaf–Chambre/Sentman DRIA, normal pressure + tangential shear,
   referenced to the face's *full* area), with keys `grid` (shape

@@ -246,7 +246,7 @@ the table regeneration read:
 ## Tier B per-face drag (`BoxFaceCd`) — Chunk 1 & 3 evidence
 
 The Tier B work adds a per-face, incidence-resolved drag coefficient for a convex
-box (`BoxFaceCd`; binding contract `docs/general-upgrades-1.md` "Tier B Drag",
+box (`BoxFaceCd`; binding contract `docs/history/general-upgrades-1.md` "Tier B Drag",
 build plan `docs/history/build-plan-tier-b-drag.md`). Chunk 1 produces the offline evidence
 that gates whether it is worth shipping, **before** any runtime is built.
 

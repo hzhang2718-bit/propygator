@@ -6,7 +6,7 @@ Companion document to `architecture.md`. Where `architecture.md` locks in the cr
 
 ## 1.1 Numerical propagator
 
-> **Status: DRAFTED.** Force-model, spacecraft, attitude, integrator, output, and metadata sections are settled. `VariableCd` (a precomputed Cd table keyed on geocentric radius and live total density) is the v1 variable-drag path for **both** sphere and box geometry (a density-varying scalar Cd); a per-face incidence-resolved box table (`BoxFaceCd`, Tier B) is shipped for the convex box (binding design `docs/general-upgrades-1.md` "Tier B Drag"). Full per-facet Sentman remains deferred (architecture §13). SRP uses a conical shadow. Attitude is a first-class input with seven modes, all but one backed by native Orekit providers. Remaining open items are cosmetic plot details. The **drag-validity & altitude-guards addendum** (drag-model validity domain + the altitude/regime guard system) has been built and folded into the subsections below — the signature (`limits=`), the metadata block (termination keys), "Escape and re-entry" (rewritten to the as-built guards), "Drag-coefficient modeling" (the §5 invariant, two-tier regime warnings, Knudsen floor), and the limitations note.
+> **Status: DRAFTED.** Force-model, spacecraft, attitude, integrator, output, and metadata sections are settled. `VariableCd` (a precomputed Cd table keyed on geocentric radius and live total density) is the v1 variable-drag path for **both** sphere and box geometry (a density-varying scalar Cd); a per-face incidence-resolved box table (`BoxFaceCd`, Tier B) is shipped for the convex box (binding design `docs/history/general-upgrades-1.md` "Tier B Drag"). Full per-facet Sentman remains deferred (architecture §13). SRP uses a conical shadow. Attitude is a first-class input with seven modes, all but one backed by native Orekit providers. Remaining open items are cosmetic plot details. The **drag-validity & altitude-guards addendum** (drag-model validity domain + the altitude/regime guard system) has been built and folded into the subsections below — the signature (`limits=`), the metadata block (termination keys), "Escape and re-entry" (rewritten to the as-built guards), "Drag-coefficient modeling" (the §5 invariant, two-tier regime warnings, Knudsen floor), and the limitations note.
 
 ### Public signature
 
@@ -428,7 +428,7 @@ BoxFaceCd.from_callable(fn, *, name=None)    # fn(radius_m, density_kgm3, theta_
 
 **Tier A — density-varying scalar Cd (sphere and box).** A sphere has no incidence dependence, so `(radius, density)` fully determines its Cd. The box keeps Orekit's attitude-driven projected-area bookkeeping; only the scalar Cd it would apply is replaced by the table value. This captures the solar-cycle / diurnal / altitude trend that a flat 2.2 misses, but applies one scalar uniformly across faces — it does **not** capture per-face incidence (that is Tier B).
 
-**Tier B — per-face incidence table (`BoxFaceCd`, convex box).** A box's true Cd also depends on how each *face* meets the flow. `BoxFaceCd` resolves this per face: a single universal `(geocentric radius, total density, face-flow angle θ ∈ [0, π])` table whose value is **one face's** Cd, referenced to that face's **full** area, as a function of the angle θ between the face normal and the incoming flow (θ = 0 head-on, π⁄2 edge-on, π fully leeward). The incidence projection is already baked in — the normal-pressure part falls off as `cos θ`, but the tangential-shear part does **not** vanish edge-on (it floors at ~0.07 at θ = π⁄2 and tapers smoothly to ~0 by θ ≈ 110°) — so the table spans the leeward half and every face is a direct lookup. In free-molecular flow a **convex** body never self-shadows, so total drag is the exact **independent sum of the six per-face contributions**: at runtime the attitude rotates the flow direction into the body frame, each face's θ is formed, and `CdA = Σ_i Cd_i · A_i` is assembled over the full face areas (no re-projection) and applied as the sphere-style `a = ½ (CdA/m) ρ |v_rel| v_rel`. Because the coefficient is per-unit-area and geometry-independent, **one shipped default serves every convex box and plate** — `BoxFaceCd.default()` (asset `data/box_face_cd_default.npz`), carrying the same gas-surface assumptions as the Tier A sphere default (SESAM accommodation anchored α = 0.90 / 400 km solar-max, diffuse re-emission, 300 K wall); a spacecraft with markedly different surface physics supplies its own via `from_table` / `from_callable`. The axis is θ (not `cos θ`): the shear's `sin θ` factor is smooth in θ but becomes `√(1−cos²θ)` — an infinite-derivative cusp at the poles — in `cos θ`, so a θ axis interpolates linearly with clean ~2nd-order convergence and no special node placement. All six faces are evaluated (windward *and* leeward) — dropping the leeward/edge shear would understate a near-cubic bus's drag by ~5–11 % at a face-on attitude and inject a non-physical discontinuity there. `BoxFaceCd` is **convex-box-only**: valid on `box_and_panels` with `solar_array_area_m2 == 0` (a protruding, articulating array makes the body non-convex, and its sweeping bus-array shadowing needs a panel method / DSMC — out of scope). Binding design: `docs/general-upgrades-1.md` "Tier B Drag".
+**Tier B — per-face incidence table (`BoxFaceCd`, convex box).** A box's true Cd also depends on how each *face* meets the flow. `BoxFaceCd` resolves this per face: a single universal `(geocentric radius, total density, face-flow angle θ ∈ [0, π])` table whose value is **one face's** Cd, referenced to that face's **full** area, as a function of the angle θ between the face normal and the incoming flow (θ = 0 head-on, π⁄2 edge-on, π fully leeward). The incidence projection is already baked in — the normal-pressure part falls off as `cos θ`, but the tangential-shear part does **not** vanish edge-on (it floors at ~0.07 at θ = π⁄2 and tapers smoothly to ~0 by θ ≈ 110°) — so the table spans the leeward half and every face is a direct lookup. In free-molecular flow a **convex** body never self-shadows, so total drag is the exact **independent sum of the six per-face contributions**: at runtime the attitude rotates the flow direction into the body frame, each face's θ is formed, and `CdA = Σ_i Cd_i · A_i` is assembled over the full face areas (no re-projection) and applied as the sphere-style `a = ½ (CdA/m) ρ |v_rel| v_rel`. Because the coefficient is per-unit-area and geometry-independent, **one shipped default serves every convex box and plate** — `BoxFaceCd.default()` (asset `data/box_face_cd_default.npz`), carrying the same gas-surface assumptions as the Tier A sphere default (SESAM accommodation anchored α = 0.90 / 400 km solar-max, diffuse re-emission, 300 K wall); a spacecraft with markedly different surface physics supplies its own via `from_table` / `from_callable`. The axis is θ (not `cos θ`): the shear's `sin θ` factor is smooth in θ but becomes `√(1−cos²θ)` — an infinite-derivative cusp at the poles — in `cos θ`, so a θ axis interpolates linearly with clean ~2nd-order convergence and no special node placement. All six faces are evaluated (windward *and* leeward) — dropping the leeward/edge shear would understate a near-cubic bus's drag by ~5–11 % at a face-on attitude and inject a non-physical discontinuity there. `BoxFaceCd` is **convex-box-only**: valid on `box_and_panels` with `solar_array_area_m2 == 0` (a protruding, articulating array makes the body non-convex, and its sweeping bus-array shadowing needs a panel method / DSMC — out of scope). Binding design: `docs/history/general-upgrades-1.md` "Tier B Drag".
 
 **When `BoxFaceCd` matters (honest, scenario-dependent).** The per-face correction is *attitude-correlated*, so its orbit-level benefit depends entirely on how the body flies. For a bus flown **face-on / nadir-held / tumbling / Sun-pointing** — where the ram meets faces near head-on — a best-fit *physical* constant Cd (or `VariableCd`) absorbs almost all of the difference: the along-track divergence over a multi-day LEO propagation is **< 1 %**, and `BoxFaceCd` is not worth its per-substep cost there. Its load-bearing case is **grazing / edge-on flight of a high-area-to-mass flat plate (a solar / drag sail)**: there the tangential shear dominates, a physical constant Cd (2.2, or `VariableCd`) *under*-predicts along-track by ~1400–1640 km over 5 days at 400 km / solar max, and the constant needed to patch it (best-fit Cd ≈ 4.7) is unphysically large and *still* leaves a ~100 km residual — a **~2× effect a recalibrated scalar cannot absorb**. That non-absorbable regime is why `BoxFaceCd` ships. **Caveat on the ~2× figure:** it was measured with `InPlaneTracking` at its default **inertial** velocity reference, so the body sat a few degrees off the true Earth-relative flow (the idealized perfectly-edge-on benefit is larger, ~9×). That limitation is now addressable: **`InPlaneTracking(velocity_reference="ecef")`** (a v0.5.0 general upgrade) holds the plate exactly on the co-rotating flow. Feathering to the true wind is a real but modest *further* refinement, honestly measured with the shipped mode: for a 1 m² / 0.5 kg sail on a 500 km SSO at solar max it cuts the drag effect another **~1.12×** (−273 km along-track over 5 days vs the `inertial` reference); the wind misalignment peaks at ~3.7° for near-polar orbits and vanishes for equatorial prograde, so the benefit is inclination-dependent. Binding design: `general-upgrades-1.md` "ECEF InPlaneTracking"; evidence: `experiments/ecef-attitude-benefit/`.
 
@@ -606,13 +606,119 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 
 ## 1.2 TLE fitter
 
-> **Status: NOT STARTED (design sketch).** The binding `fit_tle` signature, the three reference-input paths, and the data-flow diagrams already live in `architecture.md` §8; the blurb below is a placeholder to be expanded into a full sub-design when 1.2 is scheduled. It is built **last** (architecture §12) and treated as a plus, not a blocker.
+> **Status: DRAFTED (2026-07-07), NOT BUILT.** This section is now the **binding contract** for `fit_tle`, superseding the architecture §8 sketch (§8 updated in step and points here). The signature extends that sketch with four deliberate, maintainer-approved additions (`spacecraft`, `fit_bstar`, `norad_id`, `name`) plus the `progress` parameter committed by general-upgrades-1 §"Civil Time Zones & Progress Reporting" Part B. Built **last** (architecture §12) and treated as a plus, not a blocker. Orekit literal spellings named under "Fit mechanism" are to be verified against the 13.1.x javadoc at implementation (the §1.1 `PredefinedTarget` convention — a wrong name is a compile-time error); numeric internals (measurement cap, sigmas, `positionScale`, convergence thresholds, internal reference grid) are **tunable placeholders, not contract** (the §1.4 buffer-magnitudes precedent).
 
-Fit a TLE to an observed orbit by least-squares, so a high-fidelity numerical result — or user-supplied observations — can be re-expressed as a shareable TLE under SGP4. `fit_tle(reference, *, fitting_span, force_models, initial_guess, max_iterations)` accepts either a `State` (propagated internally over `fitting_span` to build the reference trajectory) or a `Trajectory` (used directly), and returns a bare `TLE` (a richer `FitResult` is a deferred extension). It leans on Orekit's built-in TLE-generation/fitting machinery for the iterative osculating→mean fit.
+Fit a TLE to an observed orbit by least squares, so a high-fidelity numerical result — or user-supplied observations — can be re-expressed as a shareable TLE under SGP4. This is the repo's first *estimation* feature: every shipped verb is a forward model whose failures are exceptions, while `fit_tle` runs an iterative differential-correction loop whose defining failure mode is **non-convergence** — a numerical behavior to scope and report honestly, not a condition to catch.
 
-The defining caveat, stated loudly in the docstring: the fit is **inherently lossy** because SGP4 is a simplified model (J2/J3/J4 zonal + single B\* drag for the near-Earth branch; simplified luni-solar + resonance for deep-space). A full-force numerical orbit can never be reproduced exactly. This is the faithful sibling of 1.3's deliberately-unfaithful `TLE.from_state_unfitted`.
+The defining caveat, stated loudly in the docstring: the fit is **inherently lossy** because SGP4 is a simplified model (J2/J3/J4 zonal + single B\* drag for the near-Earth branch; simplified luni-solar + resonance for deep-space). A full-force numerical orbit can never be reproduced exactly. This is the faithful sibling of 1.3's deliberately-unfaithful `TLE.from_state_unfitted` — and `from_state_unfitted` finally earns its keep here as the default least-squares seed (below).
 
-**To flesh out when scheduled:** convergence/quality reporting (the deferred `FitResult`), B\* handling (fit vs. fixed), the initial-guess strategy, and failure modes (non-convergence).
+### Public signature
+
+```python
+def fit_tle(
+    reference: State | Trajectory,
+    *,
+    fitting_span: float = 86400.0 * 2,        # seconds; default 2 days
+    force_models: ForceModelConfig | None = None,   # State path only; None -> leo_default()
+    spacecraft: SpacecraftConfig | None = None,     # State path only; None -> SpacecraftConfig()
+    initial_guess: TLE | None = None,         # None -> seeded from the first reference sample
+    max_iterations: int = 100,
+    fit_bstar: bool = True,
+    norad_id: int | None = None,              # output identity; None -> inherit / placeholder
+    name: str | None = None,                  # output identity; None -> inherit / placeholder
+    progress: bool | ProgressCallback = True, # indeterminate mode; see "Progress reporting"
+) -> TLE:
+```
+
+Everything after `reference` is keyword-only (the §1.1 default-argument convention: `None` sentinels substituted inside the body). The four additions over the original architecture §8 sketch, each deliberate (maintainer-approved 2026-07-07):
+
+- **`spacecraft`** — the `State` path internally runs `propagate_numerical`, and with drag/SRP on (the `leo_default`) the reference physics are wrong without the user's mass/area/Cd. Same rule as `force_models`: used only when `reference` is a `State`, warning-and-ignored when supplied with a `Trajectory` (architecture §13's resolved `fit_tle` decision, extended). `attitude` is deliberately **not** exposed — anyone needing a non-default attitude pre-propagates and passes the `Trajectory` (path (a) below).
+- **`fit_bstar`** — the B\*-handling decision. `True` estimates B\* inside the least squares (right for LEO, where the 2-day default span makes drag observable and a drag-free TLE diverges immediately); `False` holds it at the seed's value (`0.0` without a guess). The docstring warns that short spans and drag-free regimes (GEO) make B\* unobservable — the estimate can wander, absorbing along-track error — and to pass `False` there.
+- **`norad_id` / `name`** — output identity, mirroring `TLE.from_state_unfitted`'s kwargs. Resolution order: explicit kwarg → inherited from `initial_guess` → placeholder (`00000` / unnamed).
+
+### Reference-input paths
+
+The three user paths from architecture §8 stand unchanged (worked examples there):
+
+- **(a) `State`** — a reference trajectory is generated internally over `fitting_span` via `propagate_numerical` with `force_models` (default `leo_default()`), `spacecraft` (default `SpacecraftConfig()`), the default `LofAligned` attitude, and **`IntegratorConfig.high_precision()`** — the preset §1.1 designed for exactly this use ("`fit_tle` reference trajectories"). The internal output grid targets ~300 evenly spaced samples (tunable). The `State` must be in EME2000 — it feeds `propagate_numerical`, whose inertial-input rule it inherits. The internal propagation runs `progress=False`; `fit_tle` owns the reporting and emits its own phase line while the reference builds (below).
+- **(b) `Trajectory`** — used directly; `force_models` / `spacecraft` are warning-and-ignored. Accepted in **any frame**: a `TLE` carries no `Frame`, so internal conversion is sanctioned by the architecture §10 rule — a TEME trajectory from `propagate_tle` works as-is. `fitting_span` is clipped to `min(fitting_span, trajectory span)`, using the **leading** portion of the trajectory.
+- **(c) TLE → trajectory → refit** — legal and useful (SGP4 self-consistency); it is also the feature's known-exact-answer test case.
+
+### Fit mechanism
+
+Orekit's batch least squares over the TLE parameterization — the documented Orekit "fit TLE to ephemeris" recipe:
+
+1. **Template TLE.** The seed anchors the fit: `initial_guess` when supplied, else `TLE.from_state_unfitted` on the first reference sample (its osculating-in-mean-slots offset is exactly what the iteration absorbs). The template's **epoch is the reference start** (first sample in the fitting span) — all measurements sit forward of epoch, and the fitted TLE reads as "this arc, from where it began". (At build, probe Orekit's `FixedPointTleGenerationAlgorithm` as a possibly better seed; an internal choice, not contract.)
+2. **Measurements.** `PV` measurements sampled from the reference trajectory, subsampled evenly to an internal cap (~300; tunable), with internal sigma/weight constants.
+3. **Estimator.** `TLEPropagatorBuilder(template, PositionAngleType, positionScale, generation_algorithm)` + `BatchLSEstimator` with a Levenberg–Marquardt optimizer; `max_iterations` bounds both iterations and evaluations. B\* is the builder's `BSTAR` propagation parameter driver, selected for estimation iff `fit_bstar`. The per-iteration hook is a `BatchLSObserver` `@JImplements` proxy feeding the progress reporter — the known JPype default-method trap applies (implement every method the Java caller invokes; test inside a real fit, the repo-standard discipline).
+4. **Branch.** SDP4 comes free: the near-Earth/deep-space branch follows from the fitted mean motion exactly as in 1.3's `selectExtrapolator` — no user-facing knob.
+
+### Fitted-TLE field policy
+
+The fitted TLE is *physically* complete — everything SGP4 evaluates (epoch, the six mean elements, B\*) is fitted or explicitly controlled. The remaining fields are catalog bookkeeping no trajectory can supply; the rule is **identity inherits, physics is fitted-or-zeroed**, following `from_state_unfitted`'s placeholder conventions:
+
+| Field | With `initial_guess` | Without |
+|---|---|---|
+| Satellite number | `norad_id=` kwarg wins, else inherited | kwarg, else `00000` |
+| Name (line 0) | `name=` kwarg wins, else inherited | kwarg, else unnamed |
+| Classification | inherited | `U` |
+| International designator | inherited | blank |
+| Element-set number | inherited **verbatim** (no auto-increment — we are not a catalog operator) | `0` |
+| Revolution number at epoch | inherited verbatim — documented as **stale** when the fitted epoch differs from the guess's | `0` |
+| Mean-motion 1st/2nd derivatives | **always `0.0`, never inherited** | `0.0` |
+| Ephemeris type | `0` | `0` |
+| Checksums | computed (Orekit formats; re-validated through `from_strings`) | same |
+
+The mean-motion derivatives look like a fidelity loss but aren't: SGP4 ignores them entirely (legacy fields consumed only by the older SGP model — SGP4's drag rides exclusively on B\*), so zeroing them is standard practice, and inheriting a guess's values would be dishonest (they described the *guess's* fit, not ours). The revolution number is the one genuinely approximate inherited field — it counts revolutions since launch, which a trajectory cannot reconstruct.
+
+### Progress reporting (indeterminate mode — pinned here)
+
+`fit_tle` is the reporter's **indeterminate-mode** consumer (general-upgrades-1 Part B left the mode's callable semantics "pinned by 1.2's own contract" — this is that pin). The built-in reporter (`progress=True`) prints a `start` line, a phase line while the `State`-path reference propagates (`fit_tle: building reference trajectory | 48.0 h`), one line per LS iteration (`fit_tle: iter 3 | rms 0.42 km`), and an honest final line on every exit path: `done | converged in 7 iterations | rms 0.18 km`, or `failed at iter 100 | not converged | last rms 3.9 km`. A **callable** receives `min(iteration / max_iterations, 1.0)` — documented as *fraction of the iteration budget consumed*, not fraction of work: monotonic, 0→1-typed, honest about what it measures. `progress=False` is silent; `logger.info` milestones fire regardless (§1.1's convention). The final-line RMS doubles as v1's quality report (the deferred `FitResult`'s job, minus the object).
+
+### Failure modes
+
+| Condition | Result |
+|---|---|
+| `fitting_span <= 0` / `max_iterations < 1` | `ValueError` |
+| `Trajectory` reference with < 2 samples inside the fitting span | `ValueError` |
+| Reference not a bound orbit (first-sample e ≥ 1 or a ≤ 0 — SGP4 cannot represent it) | `ValueError`, pre-flight |
+| `State` reference in a non-inertial frame | `ValueError` (inherited from `propagate_numerical`) |
+| `force_models` / `spacecraft` supplied with a `Trajectory` reference | warning, ignored (architecture §13) |
+| Fitting span < ~1 orbital revolution | warn-once (weak observability), proceed |
+| No convergence within `max_iterations`, or the LS diverges | **`TLEFitError`** — a new `PropygatorError` subclass in `core/exceptions.py`, a *sibling* of `PropagationError` (fitting is not propagation), message carrying the iteration count and last RMS, never a raw Java trace; **no partial TLE** |
+| Internal reference propagation fails (`State` path) | the underlying `NumericalPropagationError` propagates unchanged |
+
+### Validated domain & de-risking
+
+The headline validated domain is **LEO** (paths (a) and (c)); one deep-space case validates the SDP4 branch. High-eccentricity / resonant regimes (Molniya-class) are where TLE fitting is historically finicky — the contract's answer is scoping, not solving: outside the validated domain, `TLEFitError` is an honest outcome (the ECEF-InPlaneTracking "LEO is the validated domain" precedent). The build **front-loads a Chunk-0 feasibility probe** (the Tier-B / ECEF-attitudes rhythm): a throwaway script against the shipped stack fits an ISS TLE from its own `propagate_tle` trajectory (must recover it) and one 2-day numerical LEO reference (record the residual); **Checkpoint A = GO/STOP on those two numbers** before any propygator surface is written. Named fallback if the estimator route proves unworkable through JPype: hand-rolled differential correction in pure NumPy (7 parameters, finite-difference Jacobian over cheap SGP4 evaluations, `numpy.linalg.lstsq` — no scipy); taken only if forced.
+
+### Testing / reference cases
+
+- **Self-fit gate (path (c), known-exact answer).** Fit from a `propagate_tle` trajectory of a known TLE; assert the fitted TLE reproduces the reference to tens-of-meters RMS over the span and recovers the source elements closely. This isolates plumbing from modeling.
+- **Numerical fit (path (a)).** 2-day LEO `leo_default` reference; assert convergence and a bounded, documented km-level RMS — the lossiness caveat made quantitative.
+- **B\* recovery.** A drag-dominated LEO case: `fit_bstar=True` recovers a plausible B\* and beats `fit_bstar=False` on residual.
+- **Deep-space branch.** A Molniya-class case (the Vallado 08195 vector already in the suite) exercising SDP4.
+- **Failure paths.** `TLEFitError` via a garbage `initial_guess` / `max_iterations=1`; the `ValueError` table; the Trajectory-path warning.
+- All JVM-touching tests acquire the JVM via the `orekit` fixture (conftest ordering rule).
+
+### Resolved decisions for 1.2
+
+- **Signature** — the architecture §8 sketch plus `spacecraft` (State-path only), `fit_bstar` (default `True`), output-identity `norad_id`/`name`, and the committed `progress`; all keyword-only after `reference`.
+- **Mechanism** — Orekit `TLEPropagatorBuilder` + `BatchLSEstimator` (Levenberg–Marquardt) over subsampled PV measurements; `BatchLSObserver` proxy for per-iteration reporting; SDP4 automatic.
+- **Fitted epoch** — the reference start (first sample); measurements all forward of epoch.
+- **Seed** — `initial_guess`, else `TLE.from_state_unfitted` on the first sample (Orekit's fixed-point generator probed at build as an internal alternative).
+- **Frames** — `Trajectory` accepted in any frame (TLE carries none; §10 sanctions internal conversion); `State` must be EME2000.
+- **Field policy** — identity inherits (kwargs win), physics fitted-or-zeroed; ṅ/n̈ always zeroed.
+- **Non-convergence** — the new `TLEFitError` (sibling of `PropagationError`), no partial result.
+- **Quality reporting** — final-line + `logger.info` RMS; `FitResult` stays deferred (architecture §13).
+
+### Still open / deferred for 1.2
+
+- **`FitResult`** return type (RMS residual, iteration count, convergence flag) — deferred, backward-compatible to add (architecture §13).
+- **Epoch at span midpoint** (minimizes max in-span error) as an alternative anchor — deferred; start-anchored for v1.
+- **Forwarding determinate progress through the State-path internal propagation** (today: suppressed + a phase line) — a polish item, deferred.
+- **Convergence thresholds / measurement weighting** — internal constants, tuned at build against the probe cases.
+- **The pure-NumPy differential-correction fallback** — named, not built; taken only if the Orekit estimator route fails at the JPype boundary.
 
 ## 1.3 TLE propagator
 
@@ -639,11 +745,11 @@ Notice what is absent relative to `propagate_numerical`: no `force_models`, `spa
 
 **`duration` calling convention.** `duration` sits before the `*`, so — exactly like 1.1's `propagate_numerical(initial, duration, *, ...)` — it is positional-or-keyword: `propagate_tle(tle, 86400)` and `propagate_tle(tle, duration=86400)` both work. An earlier draft made it keyword-only; that is dropped, so the two propagators share one calling convention for `duration`. With `output_step` now *also* required and keyword-only (below), the calling conventions are identical — the only signature differences are 1.3's **absent** `force_models` / `spacecraft` / `attitude` / `integrator` inputs and its added `start`.
 
-**`output_step` required (no default).** `output_step` is required and keyword-only, **exactly as in 1.1** — there is no 60 s default. An earlier draft defaulted it for quick-look convenience; that is dropped in favour of full cross-feature consistency. The decisive reason is that a *defaulted* step turns the `output_step > duration` guard into a foot-gun: a short quick-look like `propagate_tle(tle, 30)` would raise `ValueError` for a step the user never chose. Requiring the step makes that guard unambiguous (the user always picked it) and lets 1.3 reuse 1.1's propagator-agnostic pre-flight via the promoted shared `core/sampling.py` helper — the positive/ordered-step checks *and* the output-sample cap (below) — rather than a bespoke relaxed copy. (1.1's `_validate_inputs` interleaves these with numerical-only checks, so the shared subset is extracted to `core/` rather than reused in place; see `docs/build-plan-feature-1.3-notes.md` #7.) The cost is one extra keyword at the call site (`propagate_tle(tle, 3600, output_step=60)`); the README / §9 examples already pass it explicitly.
+**`output_step` required (no default).** `output_step` is required and keyword-only, **exactly as in 1.1** — there is no 60 s default. An earlier draft defaulted it for quick-look convenience; that is dropped in favour of full cross-feature consistency. The decisive reason is that a *defaulted* step turns the `output_step > duration` guard into a foot-gun: a short quick-look like `propagate_tle(tle, 30)` would raise `ValueError` for a step the user never chose. Requiring the step makes that guard unambiguous (the user always picked it) and lets 1.3 reuse 1.1's propagator-agnostic pre-flight via the promoted shared `core/sampling.py` helper — the positive/ordered-step checks *and* the output-sample cap (below) — rather than a bespoke relaxed copy. (1.1's `_validate_inputs` interleaves these with numerical-only checks, so the shared subset is extracted to `core/` rather than reused in place; see `docs/history/build-plan-feature-1.3,4-notes.md` #7.) The cost is one extra keyword at the call site (`propagate_tle(tle, 3600, output_step=60)`); the README / §9 examples already pass it explicitly.
 
 **`start` default.** Defaults to the TLE's own epoch (`tle.epoch`), because SGP4 is most accurate at epoch and degrades away from it. The common alternative is `start=Epoch.now()` for a "where is it now and next" view; both are documented, with the accuracy caveat below.
 
-**`name` default.** When `name` is omitted it falls back to the TLE's own name (`tle.name`), so a fetched or 3-line TLE (`fetch_tle("ISS")` → `"ISS (ZARYA)"`) carries its identity into the trajectory's metadata `name` with no extra typing. An explicit `name=` always wins; a bare 2-line TLE whose `tle.name` is `None` leaves the metadata `name` unset (unchanged from supplying nothing). This reuses the existing optional `name` metadata field — no new key — so 1.1's metadata grammar and its CSV-header snapshots are untouched. (For the fallback to carry anything, the fetch path / `TLE.from_strings`' 3-line form must populate `tle.name`; see `docs/build-plan-feature-1.3-notes.md` Note 3.)
+**`name` default.** When `name` is omitted it falls back to the TLE's own name (`tle.name`), so a fetched or 3-line TLE (`fetch_tle("ISS")` → `"ISS (ZARYA)"`) carries its identity into the trajectory's metadata `name` with no extra typing. An explicit `name=` always wins; a bare 2-line TLE whose `tle.name` is `None` leaves the metadata `name` unset (unchanged from supplying nothing). This reuses the existing optional `name` metadata field — no new key — so 1.1's metadata grammar and its CSV-header snapshots are untouched. (For the fallback to carry anything, the fetch path / `TLE.from_strings`' 3-line form must populate `tle.name`; see `docs/history/build-plan-feature-1.3,4-notes.md` Note 3.)
 
 ### Frame handling
 
@@ -658,7 +764,7 @@ Unlike `propagate_numerical`, 1.3 carries **no altitude-guard family** and no `l
 | Condition | Exception |
 |---|---|
 | `duration <= 0` / `output_step <= 0` / `output_step > duration` | `ValueError` (propygator-side, before any Orekit call) |
-| output sample count `floor(duration/output_step + tol) + 1` over the shared cap (`_MAX_OUTPUT_SAMPLES` = 10,000,000; a tiny `output_step` over a long `duration`) | `ValueError` (propygator-side; reuses 1.1's cap via the promoted `core` helper — see `docs/build-plan-feature-1.3-notes.md` #7) |
+| output sample count `floor(duration/output_step + tol) + 1` over the shared cap (`_MAX_OUTPUT_SAMPLES` = 10,000,000; a tiny `output_step` over a long `duration`) | `ValueError` (propygator-side; reuses 1.1's cap via the promoted `core` helper — see `docs/history/build-plan-feature-1.3,4-notes.md` #7) |
 | Malformed TLE (bad checksum / field) | `ValueError` at `TLE.from_strings` construction (architecture §10), so `propagate_tle` receives a valid TLE |
 | SGP4/SDP4 internal failure during the span — orbit has **decayed**, sub-surface semi-major axis, eccentricity out of range | caught `OrekitException`, re-raised as `TLEPropagationError` (carrying the Orekit message string, no Java trace, per architecture §3) |
 | Unrecognized underlying Orekit failure | `TLEPropagationError` wrapping the original |
@@ -731,7 +837,7 @@ Per architecture §11:
 
 - **SGP4 implementation-agreement.** Verify `propagate_tle` output against **published Vallado SGP4 test vectors** (the canonical *Revisiting Spacetrack Report #3* / AIAA 2006-6753 cases) to centimetre agreement at sampled times, **compared in the native TEME frame** — comparing after a TEME→EME2000 conversion injects EOP-dependent differences that would blow the centimetre budget, so the test reads the raw SGP4 output frame. Cover **both branches**: at least one near-Earth (SGP4, period < 225 min) *and* one deep-space (SDP4) vector from the same suite (e.g. a Molniya-type case such as 08195 / 04632 — verify the catalog number against the published case list), so `selectExtrapolator`'s automatic branch pick is exercised. This is *implementation-agreement* with the reference SGP4/SDP4, **not** absolute accuracy against truth (which degrades with time from epoch; see the accuracy caveat above).
 - **ISS end-to-end.** Exercise a fixed ISS TLE through `propagate_tle` → `plot_summary` / `export_all`, confirming the 1.1 output stack consumes a TEME-framed trajectory unchanged.
-- **Sample-count contract.** Assert `propagate_tle` honours the §1.1 sample-count formula exactly (`floor(duration/output_step + tol) + 1`, first sample at `start`), so the two propagators produce identically-gridded trajectories — this is the test that would catch the dependency-rule duplication/promotion decision drifting (see `docs/build-plan-feature-1.3-notes.md`).
+- **Sample-count contract.** Assert `propagate_tle` honours the §1.1 sample-count formula exactly (`floor(duration/output_step + tol) + 1`, first sample at `start`), so the two propagators produce identically-gridded trajectories — this is the test that would catch the dependency-rule duplication/promotion decision drifting (see `docs/history/build-plan-feature-1.3,4-notes.md`).
 - **CSV snapshot.** A CSV snapshot for a fixed ISS TLE + `columns=["keplerian", "mean_anomaly"]` pins the EME2000 element frame and the `keplerian, mean_anomaly, sun` column order.
 
 ### Resolved decisions for 1.3
@@ -910,28 +1016,137 @@ A thin wrapper over a `_draw_sky_track(ax, trajectory, station, ...)` primitive 
 - **Buffer magnitudes** — finalized at `half_window_s=2700 s` / `output_step=10 s` / `refresh_s=1 s` (dialled in against look/feel + measured compute during the build); whether to surface the buffer re-propagation trigger as a separate knob stays deferred.
 - **Halo vs. colour** for the sky-track contrast — settle the exact path-effect when it can be seen.
 - **Planet markers** in the sky panel (`CelestialBodyFactory` + DE ephemeris) — deferred; **bright-star markers** — out of scope (no catalog).
-- **Time-zone exposure** — the `live_track` `tz=` half is **realized** (the v0.5.0 civil-time upgrade: `tz: USTimeZone | tzinfo | None = None`, resolved once at entry via `core.time._resolve_tz`, `tzdata` now a declared dependency; general-upgrades-1 §"Civil Time Zones & Progress Reporting" Part A). The "eventual general UTC → US-zone tools" half maps onto Feature 1.5 `find_passes` (its `Pass` rise/culmination/set epochs inherit the same `USTimeZone` / `_resolve_tz` surface) and stays future.
+- **Time-zone exposure** — the `live_track` `tz=` half is **realized** (the v0.5.0 civil-time upgrade: `tz: USTimeZone | tzinfo | None = None`, resolved once at entry via `core.time._resolve_tz`, `tzdata` now a declared dependency; general-upgrades-1 §"Civil Time Zones & Progress Reporting" Part A). The "eventual general UTC → US-zone tools" half maps onto Feature 1.5 (its `Pass` rise/culmination/set epochs inherit the same `USTimeZone` / `_resolve_tz` surface) — now drafted in §1.5, landing on the pass *formatters* (`passes_to_dataframe` / the pass plot verbs), not on `find_passes` itself.
 - **A time-acceleration multiplier** (fast-forward / scrub) — closed: not offered (real-time only).
 - **Saving the animation** to mp4/gif — out of scope for v1 (display only).
 - **Performance** — v1 already derives the static per-buffer data once (so per-frame work is O(1)), and the **artist-data-update half** landed in the v0.5.0 mutate-in-place upgrade (build-once / mutate-in-place, no `ax.clear()`); **blitting** remains a later optimization (removing the residual matplotlib redraw, chiefly the basemap), as does running the buffer rebuild **off-thread** so a re-propagation / cache-miss re-fetch never stalls the draw.
 
 ## 1.5 Ground passes + brightness
 
-> **Status: NOT STARTED (design sketch).** The `find_passes` signature, the `Pass` type, and the data-flow live in architecture §6/§7/§8; the blurb below is a placeholder to be expanded into a full sub-design when 1.5 is scheduled. 1.5 reuses the `look_angles` primitive built in 1.4.
+> **Status: DRAFTED (2026-07-07), NOT BUILT.** This section is now the **binding contract** for `find_passes` and its output surfaces, refining the architecture §6/§7/§8 sketches (§6's `Pass` gains three approved azimuth fields; §7's signature line updated in step). 1.5 reuses the 1.4 topocentric kernel (`look_angles` / `look_angles_track` / `sun_look_angles`) **verbatim** and carries the `progress` parameter committed by general-upgrades-1 Part B from birth. Internal scan constants (coarse step, refinement tolerance, twilight threshold, per-pass sampling) are **tunable placeholders, not contract** (the §1.4 buffer-magnitudes precedent). The `tz=` surface deliberately lands on the pass *formatters*, not on `find_passes` — an approved deviation from the general-upgrades-1 forward note's literal wording (see "Time zones" below; that note now carries the resolution).
 
-The synthesis feature: given a TLE, a `GroundStation`, and a time window, find future **visible passes** — when the satellite is above the horizon, sunlit, and the observer is in darkness — with an estimated **visual magnitude**. It combines tracking, lighting geometry, and eclipse logic.
+The synthesis feature: given a TLE, a `GroundStation`, and a time window, find future **visible passes** — when the satellite is above the horizon, sunlit, and the observer is in darkness — with an estimated **visual magnitude**. It combines tracking, lighting geometry, and eclipse logic; it is composition over shipped primitives (`propagate_tle`, the `core/observation.py` kernel), with the only new physics being the shadow test and the phase-law magnitude.
+
+### Public signature
 
 ```python
-def find_passes(tle, station, start, duration, min_elevation_deg) -> list[Pass]: ...
+def find_passes(
+    tle: TLE,
+    station: GroundStation,
+    duration: float,                          # seconds, positive — search-window length
+    *,
+    start: Epoch | None = None,               # None -> Epoch.now() (the "tonight" default)
+    min_elevation_deg: float = 10.0,          # geometric gate; refraction out of scope
+    visible_only: bool = True,                # False -> all geometric passes, annotated
+    standard_magnitude: float | None = None,  # None -> registry lookup by tle.norad_id
+    progress: bool | ProgressCallback = True, # determinate scanned/total fraction
+) -> list[Pass]:
 ```
 
-A `Pass` carries `rise` / `culmination` / `set` epochs, `max_elevation_deg`, `peak_magnitude` (None if not computed), and `sunlit_at_culmination` (architecture §6). The internal pipeline (architecture §8): propagate the TLE → find horizon crossings → check elevation → check lighting (satellite lit, observer dark, not in Earth's shadow) → compute magnitude.
+`duration` sits in the positional-or-keyword slot exactly as in `propagate_numerical` / `propagate_tle` — one calling convention for `duration` across all long-window verbs (a deliberate reorder of the architecture §8 sketch's `(…, start, duration, …)`; the README target example passes everything by keyword and runs verbatim). `start=None → Epoch.now()` because pass prediction is inherently "from now" (the `propagate_tle` `start=tle.epoch` spirit). `min_elevation_deg` defaults to the customary 10° observing threshold. The returned list is sorted by rise time and may be empty (a normal answer, not a warning).
 
-**Outputs — two forms, cheap and rich.**
+### Pass semantics
 
-- **Pass table (cheap).** A tabular view of `list[Pass]` for quick reading — a `passes_to_dataframe(passes) -> pd.DataFrame` (pandas already a dep, mirroring `Trajectory.to_dataframe`) and/or a formatted-text table. Plus the already-anticipated `io/exports` **Pass list → ICS/CSV** export (architecture §7). Cheap formatting of an existing core type — no new dependency.
-- **Sky charts (rich).** `plot_sky_chart` (`plotting/passes.py`, matplotlib polar) layers `Pass` objects — rise/culmination/set, brightness, lit/eclipse shading — onto the **same** `look_angles` primitive built in 1.4, plus `plot_pass_timeline`.
+- A **pass** is a maximal interval where elevation ≥ `min_elevation_deg`. `rise` / `set` are the threshold crossings, `culmination` the elevation maximum between them.
+- A pass is **visible** if at *some point* during it the satellite is sunlit **and** the observer is in darkness (station Sun elevation ≤ −6°, end of civil twilight — a module constant, not a parameter). The "some point" wording matters: the classic evening ISS pass enters Earth's shadow mid-pass, so `sunlit_at_culmination` can legitimately be `False` on a visible pass — which is why that field stays informative under the default filter.
+- `visible_only=True` (default) returns visible passes only, honoring the feature's definition; `False` returns **every geometric pass**, each annotated — the radio-operator / general case. Visibility is thus a filter over one computation, not a different function.
+- **`peak_magnitude`** is the brightest (minimum) magnitude over the pass's visible portion; `None` when no standard magnitude is available **or** the pass has no visible portion (reachable only with `visible_only=False`). Magnitude availability never gates pass detection — a satellite outside the registry still gets its passes, magnitude-less (architecture §3).
+- Passes straddling the window boundary are **clamped and included** (their clamped endpoint is not a true rise/set; documented). A satellite continuously above the gate for the whole window (GEO from low latitude) yields one window-spanning clamped pass plus a warn-once. A satellite that never rises yields `[]`.
 
-**Brightness.** Visual magnitude uses the citation-backed standard-magnitude table in `core/catalogs.py` (intrinsic brightness at 1000 km, 50% phase angle), corrected for range and phase angle in `tracking/visibility.py` (`compute_magnitude`). Satellites outside the registry need a user-supplied magnitude, or passes are returned without a magnitude estimate (architecture §3).
+### The `Pass` type (extended — approved 2026-07-07)
 
-**To flesh out when scheduled:** the horizon-crossing / culmination search algorithm, the eclipse + lighting model, the magnitude/phase-angle math and its references, and the exact sky-chart / timeline layouts.
+Three additive azimuth fields join the shipped type (architecture §6 updated in step), so the pass table can answer "where do I look" (rises in the NNW, peaks in the SE…):
+
+```python
+rise_azimuth_deg: float | None = None
+culmination_azimuth_deg: float | None = None
+set_azimuth_deg: float | None = None
+```
+
+`find_passes` always populates them; the `None` defaults exist only so hand-built `Pass` objects (tests, user code) stay valid — the one edit to a shipped core type in this feature. `Pass` deliberately stays **light**: it does *not* store the sky arc (the az/el polyline), which keeps it a plain frozen value type in `core/` — the consequence for `plot_sky_chart` is noted under "Outputs".
+
+### Search algorithm (mechanism, not contract)
+
+1. **Coarse scan.** One `propagate_tle` over `[start, start + duration]` at a coarse step (~30 s), one `look_angles_track` (a single `TopocentricFrame` build) → the elevation array.
+2. **Bracket & refine.** Threshold crossings bracket candidate passes; rise/set refine by bisection and culmination by golden-section on single-shot `look_angles`, to ~0.5 s.
+3. **Lighting only inside passes.** The sunlit / observer-dark / magnitude evaluation runs only within each bracketed pass (short arcs, ~100 fine samples each) — never as an O(window) scan. If profiling wants it, a small batched Sun-track helper joins the existing `core/observation.py` kernel additively.
+
+The internal `propagate_tle` call brings 1.3's machinery along for free: the shared sample-grid cap, the stale-TLE `StaleTLEWarning` for windows reaching > 30 days from the TLE epoch (warn-once, never an error), and the decay behavior (below).
+
+### Lighting model
+
+- **Observer darkness:** `sun_look_angles(station, t).elevation_deg ≤ −6°` (civil twilight's end — the standard satellite-spotting threshold; a module constant for v1).
+- **Satellite sunlit:** a **conical-umbra** test — consistent with the §1.1 SRP shadow convention; penumbra counts as lit (grazing brightness) — implemented as pure NumPy geometry in `tracking/visibility.py` given satellite and Sun positions in a common inertial frame (Sun positions via the `core/bodies` accessors).
+- **Refraction:** out of scope; the horizon is geometric. Documented.
+
+### Brightness
+
+`mag = std_mag + 5·log₁₀(range/1000 km) − 2.5·log₁₀(F(φ)/F(90°))` with the diffuse-sphere phase function `F(φ) = ((π−φ)·cos φ + sin φ)/π` — realizing architecture §3's pinned convention (intrinsic brightness at 1000 km range, 50% phase angle, i.e. φ = 90°). The standard-magnitude table lands in `core/catalogs.py` keyed on NORAD id, seeded from Mike McCants's `qsmag` with the flagged constant-offset reconciliation (qsmag assumes 100% illumination; the offset is ≈ 2.5·log₁₀ π ≈ +1.24 mag — magnitude *and direction* verified at build), every entry carrying its in-source citation (§3: untraceable values are not acceptable). Resolution order: explicit `standard_magnitude=` → registry by `tle.norad_id` → magnitudes `None`.
+
+The photometric kernel is `tracking/visibility.py`'s
+
+```python
+def compute_magnitude(state: State, station: GroundStation, standard_magnitude: float) -> float: ...
+```
+
+which fetches the Sun internally at `state.epoch`, computes slant range and phase angle, and applies the formula. Per the architecture §10 rule its frame-carrying input must be in a specific frame (EME2000; `ValueError` otherwise, the `to_geodetic` pattern). It is **purely photometric** — it does *not* check eclipse; the caller (`find_passes`) gates lighting. Reachable at `propygator.tracking.visibility`, not top-level (the `look_angles_track` precedent).
+
+### Outputs
+
+One producer, five consumers. Data flows one way — `find_passes → list[Pass] →` formatters/plots/exports — and because a `Pass` stores only its scalar fields, everything that needs just those numbers is JVM-free, while the one consumer that must redraw the sky arc takes the `tle` + `station` again and recomputes it:
+
+- **`passes_to_dataframe(passes, *, tz=None) -> pd.DataFrame`** (`tracking/passes.py`, top-level export; mirrors `Trajectory.to_dataframe`). One row per pass; columns `rise` / `culmination` / `set` as **tz-aware pandas datetimes** (UTC by default, converted when `tz=` is given — real dtype, not formatted text), `duration_s` (derived `set − rise`), `max_elevation_deg`, the three azimuths, `peak_magnitude`, `sunlit_at_culmination`. Pure formatting, no JVM. No bespoke text-table formatter — a DataFrame prints well, and the earlier "and/or" allows dropping it.
+- **`plot_sky_chart(tle, station, passes, *, tz=None) -> Figure`** (`plotting/passes.py`, matplotlib polar; `passes: Pass | Sequence[Pass]`). Recomputes each pass's arc internally (`propagate_tle` over `[rise, set]` → `look_angles_track` — cheap over minutes-long arcs; the price of a light `Pass`), drawn in the `_draw_sky_track` conventions (N up, zenith center): one arc per pass, rise/set labels with tz-formatted times and azimuths, culmination marker with max elevation, **lit vs. eclipsed segment styling** (the shading 1.4's geometry-only line explicitly left to 1.5), magnitude annotation, title from `tle.name`. JVM-touching.
+- **`plot_pass_timeline(passes, *, tz=None) -> Figure`** (`plotting/passes.py`, matplotlib). The "when" view to the sky chart's "where": x = wall clock across the window (tz-formatted), y = elevation 0–90°; each pass a bar spanning rise→set with height = `max_elevation_deg` and the peak magnitude annotated; `sunlit_at_culmination` styles the bar. Bars get a small minimum display width (a 10-minute pass on a 3-day axis is sliver-thin; positions stay exact). Draws only stored `Pass` fields — no TLE, no JVM. (Shading observer-darkness bands would need the station + JVM; deliberately not in the v1 shape.)
+- **`export_passes_csv(passes, path) -> None`** (`io/exports.py`; the `export_csv` return convention). The DataFrame's columns as CSV with the standard metadata header, **UTC only** — consistent with the trajectory CSV's archival-UTC rule (localizing CSV was explicitly ruled out in general-upgrades-1 Part A).
+- **`export_passes_ics(passes, path, *, name=None) -> None`** (`io/exports.py`). One `VEVENT` per pass (`DTSTART`=rise, `DTEND`=set, summary like `ISS pass - max el 45 deg, mag -3.2`), a hand-rolled VCALENDAR (plain text, no new dependency — realizing architecture §7's anticipated "Pass list → ICS"). Timestamps UTC; calendar clients localize themselves, so no `tz=`. The `name=` keyword exists because a `Pass` carries no satellite name; defaults to a generic label.
+
+`io/` consumes only the `core/` `Pass` type, so the dependency rule holds with no new edges.
+
+### Time zones
+
+The `tz: USTimeZone | tzinfo | None = None` surface (lowered through the shipped `core.time._resolve_tz`) lands on the three **formatters** above — `passes_to_dataframe`, `plot_sky_chart`, `plot_pass_timeline` — and *not* on `find_passes` itself, which returns tz-less `Epoch`-carrying value objects and formats nothing (a `tz=` there would be dead). This honors the general-upgrades-1 Part A forward note's *spirit* (pass epochs inherit the `USTimeZone` surface wherever they become human-readable) while deviating from its literal wording ("`find_passes` will accept the same `tz=`") — maintainer-approved 2026-07-07 and recorded beside that note.
+
+### Progress reporting
+
+`find_passes` is the reporter's second **determinate** consumer (general-upgrades-1 Part B): `progress=True` drives the 0→1 fraction over the coarse scan + refinement (`scanned / total`), with the `start` line before JVM boot and an honest final line, exactly as §1.1 documents; a callable receives the fraction; `False` is silent. Typical windows finish in seconds, so this is mostly the `start`/`done` pair — included from birth per the standing commitment so the reporter keeps three consumers.
+
+### Failure modes
+
+| Condition | Result |
+|---|---|
+| `duration <= 0` | `ValueError` |
+| `min_elevation_deg` outside `[0, 90)` | `ValueError` |
+| `standard_magnitude` non-finite | `ValueError` |
+| Internal sample grid over the shared cap | `ValueError` (inherited via `propagate_tle` / `core/sampling.py`) |
+| SGP4 decay / internal failure inside the window | `TLEPropagationError` propagates unchanged (1.3's fidelity-honesty stance; no partial pass list) |
+| Window reaching > 30 d from the TLE epoch | `StaleTLEWarning` via `propagate_tle` (warn-once, never an error) |
+| No passes found | `[]` — a normal answer, no warning |
+| Satellite continuously above the gate all window | one window-spanning clamped pass + warn-once |
+
+### Testing / reference cases
+
+- **External cross-check.** ISS passes over a fixed station vs. independently computed predictions (the 1.4 self-sourced + cross-checked reference-data precedent): rise/set within seconds, max elevation within ~1°, azimuths within ~1°.
+- **Refinement pin.** Elevation at refined rise/set equals `min_elevation_deg` within tolerance.
+- **Lighting gates.** A mid-pass shadow-entry case asserting a *visible* pass with `sunlit_at_culmination=False`; a daytime pass excluded under `visible_only=True` and present-annotated under `False`; the observer-dark gate flipping across twilight.
+- **Magnitude.** Formula spot-check against a hand-computed / published example; the qsmag → 50%-phase offset verified with citations.
+- **Edges.** Empty window → `[]`; window-straddling clamp; the always-up warn-once.
+- **Snapshots.** DataFrame columns/dtypes (including a tz-aware conversion), CSV, ICS; `plot_sky_chart` / `plot_pass_timeline` figure snapshots (static plots — unlike 1.4's live view, fully snapshot-testable per architecture §11).
+- **Safe-before-init.** Extended `Pass` construction stays in the pure-Python `tests/core/*` suite; all JVM-touching tests acquire the `orekit` fixture.
+
+### Resolved decisions for 1.5
+
+- **Signature** — `duration` positional-or-keyword (cross-verb convention); `start=None → Epoch.now()`; `min_elevation_deg=10.0`; `visible_only=True` default (the feature's definition, with the geometric-all escape); `standard_magnitude` override → registry → `None`; `progress` from birth.
+- **Visibility** — "sunlit ∧ observer dark (Sun el ≤ −6°) at some point while above the gate"; conical umbra, penumbra = lit; refraction out of scope.
+- **`Pass`** — extended with three `None`-default azimuth fields; stays light (no stored arc).
+- **Outputs** — `passes_to_dataframe` (tz-aware datetimes) / `plot_sky_chart` (takes `tle` + `station` again, recomputes arcs, lit/eclipse styling) / `plot_pass_timeline` (Pass-fields-only, no JVM) / `export_passes_csv` (UTC) / `export_passes_ics` (UTC, `name=` kwarg); all top-level exports; `compute_magnitude` stays at `tracking.visibility`.
+- **`tz=`** — on the formatters, not `find_passes` (approved deviation, recorded in general-upgrades-1).
+- **Module placement** — `tracking/passes.py` (`find_passes`, `passes_to_dataframe`), `tracking/visibility.py` (shadow test, phase angle, `compute_magnitude`), `plotting/passes.py` (the two plot verbs), `io/exports.py` (the two exporters), `core/catalogs.py` (the cited magnitude table) — exactly the architecture §7 homes.
+
+### Still open / deferred for 1.5
+
+- **Scan constants** (coarse step ~30 s, refinement ~0.5 s, per-pass fine sampling, the −6° threshold) — dialled in at build; tunable placeholders like 1.4's buffer magnitudes.
+- **A batched Sun-track kernel helper** — added additively only if per-pass profiling warrants.
+- **Observer-darkness band shading on the timeline** — would make it station-aware + JVM-touching; deferred.
+- **Exposing the twilight threshold as a parameter** — fixed at −6° for v1; deferred.
+- **Bulk multi-satellite pass search** (one station, many TLEs) — out of scope for v1; the per-TLE verb composes.

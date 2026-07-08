@@ -2,6 +2,14 @@
 
 This document provides specific details regarding a set of general upgrades to propygator. It temporarily supercedes architecture.md and features.md, but minimally and only in specifically noted spots. It will function as a source of truth for propygator v0.5.0 build.
 
+> **Archived to `docs/history/` (2026-07-07), one exception to its historical status:**
+> all five sections shipped/resolved as `v0.5.0` and every shipped section's
+> Supercessions are folded back — but the **ERP half of "Planetary Third-Body & Earth
+> Radiation Pressure" remains the binding contract** for the parked, upstream-blocked
+> `earth_radiation` resume (`experiments/earth-radiation/` carries the patch + probe +
+> recipe). Archived location notwithstanding, that section still wins on conflict when
+> the resume happens.
+
 ## Tier B Drag
 
 > Adds **`BoxFaceCd`** — a per-face, incidence-resolved drag-coefficient table for a
@@ -347,7 +355,7 @@ The ±Z faces (a sail's big faces) therefore contain the wind exactly in their p
 > **`earth_radiation`** (Knocke's rediffused Earth albedo + thermal-infrared radiation
 > pressure) — the fourth general upgrade feeding v0.5.0 (one branch,
 > `feature/additional-perturbations`, both chunks; realizing items 1–2 of
-> `docs/prospective-forces-and-progress-findings.md` — item 3, progress reporting, stays
+> `docs/history/prospective-forces-and-progress-findings.md` — item 3, progress reporting, stays
 > unscoped and that doc remains its reference). Both ride inside `ForceModelConfig` — the
 > designed extension point — so the frozen `propagate_numerical` signature is untouched;
 > both are **off in every preset** (default runs stay bit-identical); and both wire
@@ -391,7 +399,7 @@ The ±Z faces (a sail's big faces) therefore contain the wind exactly in their p
 
 ### Context
 
-The decision record (condensed from `docs/prospective-forces-and-progress-findings.md` §2–§3; Orekit-API claims there were confirmed against the installed orekit_jpype 13.1.x by direct introspection on 2026-06-20):
+The decision record (condensed from `docs/history/prospective-forces-and-progress-findings.md` §2–§3; Orekit-API claims there were confirmed against the installed orekit_jpype 13.1.x by direct introspection on 2026-06-20):
 
 - **Planetary gravity ships as completeness, honestly scoped.** Planetary accelerations on an Earth orbiter are ~1e-10–1e-13 of central gravity (Venus and Jupiter dominate) — this will never visibly move a LEO trajectory, and the contract says so out loud. It ships anyway because the cost is trivial: the Sun/Moon third-body path is cloned verbatim, `CelestialBodyFactory` already exposes every planet, and the JPL DE ephemeris **already bundled in orekit-data answers for all of them** (probed: `getJupiter()` resolves and returns a µ) — no new data dependency, no resolver work. At that price, "full third-body completeness" is worth having for high-precision GEO / long-arc work.
 - **One lumped toggle, not per-planet booleans.** At these magnitudes, per-planet selection is false granularity — no one has a physical reason to want "just Saturn", and seven booleans (or a names-tuple) would bloat the config and the metadata grammar for zero information. A single `planets_third_body` boolean with a **pinned** planet set keeps the config readable, the grammar token deterministic, and the intent honest ("completeness on/off"). (The findings doc leaned toward a couple of explicit booleans; this contract supersedes that lean.)
@@ -489,7 +497,7 @@ KnockeRediffusedForceModel(_sun(), radiation_sensitive,
 - **Per-face optical properties** (a radiation analog of `BoxFaceCd`) — not modeled; stays in the model-limitations note.
 - **Progress reporting** (findings doc §4) — deferred, unscoped; the findings doc stays in `docs/` as its reference.
 
-**Build shape** (one branch, `feature/additional-perturbations`; detailed sequencing is the build plan's job): planets chunk first (afternoon-scale; exercises the config/grammar/`_WiredForces` seams end-to-end), then the ERP runtime + tests (with a **provisional** resolution constant), then the ERP experiment (deliverables 1–2 — run *through the shipped path* by overriding the module constant per rung, which is why the runtime lands first; it finalizes `_EARTH_RADIATION_ANGULAR_RESOLUTION` before any doc quotes a number), then docs fold-back + wrap-up — Supercessions folded into `features.md` §1.1 / `architecture.md` §13 / `README.md` / `CLAUDE.md`; a status note added to `docs/prospective-forces-and-progress-findings.md` marking items 1–2 realized (the doc stays put for item 3); CHANGELOG `[Unreleased]` entry per `docs/changelog-guidelines.md` (maintainer-authored); squash-merge to `main`, **no tag** (v0.5.0 is tagged once, after all general upgrades land).
+**Build shape** (one branch, `feature/additional-perturbations`; detailed sequencing is the build plan's job): planets chunk first (afternoon-scale; exercises the config/grammar/`_WiredForces` seams end-to-end), then the ERP runtime + tests (with a **provisional** resolution constant), then the ERP experiment (deliverables 1–2 — run *through the shipped path* by overriding the module constant per rung, which is why the runtime lands first; it finalizes `_EARTH_RADIATION_ANGULAR_RESOLUTION` before any doc quotes a number), then docs fold-back + wrap-up — Supercessions folded into `features.md` §1.1 / `architecture.md` §13 / `README.md` / `CLAUDE.md`; a status note added to `docs/history/prospective-forces-and-progress-findings.md` marking items 1–2 realized (the doc stays put for item 3); CHANGELOG `[Unreleased]` entry per `docs/changelog-guidelines.md` (maintainer-authored); squash-merge to `main`, **no tag** (v0.5.0 is tagged once, after all general upgrades land).
 
 
 ## Civil Time Zones & Progress Reporting
@@ -499,7 +507,7 @@ KnockeRediffusedForceModel(_sun(), radiation_sensitive,
 > readout clock in a **US civil time zone** (default unchanged — UTC), and **(B)**
 > **default-on progress reporting** for the long-running verbs — plain, throttled stderr
 > status lines so a user never stares at a seemingly frozen terminal. (B) realizes item 3
-> of `docs/prospective-forces-and-progress-findings.md` (§4), which that doc left
+> of `docs/history/prospective-forces-and-progress-findings.md` (§4), which that doc left
 > unscoped; §4 stays its mechanism reference until this ships. Part A rides the tz-ready
 > `_format_clock` seam already built into `tracking/live.py` (features.md §1.4 named it),
 > so the core time model is untouched; Part B adds one keyword-with-default to the frozen
@@ -543,7 +551,7 @@ KnockeRediffusedForceModel(_sun(), radiation_sensitive,
 - **`features.md` §1.1, `propagate_numerical` signature** — gains a trailing `progress: bool | ProgressCallback = True` (keyword-with-default; `ProgressCallback = Callable[[float], None]`). This is the single deliberate edit to the frozen §1.1 signature; it is additive and backward-compatible (existing calls are unaffected), but the **default changes observable behavior** — a bare `propagate_numerical(...)` now emits progress to stderr.
 - **`features.md` §1.1, a new "Progress reporting" paragraph** — documents the default-on plain-line reporter, the `progress=False` opt-out, and the `progress=<callable>` seam.
 - **`architecture.md` §Logging ("never bare prints") + `CLAUDE.md` "Architecture invariants" ("Logging, never prints")** — gain a **sanctioned-exception** clause: transient progress output may go to **stderr** provided it is TTY-gated, opt-out (`progress=False`), never written to stdout, and never attached to the root logger. (`logger.info` progress milestones are still emitted for handler-configured users.)
-- **`docs/prospective-forces-and-progress-findings.md`, status header** — item 3 (progress reporting) moves from "remains unscoped — §4 is still the live reference" to "scoped by general-upgrades-1 §Civil Time Zones & Progress Reporting"; §4 stays the mechanism reference.
+- **`docs/history/prospective-forces-and-progress-findings.md`, status header** — item 3 (progress reporting) moves from "remains unscoped — §4 is still the live reference" to "scoped by general-upgrades-1 §Civil Time Zones & Progress Reporting"; §4 stays the mechanism reference.
 - **Features 1.5 `find_passes` / 1.2 `fit_tle` (NOT STARTED)** — their eventual signatures carry the same `progress` parameter from birth (a forward commitment, not an edit to existing text, so the reporter has three consumers).
 - **Code** — a new `core/progress.py` (`_ProgressReporter`: determinate + indeterminate modes, the TTY gate, the 10-percent/heartbeat throttle, ASCII-only rendering, the callable pass-through; plus the public `ProgressCallback` alias — it names a public parameter type, so it is defined here and re-exported at the top level); `propagation/numerical.py` — an `OrekitFixedStepHandler` `@JImplements` proxy (all three of `init`/`handleStep`/`finish`), registered via `propagator.getMultiplexer().add(step, handler)`, the reporter finalized in a `finally`; the `progress` parameter and its wiring; tests; `README.md` / `CLAUDE.md`.
 
@@ -582,7 +590,7 @@ class USTimeZone(Enum):
 
 **Dependency.** Declare it in `environment.yml` as conda-forge's **`python-tzdata`** (the conda package named plain `tzdata` is the raw IANA database — it does *not* provide the importable Python module `zoneinfo` falls back to on Windows) and in `pyproject` runtime deps under its PyPI name **`tzdata`**. It is a tiny pure-data package, already present transitively; declaring it makes the tz path deterministic across platforms rather than reliant on pandas' transitive pull.
 
-**Feature 1.5 inheritance (forward note, not built here).** `find_passes` will accept the same `tz=` and apply `_resolve_tz` when it formats the `Pass` rise/culmination/set epochs — the "eventual UTC → US-zone tools" the §1.4 deferred bullet named. No 1.5 code lands in this section.
+**Feature 1.5 inheritance (forward note, not built here).** `find_passes` will accept the same `tz=` and apply `_resolve_tz` when it formats the `Pass` rise/culmination/set epochs — the "eventual UTC → US-zone tools" the §1.4 deferred bullet named. No 1.5 code lands in this section. *(Resolution at 1.5 contract drafting, 2026-07-07: the `tz=` surface lands on the pass **formatters** — `passes_to_dataframe` / `plot_sky_chart` / `plot_pass_timeline` — not on `find_passes` itself, which returns tz-less `Epoch`-carrying `Pass` objects and formats nothing. A maintainer-approved deviation from this note's literal wording; features §1.5 is binding.)*
 
 **Out of scope (Part A).** Non-US zones as first-class enum members (use a raw `tzinfo`); localizing the CSV `epoch_utc` column (a §1.1-named archival UTC column — if ever wanted, an additive `local` column *group* on the `io/exports.py` registry, never a conversion of the canonical column); any change to `Epoch` / `TimeScale` / `to_iso` (civil zones stay out of the physics-scale model).
 

@@ -625,7 +625,12 @@ class Pass:
     max_elevation_deg: float
     peak_magnitude: float | None     # None if not computed
     sunlit_at_culmination: bool
+    rise_azimuth_deg: float | None = None         # populated by find_passes;
+    culmination_azimuth_deg: float | None = None  # None-defaults only so hand-built
+    set_azimuth_deg: float | None = None          # Pass objects stay valid
 ```
+
+The three azimuth fields were added at the 1.5 contract drafting (features §1.5, approved 2026-07-07) so a pass table can answer "where do I look"; they are additive-with-defaults, keeping the type safe-before-init and hand-constructible. `Pass` deliberately stores no sky arc (az/el polyline) — it stays a light value type; `plot_sky_chart` recomputes arcs from the `TLE` + `GroundStation` (features §1.5).
 
 ---
 
@@ -640,7 +645,8 @@ src/propygator/
 |       SpacecraftGeometry, VariableCd, BoxFaceCd, IntegratorConfig,
 |       AltitudeLimits, the attitude family, propagate_numerical,
 |       propagate_tle, fit_tle, fetch_tle, current_state,
-|       current_ground_position, find_passes, look_angles, sun_look_angles,
+|       current_ground_position, find_passes, passes_to_dataframe,
+|       look_angles, sun_look_angles,
 |       moon_look_angles (look_angles_track, the batched array form, stays
 |       in propygator.core.observation), the plot_*/export* functions, init,
 |       clear_cache, and the exception types. (BoxFaceCd, the shipped Tier-B
@@ -733,9 +739,12 @@ src/propygator/
 │   │                    defaults to tle.epoch.
 │   │                    Default output frame: TEME. Reuses the shared
 │   │                    output-sample grid + cap from core/sampling.py.
-│   ├── fitter.py        fit_tle(reference, fitting_span, ...)
+│   ├── fitter.py        fit_tle(reference, *, fitting_span, force_models,
+│   │                    spacecraft, initial_guess, max_iterations, fit_bstar,
+│   │                    norad_id, name, progress) -> TLE
 │   │                    Accepts State (then propagates internally) or
-│   │                    Trajectory (used directly). See §8.
+│   │                    Trajectory (used directly). See §8; full binding
+│   │                    sub-design: features §1.2.
 │   └── sources.py       fetch_tle, fetch_celestrak (fetch_spacetrack deferred)
 │                        Caches to ~/.propygator/cache/
 │                        fetch_tle(name_or_id, source='celestrak')
@@ -761,10 +770,14 @@ src/propygator/
 │   │                    _draw_sky_track (sky panel only with a GroundStation).
 │   │                    Lazily imports plotting/ (the export_all precedent,
 │   │                    dep rule below). Live display only; not saved.
-│   ├── passes.py        find_passes(tle, station, start, duration,
-│   │                                min_elevation_deg)
-│   └── visibility.py    Eclipse check, sun angle, phase angle
-│                        compute_magnitude(state, sun, observer, std_mag)
+│   ├── passes.py        find_passes(tle, station, duration, *, start=None,
+│   │                    min_elevation_deg=10.0, visible_only=True,
+│   │                    standard_magnitude=None, progress=True) -> list[Pass]
+│   │                    + passes_to_dataframe(passes, *, tz=None).
+│   │                    Full binding signature: features §1.5.
+│   └── visibility.py    Conical-umbra eclipse check, phase angle,
+│                        compute_magnitude(state, station, standard_magnitude)
+│                        (Sun fetched internally; EME2000 required, §10).
 │                        Pulls the standard-magnitude table from core/catalogs.py.
 │
 ├── plotting/
@@ -788,6 +801,8 @@ src/propygator/
 │
 └── io/
     └── exports.py       Trajectory → CSV/JSON; Pass list → ICS/CSV
+                         (export_passes_csv / export_passes_ics — UTC
+                         timestamps only; features §1.5)
                          Writes TrajectoryMetadata to format-appropriate
                          locations (CSV header comments, JSON top-level key,
                          image file metadata via savefig metadata=).
@@ -816,7 +831,7 @@ User → State + ForceModelConfig + duration
 
 ### 1.2 TLE fitting
 
-`fit_tle` accepts either a `State` or a `Trajectory` as its reference input:
+`fit_tle` accepts either a `State` or a `Trajectory` as its reference input. The full binding sub-design is **features §1.2** (drafted 2026-07-07; it extends the original sketch here with `spacecraft` / `fit_bstar` / `norad_id` / `name` — maintainer-approved — plus the `progress` parameter committed by general-upgrades-1 Part B):
 
 ```python
 def fit_tle(
@@ -824,18 +839,26 @@ def fit_tle(
     *,
     fitting_span: float = 86400.0 * 2,   # seconds; default 2 days
     force_models: ForceModelConfig | None = None,  # used only if reference is State
+    spacecraft: SpacecraftConfig | None = None,    # used only if reference is State
     initial_guess: TLE | None = None,
     max_iterations: int = 100,
+    fit_bstar: bool = True,
+    norad_id: int | None = None,         # output identity; None -> inherit / placeholder
+    name: str | None = None,             # output identity; None -> inherit / placeholder
+    progress: bool | ProgressCallback = True,   # indeterminate mode (features §1.2)
 ) -> TLE:
     """Fit a TLE against a reference trajectory.
 
     If `reference` is a State, a numerical trajectory is generated over
-    `fitting_span` using `force_models` (defaults to leo_default) and the
-    fit is performed against that trajectory.
+    `fitting_span` using `force_models` (defaults to leo_default) and
+    `spacecraft` (defaults to SpacecraftConfig()) and the fit is performed
+    against that trajectory.
 
-    If `reference` is a Trajectory, it is used directly and `force_models`
-    is ignored (warning emitted if supplied). `fitting_span` is clipped to
-    the trajectory's actual span.
+    If `reference` is a Trajectory, it is used directly and `force_models` /
+    `spacecraft` are ignored (warning emitted if supplied). `fitting_span`
+    is clipped to the trajectory's actual span (leading portion).
+
+    Non-convergence raises TLEFitError (features §1.2).
     """
 ```
 
@@ -1121,9 +1144,10 @@ Suggested implementation sequence:
 4. **1.5 Ground passes + brightness** — builds on 1.4 and visibility; reuses 1.4's `look_angles`. Adds a pass table plus the richer sky/timeline charts.
 5. **1.2 TLE fitter** — hardest; lean on Orekit's built-in fitting machinery. Treated as a plus rather than a blocker.
 
-**1.1 Numerical propagator** is built and released, together with its
-drag-validity/altitude-guards and ECEF-nadir/direction-markers addenda.
-**1.3 TLE propagator** is the next feature.
+**1.1–1.4 are built and released** (`v0.1.0`–`v0.4.0`, including the 1.1
+addenda), followed by the five general upgrades batched as `v0.5.0`.
+**1.5 Ground passes** is the next feature (contract drafted, features §1.5),
+then **1.2 TLE fitter** (contract drafted, features §1.2).
 
 ---
 
@@ -1141,7 +1165,7 @@ drag-validity/altitude-guards and ECEF-nadir/direction-markers addenda.
 - **`Trajectory` backing arrays read-only** — `setflags(write=False)` in `__post_init__` so frozen-elsewhere semantics extend to array contents.
 - **`Epoch.now()` default scale** — UTC, explicit in the signature.
 - **`Trajectory` user-construction API** — `from_states` (ergonomic, small N) and `from_arrays` (vectorized, large N).
-- **`fit_tle` contract** — accepts `State | Trajectory`; `force_models` used only in the State case; emits warning if supplied with a Trajectory.
+- **`fit_tle` contract** — accepts `State | Trajectory`; `force_models` used only in the State case; emits warning if supplied with a Trajectory. Full contract drafted 2026-07-07 (features §1.2): `spacecraft` follows the same State-only rule; adds `fit_bstar`, output-identity `norad_id`/`name`, and the committed `progress` (indeterminate mode); non-convergence raises the new `TLEFitError` (a `PropygatorError` sibling of `PropagationError`).
 - **`NullHandler` on the package logger** — yes, in `__init__.py`.
 - **CI** — Tier 1 (Ubuntu, Python 3.11), cached conda env, no Windows.
 - **NumPy 2.x + orekit_jpype compatibility** — verified May 2026 via the three-layer test in §11; environment snapshot in `docs/verified_environments/2026-05.txt`.

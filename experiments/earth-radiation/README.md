@@ -1,6 +1,6 @@
 # Earth radiation pressure — Orekit Knocke bug evidence + parked runtime
 
-Evidence for the **Outcome** note of `docs/general-upgrades-1.md` "Planetary
+Evidence for the **Outcome** note of `docs/history/general-upgrades-1.md` "Planetary
 Third-Body & Earth Radiation Pressure": the `earth_radiation` feature (build
 plan `docs/history/build-plan-additional-perturbations.md`, Chunks 2–3) is
 **blocked** — `KnockeRediffusedForceModel` is defective in every Orekit
