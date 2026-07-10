@@ -13,18 +13,23 @@ CelesTrak's GP/SATCAT data (https://celestrak.org/satcat/ ; the per-object name 
 each inline comment is the exact CelesTrak GP object name), so the registry is
 auditable and extensible.
 
-**Magnitude alignment for Feature 1.5.** The same file will later carry the
-standard-magnitude table (architecture §3); this seed set is deliberately limited to
-bright **LEO** objects that appear in Mike McCants's ``qsmag`` standard-magnitude
-database (https://www.mmccants.org/programs/qsmag.zip), so the registry and that
-future table stay consistent (GEO / faint objects are absent from visual-observer
-magnitude tables and so are omitted here). Note when 1.5 lands: ``qsmag`` magnitudes
-assume 100% illumination, while architecture §3's "standard magnitude at 1000 km,
-50% phase angle" is the Heavens-Above convention — a constant-offset difference to
-reconcile then, not here.
+**Standard-magnitude table (Feature 1.5).** The registry's companion table
+``_STANDARD_MAGNITUDES`` (below) carries each object's standard visual magnitude in
+the contract convention — intrinsic brightness at 1000 km range and **50%
+illumination** (architecture §3; features.md §1.5 "Brightness") — seeded from Mike
+McCants's ``qsmag`` database with the full-phase -> 50%-phase diffuse-sphere offset
+(+2.5*log10(pi) ~= +1.24 mag) applied: the constant-offset reconciliation the
+Feature-1.3-era note here anticipated, verified at the 1.5 build (see the table's
+provenance block). The registry seed set was deliberately limited to bright **LEO**
+objects appearing in ``qsmag`` so the two stay consistent (GEO / faint objects are
+absent from visual-observer magnitude tables and so are omitted); the one exception
+is Tianhe/CSS, which post-dates the archived ``qsmag`` and is sourced from
+Heavens-Above instead.
 """
 
 from __future__ import annotations
+
+import math
 
 
 def _normalize(name: str) -> str:
@@ -59,6 +64,66 @@ _NAME_TO_NORAD: dict[str, int] = {
 _LOOKUP: dict[str, int] = {
     _normalize(name): norad_id for name, norad_id in _NAME_TO_NORAD.items()
 }
+
+
+# ---------------------------------------------------------------------------
+# Standard-magnitude table (Feature 1.5)
+# ---------------------------------------------------------------------------
+#
+# Standard visual magnitude in the *contract* convention (architecture §3;
+# features.md §1.5 "Brightness"): intrinsic brightness at 1000 km range and 50%
+# illumination (phase angle 90 deg, diffuse-sphere phase function).
+#
+# Primary source: Mike McCants's qsmag database — the file "qs.mag" dated
+# 2020-09-14, retrieved 2026-07-07 via the Internet Archive snapshot of
+# 2025-05-27 (the live https://www.mmccants.org/programs/qsmag.zip link 404s;
+# the site is preserved but partially broken):
+#   https://web.archive.org/web/20250527224825id_/https://www.mmccants.org/programs/qsmag.zip
+# qsmag magnitudes are defined at 1000 km range and *full* phase — quicksat.txt
+# (same site, snapshot 2025-05-28): "the intrinsic magnitude ... is defined to
+# be the maximum apparent brightness of the satellite when it is seen at full
+# phase at a range of 1000 kilometers" — so each raw value is converted to the
+# 50%-phase convention by the diffuse-sphere offset +2.5*log10(pi) ~= +1.243 mag
+# (phase function F(phi) = ((pi - phi)*cos(phi) + sin(phi))/pi; F(90deg)/F(0) = 1/pi).
+#
+# Offset direction check (2026-07-07, per the 1.5 build plan Chunk 1): with the
+# offset applied, the converted values land within ~0.5 mag of Heavens-Above's
+# independently maintained intrinsic magnitudes (same 1000 km / 50% convention):
+# ISS -2.5 + 1.243 = -1.26 vs H-A -1.8; HST 1.5 + 1.243 = 2.74 vs H-A 2.2
+# (https://www.heavens-above.com/satinfo.aspx?satid=25544 / 20580, retrieved
+# 2026-07-07). With the opposite sign they would sit ~2 mag off. The residual
+# ~0.5 mag is normal disagreement between observer-fit magnitude estimates.
+
+# Full-phase (qsmag) -> 50%-phase (contract) diffuse-sphere offset, ~= +1.243.
+_QSMAG_TO_STD_OFFSET = 2.5 * math.log10(math.pi)
+
+# NORAD id -> standard magnitude (1000 km, 50% illumination). Raw qsmag values
+# quoted per entry; each converts through _QSMAG_TO_STD_OFFSET.
+_STANDARD_MAGNITUDES: dict[int, float] = {
+    25544: -2.5 + _QSMAG_TO_STD_OFFSET,  # ISS — qs.mag: "ISS  -2.5"
+    20580: 1.5 + _QSMAG_TO_STD_OFFSET,  # HST — qs.mag: "HST  1.5" (occ flare to -4)
+    33591: 5.0 + _QSMAG_TO_STD_OFFSET,  # NOAA 19 — qs.mag: "NOAA 19  5.0"
+    25994: 2.0 + _QSMAG_TO_STD_OFFSET,  # TERRA — qs.mag: "Terra  2.0"
+    27424: 4.0 + _QSMAG_TO_STD_OFFSET,  # AQUA — qs.mag: "AQUA  4.0"
+    27386: 3.0 + _QSMAG_TO_STD_OFFSET,  # ENVISAT — qs.mag: "EnviSat  3.0"
+    # Tianhe/CSS post-dates the archived qsmag (launched 2021-04), so its value
+    # comes from Heavens-Above directly — already in the 1000 km / 50% contract
+    # convention, no offset: "Intrinsic brightness ... 0.0 (at 1000km distance,
+    # 50% illuminated)", https://www.heavens-above.com/satinfo.aspx?satid=48274,
+    # retrieved 2026-07-07.
+    48274: 0.0,  # CSS (TIANHE)
+}
+
+
+def _standard_magnitude(norad_id: int) -> float | None:
+    """Standard magnitude (1000 km, 50% illumination) for ``norad_id``, or ``None``.
+
+    ``None`` means the satellite is outside the curated table: ``find_passes``
+    then returns passes without magnitude estimates (architecture §3) unless the
+    caller supplies ``standard_magnitude=`` explicitly. Pure-Python, safe before
+    init.
+    """
+    return _STANDARD_MAGNITUDES.get(norad_id)
 
 
 def _check_positive(norad_id: int) -> int:

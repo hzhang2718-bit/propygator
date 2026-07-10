@@ -19,7 +19,7 @@
 > Feature 1.5 contract** (`features.md` §1.5, binding): a **sampling-based** finder
 > (coarse `propagate_tle` + `look_angles_track` scan, bracket, scalar-`look_angles`
 > refinement), with the event-based route (`ElevationDetector`) recorded as the named
-> alternative in `docs/build-plan-feature-1.5.md` should grazing-pass coverage
+> alternative in `docs/history/build-plan-feature-1.5.md` should grazing-pass coverage
 > demand it. The rationale lives in that build plan.
 
 ## Why these exist

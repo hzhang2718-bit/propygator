@@ -5,11 +5,10 @@ A Python library for orbital simulation and satellite tracking, built on [Orekit
 [![CI](https://github.com/hzhang2718-bit/propygator/actions/workflows/ci.yml/badge.svg)](https://github.com/hzhang2718-bit/propygator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Status: under construction.** The **numerical propagator (Feature 1.1)** and the
-> **TLE propagator (Feature 1.3)** are implemented — propagate a state vector or a TLE
-> and produce the full plot + CSV output surface (examples below). Real-time tracking
-> and pass prediction (Features 1.4–1.5) are next; their APIs in the "Coming next"
-> section are the *target* surface and are not implemented yet. See
+> **Status: under construction.** Four of the five v1 features are implemented — the
+> **numerical propagator (1.1)**, **TLE propagator (1.3)**, **real-time tracking
+> (1.4)**, and **ground-pass prediction (1.5)** — each with its plot + CSV/output
+> surface (examples below). Only **TLE fitting (1.2)** remains. See
 > [`docs/architecture.md`](docs/architecture.md) for the full design.
 
 ## Install
@@ -137,21 +136,25 @@ anim = pgr.live_track("ISS", durham)              # 4-panel; pgr.live_track("ISS
 A walkthrough lives in
 [`notebooks/05_realtime_tracking.ipynb`](notebooks/05_realtime_tracking.ipynb).
 
-### Coming next (Feature 1.5)
+### Pass prediction (Feature 1.5)
 
-Pass prediction is designed but **not yet implemented** — this is the target
-surface it will expose:
+Find a satellite's visible passes over a ground station — sunlit, observer in
+darkness — with an estimated visual magnitude, and turn them into a table, a
+calendar file, or a sky chart:
 
 ```python
 import propygator as pgr
 
 iss = pgr.fetch_tle("ISS")
 durham = pgr.GroundStation("Durham", 35.99, -78.90, altitude_m=130)
-passes = pgr.find_passes(                         # visible passes (1.5)
-    iss, durham, start=pgr.Epoch.now(), duration=86400, min_elevation_deg=20
-)
-for p in passes:
-    print(f"Pass at {p.culmination.to_iso()}, max el {p.max_elevation_deg:.1f} deg")
+
+passes = pgr.find_passes(iss, durham, 86400, min_elevation_deg=20)  # next 24 h
+
+df = pgr.passes_to_dataframe(passes, tz=pgr.USTimeZone.EASTERN)     # tz-aware table
+print(df[["rise", "max_elevation_deg", "peak_magnitude"]])
+
+pgr.export_passes_ics(passes, "iss_passes.ics", name="ISS")        # add to a calendar
+pgr.plot_sky_chart(iss, durham, passes)                            # where to look
 ```
 
 ## Features
@@ -165,9 +168,11 @@ v1 feature set (✅ = implemented):
 - ✅ **Real-time tracking** — current position (`current_state` /
   `current_ground_position`), an observer sky view (`look_angles` /
   `plot_sky_track`), and a live, self-updating dashboard (`live_track`).
+- ✅ **Ground passes + brightness** — visible passes from a ground station with
+  estimated visual magnitude (`find_passes`), plus table / CSV / iCalendar / sky-chart
+  / timeline output (`passes_to_dataframe`, `export_passes_csv`, `export_passes_ics`,
+  `plot_sky_chart`, `plot_pass_timeline`).
 - **TLE fitting** — least-squares fit of a TLE against a reference trajectory.
-- **Ground passes + brightness** — visible passes from a ground station, with
-  estimated visual magnitude.
 
 ## Notebooks
 
@@ -182,6 +187,8 @@ ordering:
   propagate a TLE with SGP4/SDP4, reusing the same output surface.
 - [`05_realtime_tracking.ipynb`](notebooks/05_realtime_tracking.ipynb) — real-time
   primitives, the observer sky view, and the live tracking dashboard.
+- [`06_pass_prediction.ipynb`](notebooks/06_pass_prediction.ipynb) — find visible
+  passes, tabulate and export them (CSV / iCalendar), and plot the sky chart + timeline.
 
 Rendered HTML versions will be posted on the projects page _(link to be added)_.
 

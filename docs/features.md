@@ -1150,3 +1150,12 @@ The `tz: USTimeZone | tzinfo | None = None` surface (lowered through the shipped
 - **Observer-darkness band shading on the timeline** — would make it station-aware + JVM-touching; deferred.
 - **Exposing the twilight threshold as a parameter** — fixed at −6° for v1; deferred.
 - **Bulk multi-satellite pass search** (one station, many TLEs) — out of scope for v1; the per-TLE verb composes.
+
+### Outcome (as-built — Feature 1.5 shipped)
+
+Built as six chunks on branch `feature/find-passes` (off `main`); the design above held with only tuning deltas (build plan archived at `docs/history/build-plan-feature-1.5.md`).
+
+- **Refinement shape chosen:** the batched fine-grid, not the contract's scalar-bisection sketch. `find_passes` runs a coarse 30 s scan (`_COARSE_STEP_S`) → brackets (above-gate runs padded one sample each side **plus** grazing local-maxima within `_GRAZE_MARGIN_DEG = 2°` of the gate) → a fine 1 s batched grid (`_FINE_STEP_S`, capped at `_MAX_FINE_SAMPLES = 10_000`) with sub-sample interpolation (linear at the threshold crossings, parabolic at culmination) → per-pass lighting/magnitude only. Twilight gate `_TWILIGHT_SUN_EL_DEG = -6°`. Agreement with the committed Skyfield fixture (ISS/Durham, 2 d): < 2 s on times, < 1° on azimuths, < 0.1° on elevation (Checkpoint A met).
+- **Chunk 4 (JVM-free consumers):** `passes_to_dataframe` (tz-aware `datetime64[ns]` columns via `core.time._resolve_tz`); `export_passes_csv` (UTC ISO strings + `# key: value` metadata header, columns pinned equal to the DataFrame by a parity test); `export_passes_ics` (hand-rolled VCALENDAR, one VEVENT/pass, a deterministic output — `DTSTAMP = DTSTART`, `UID` from rise-stamp + index, version-free `PRODID` — so it is snapshot-testable; **not** RFC 5545 line-folded, documented).
+- **Chunk 5 (plots):** `plot_sky_chart` recomputes each pass arc (`_SKY_ARC_SAMPLES = 121`) and draws lit/eclipse segments through the shared `_draw_sky_track` seams (unmodified); `plot_pass_timeline` is Pass-fields-only, with a minimum bar width (`_MIN_BAR_WIDTH_MINUTES = 25`) and a y-view to 98° so peak-magnitude labels clear the 90° max. Styling constants are tunable placeholders.
+- **Surface:** `find_passes` / `passes_to_dataframe` / `export_passes_csv` / `export_passes_ics` / `plot_sky_chart` / `plot_pass_timeline` are top-level exports; `compute_magnitude` stays at `tracking.visibility`. `Pass` gained the three `None`-default azimuth fields. All internal scan constants live in `tracking/passes.py` / `plotting/passes.py` as tunable placeholders.

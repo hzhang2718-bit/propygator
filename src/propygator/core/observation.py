@@ -138,11 +138,24 @@ class AzElRange:
 
 @dataclass(frozen=True)
 class Pass:
-    """A single visible pass of a satellite over a ground station.
+    """A single pass of a satellite over a ground station.
 
     Produced by ``find_passes`` (Feature 1.5); a plain value type — field
     consistency (e.g. rise ≤ culmination ≤ set) is the producer's responsibility.
-    ``peak_magnitude`` is ``None`` when brightness was not computed.
+    ``rise`` / ``set`` are crossings of the *producer's elevation gate*
+    (``find_passes``'s ``min_elevation_deg``, 10° by default), not of the 0°
+    horizon — a satellite is typically already well up at ``rise``.
+    ``peak_magnitude`` is ``None`` when brightness was not computed (no standard
+    magnitude available, or the pass has no visible portion).
+    ``sunlit_at_culmination`` can be ``False`` on a pass that *was* visible
+    earlier in its arc — the classic evening pass that enters Earth's shadow
+    mid-pass (features.md §1.5 "Pass semantics"). A pass clamped at the search
+    window's edge carries the clamped epoch, not a true rise/set.
+
+    The three ``*_azimuth_deg`` fields locate the pass in the observer's sky
+    ("rises in the NNW, sets in the SE"). ``find_passes`` always populates them;
+    their ``None`` defaults exist only so hand-built ``Pass`` objects stay valid
+    (the fields were added at the 1.5 contract drafting, features.md §1.5).
     """
 
     rise: Epoch
@@ -151,6 +164,9 @@ class Pass:
     max_elevation_deg: float
     peak_magnitude: float | None
     sunlit_at_culmination: bool
+    rise_azimuth_deg: float | None = None
+    culmination_azimuth_deg: float | None = None
+    set_azimuth_deg: float | None = None
 
 
 # ---------------------------------------------------------------------------

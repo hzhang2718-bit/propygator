@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -43,11 +44,13 @@ import numpy as np
 
 from ..core.bodies import _sun
 from ..core.frames import Frame, geodetic_track
-from ..core.states import Trajectory, _vector3d_to_array
+from ..core.states import Trajectory, _propygator_version, _vector3d_to_array
 from ..core.time import _abs_date
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
+
+    from ..core.observation import Pass
 
 
 logger = logging.getLogger(__name__)
@@ -452,3 +455,182 @@ def export_all(
 
     logger.info("export_all wrote %d output(s) to %s", len(written), out_dir)
     return written
+
+
+# --- Feature 1.5: pass exports ----------------------------------------------
+#
+# ``io/`` depends only on ``core/`` (architecture §7), and a ``Pass`` is a
+# ``core/`` type, so both exporters build straight from its scalar fields — they
+# do **not** import ``tracking.passes.passes_to_dataframe`` (which would be an
+# ``io → tracking`` edge). The CSV column names mirror that DataFrame's (a test
+# pins the two equal so they can't drift); both are pure Python (no JVM — a
+# ``Pass`` carries only scalars and pure-Python ``Epoch`` objects).
+
+# Pass-table columns, in output order — the same set and order as
+# ``tracking.passes.passes_to_dataframe`` (kept aligned by a parity test), with
+# the three epoch columns rendered UTC-only here (CSV is archival UTC, matching
+# the trajectory CSV's ``epoch_utc`` rule — features.md §1.5 "Outputs").
+_PASS_CSV_COLUMNS: tuple[str, ...] = (
+    "rise",
+    "culmination",
+    "set",
+    "duration_s",
+    "max_elevation_deg",
+    "rise_azimuth_deg",
+    "culmination_azimuth_deg",
+    "set_azimuth_deg",
+    "peak_magnitude",
+    "sunlit_at_culmination",
+)
+
+# UTC basic-format iCalendar timestamp (RFC 5545 form ``YYYYMMDDTHHMMSSZ``); the
+# trailing ``Z`` marks UTC, so calendar clients localize themselves (no ``tz=``).
+_ICS_TIMESTAMP_FORMAT = "%Y%m%dT%H%M%SZ"
+
+
+def export_passes_csv(passes: list[Pass], path: str | Path) -> None:
+    """Write ``passes`` to ``path`` as CSV with a metadata header (features.md §1.5).
+
+    The columns of :func:`~propygator.tracking.passes.passes_to_dataframe` (same
+    names and order), **UTC only** — ``rise`` / ``culmination`` / ``set`` are ISO
+    strings in UTC, consistent with the trajectory CSV's archival-UTC rule
+    (localizing a CSV was ruled out; calendar/display localization lives on the
+    DataFrame and plot formatters). ``duration_s`` is ``set − rise`` in seconds;
+    the remaining columns are the scalar ``Pass`` fields (an unset
+    ``peak_magnitude`` is written empty).
+
+    A ``# key: value`` metadata header (the :func:`export_csv` pattern) records
+    the propygator version, the pass count, the UTC time scale, and the export
+    time; reload the table with ``pandas.read_csv(path, comment="#")``. ``path``
+    (``str`` or ``Path``) is created with parents; an existing file is
+    overwritten. Pure Python — no JVM.
+    """
+    import pandas as pd
+
+    data: dict[str, np.ndarray] = {
+        "rise": np.array(
+            [p.rise.to_datetime().strftime(_EPOCH_UTC_FORMAT) for p in passes]
+        ),
+        "culmination": np.array(
+            [p.culmination.to_datetime().strftime(_EPOCH_UTC_FORMAT) for p in passes]
+        ),
+        "set": np.array(
+            [p.set.to_datetime().strftime(_EPOCH_UTC_FORMAT) for p in passes]
+        ),
+        "duration_s": np.array(
+            [p.set.seconds_since(p.rise) for p in passes], dtype=np.float64
+        ),
+        "max_elevation_deg": np.array(
+            [p.max_elevation_deg for p in passes], dtype=np.float64
+        ),
+        "rise_azimuth_deg": np.array(
+            [p.rise_azimuth_deg for p in passes], dtype=np.float64
+        ),
+        "culmination_azimuth_deg": np.array(
+            [p.culmination_azimuth_deg for p in passes], dtype=np.float64
+        ),
+        "set_azimuth_deg": np.array(
+            [p.set_azimuth_deg for p in passes], dtype=np.float64
+        ),
+        "peak_magnitude": np.array(
+            [p.peak_magnitude for p in passes], dtype=np.float64
+        ),
+        "sunlit_at_culmination": np.array(
+            [p.sunlit_at_culmination for p in passes], dtype=bool
+        ),
+    }
+    frame = pd.DataFrame(data, columns=list(_PASS_CSV_COLUMNS))
+
+    metadata = {
+        "content": "passes",
+        "propygator_version": _propygator_version(),
+        "n_passes": len(passes),
+        "time_scale": "UTC",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    header = _metadata_header_lines(metadata)
+    # newline="" lets pandas control line terminators (no doubled newlines on
+    # Windows); the comment header is written first, then the table body.
+    with out.open("w", newline="", encoding="utf-8") as fh:
+        fh.write("\n".join(header) + "\n")
+        frame.to_csv(fh, index=False)
+
+    logger.info("Exported %d pass(es) to %s", len(passes), out)
+
+
+def _ics_escape_text(text: str) -> str:
+    """Escape an iCalendar TEXT value (RFC 5545 §3.3.11).
+
+    Backslash first (so it doesn't double-escape the escapes added after it),
+    then the value delimiters ``;`` and ``,`` and any newline; a stray carriage
+    return is dropped (line breaks are re-added as the ``\\n`` escape).
+    """
+    return (
+        text.replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\r", "")
+        .replace("\n", "\\n")
+    )
+
+
+def export_passes_ics(
+    passes: list[Pass], path: str | Path, *, name: str | None = None
+) -> None:
+    """Write ``passes`` to ``path`` as an iCalendar (``.ics``) file (features.md §1.5).
+
+    One ``VEVENT`` per pass in a hand-rolled ``VCALENDAR`` (plain text, no new
+    dependency): ``DTSTART`` = rise, ``DTEND`` = set, and an ASCII ``SUMMARY``
+    like ``"ISS pass - max el 45 deg, mag -3.2"`` (the magnitude clause is
+    dropped when ``peak_magnitude`` is ``None``). Timestamps are UTC
+    ``YYYYMMDDTHHMMSSZ`` — the trailing ``Z`` lets a calendar client localize on
+    import, so there is no ``tz=``.
+
+    ``name`` labels the satellite in every summary (a ``Pass`` carries no name);
+    it defaults to a generic ``"Satellite"``. Output is a pure function of
+    ``(passes, name)`` — no wall-clock and no version leak into the file — so it
+    is reproducible and snapshot-testable: ``DTSTAMP`` mirrors ``DTSTART`` and
+    each ``UID`` is derived from the rise timestamp plus the pass index. ``path``
+    (``str`` or ``Path``) is created with parents; an existing file is
+    overwritten. Pure Python — no JVM.
+
+    Lines are **not** folded to the RFC 5545 §3.1 75-octet soft limit: the
+    generated summaries are short, but a very long ``name`` can produce a
+    ``SUMMARY`` line over 75 octets. Common clients (Google/Apple/Outlook) accept
+    unfolded lines; a strict RFC parser may not.
+    """
+    label = name if name is not None else "Satellite"
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//propygator//passes//EN",
+        "CALSCALE:GREGORIAN",
+    ]
+    for i, p in enumerate(passes):
+        rise = p.rise.to_datetime().strftime(_ICS_TIMESTAMP_FORMAT)
+        set_ = p.set.to_datetime().strftime(_ICS_TIMESTAMP_FORMAT)
+        summary = f"{label} pass - max el {p.max_elevation_deg:.0f} deg"
+        if p.peak_magnitude is not None:
+            summary += f", mag {p.peak_magnitude:.1f}"
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{rise}-{i}@propygator",
+            f"DTSTAMP:{rise}",
+            f"DTSTART:{rise}",
+            f"DTEND:{set_}",
+            f"SUMMARY:{_ics_escape_text(summary)}",
+            "END:VEVENT",
+        ]
+    lines.append("END:VCALENDAR")
+
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # RFC 5545 mandates CRLF line breaks; newline="" keeps Python from
+    # translating them again on write.
+    out.write_text("\r\n".join(lines) + "\r\n", newline="", encoding="utf-8")
+
+    logger.info("Exported %d pass(es) to %s", len(passes), out)

@@ -17,6 +17,9 @@ Feature 1.4 adds the realtime verbs (``current_state`` /
 ``current_ground_position`` / ``live_track``). The v0.5.0 general upgrades add
 ``USTimeZone`` (the ``live_track`` ``tz=`` civil display zones) and
 ``ProgressCallback`` (the type of a long-running verb's ``progress=`` callable).
+Feature 1.5 adds the pass-prediction surface (``find_passes`` /
+``passes_to_dataframe`` / ``export_passes_csv`` / ``export_passes_ics`` /
+``plot_sky_chart`` / ``plot_pass_timeline``).
 """
 
 import logging
@@ -47,11 +50,13 @@ from .core.progress import ProgressCallback
 from .core.states import Orientation, State, Trajectory, _propygator_version
 from .core.time import Epoch, TimeScale, USTimeZone
 from .core.tle import TLE
-from .io import export_all, export_csv
+from .io import export_all, export_csv, export_passes_csv, export_passes_ics
 from .plotting import (
     plot_3d,
     plot_altitude,
     plot_ground_track,
+    plot_pass_timeline,
+    plot_sky_chart,
     plot_sky_track,
     plot_speed,
     plot_summary,
@@ -75,7 +80,13 @@ from .propagation import (
     propagate_numerical,
 )
 from .tle import fetch_tle, propagate_tle
-from .tracking import current_ground_position, current_state, live_track
+from .tracking import (
+    current_ground_position,
+    current_state,
+    find_passes,
+    live_track,
+    passes_to_dataframe,
+)
 
 # Single-sourced via core.states._propygator_version (importlib.metadata), which
 # returns "unknown" when running from a source tree without distribution metadata
@@ -149,4 +160,11 @@ __all__ = [
     "sun_look_angles",
     "moon_look_angles",
     "plot_sky_track",
+    # Feature 1.5 — passes (compute_magnitude stays at tracking.visibility)
+    "find_passes",
+    "passes_to_dataframe",
+    "export_passes_csv",
+    "export_passes_ics",
+    "plot_sky_chart",
+    "plot_pass_timeline",
 ]

@@ -115,7 +115,7 @@ follows `docs/release-process.md` at the end of Chunk 6 and is the maintainer's.
 
 ---
 
-## Chunk 1 — `Pass` extension + the cited standard-magnitude table (pure-Python, safe before init)
+## Chunk 1 — `Pass` extension + the cited standard-magnitude table (pure-Python, safe before init) - Done
 
 **Goal:** the two `core/` prerequisites — the extended `Pass` value type and the
 citation-backed magnitude table — constructible and validating with **no JVM**
@@ -157,7 +157,7 @@ comment.
 
 ---
 
-## Chunk 2 — The visibility kernel (`tracking/visibility.py`)
+## Chunk 2 — The visibility kernel (`tracking/visibility.py`) - Done
 
 **Goal:** the feature's only new physics, isolated and unit-tested before the
 engine consumes it: the conical-umbra sunlit test, the phase angle, and
@@ -203,7 +203,7 @@ green; the Orekit cross-check agrees; mypy clean.
 
 ---
 
-## Chunk 3 — The pass-search engine (`find_passes`) → Checkpoint A
+## Chunk 3 — The pass-search engine (`find_passes`) → Checkpoint A - Done
 
 **Goal:** the headline verb, end-to-end per the contract — scan, bracket, refine,
 gate, annotate, filter, report progress, honor every failure row (contract: Public
@@ -284,7 +284,7 @@ cross-check deltas within tolerance; bare `import propygator` still JVM-free.
 
 ---
 
-## Chunk 4 — Pass table + exports (`passes_to_dataframe`, CSV, ICS)
+## Chunk 4 — Pass table + exports (`passes_to_dataframe`, CSV, ICS) - Done
 
 **Goal:** the JVM-free consumers — the DataFrame with real tz-aware datetimes and
 the two `io/` exporters (contract: Outputs; Time zones).
@@ -320,7 +320,7 @@ side); `import propygator` unchanged.
 
 ---
 
-## Chunk 5 — The plots (`plot_sky_chart`, `plot_pass_timeline`)
+## Chunk 5 — The plots (`plot_sky_chart`, `plot_pass_timeline`) - Done
 
 **Goal:** the rich outputs in `plotting/passes.py`, snapshot-tested (contract:
 Outputs; the 1.4 ↔ 1.5 line — the shared `_draw_sky_track` stays geometry-only).
@@ -356,7 +356,7 @@ contract holds); `plot_*` re-exports wired.
 
 ---
 
-## Chunk 6 — Wrap-up: docs, notebook, sweep, release
+## Chunk 6 — Wrap-up: docs, notebook, sweep, release - Done
 
 **Goal:** land the feature — docs reconciled, the walkthrough notebook, clean
 sweep, squash-merge + tag (the maintainer's release).

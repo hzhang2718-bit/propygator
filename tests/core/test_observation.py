@@ -170,3 +170,33 @@ def test_pass_frozen():
     p = Pass(rise, rise, rise, 10.0, 3.5, False)
     with pytest.raises(FrozenInstanceError):
         p.max_elevation_deg = 20.0
+
+
+def test_pass_azimuth_fields_default_none():
+    # The 1.5-era azimuth fields are additive-with-defaults: the pre-1.5 6-field
+    # construction shape must keep working (features.md §1.5 "The Pass type").
+    rise = Epoch.from_iso("2024-01-01T00:00:00", scale=TimeScale.UTC)
+    p = Pass(rise, rise, rise, 10.0, 3.5, False)
+    assert p.rise_azimuth_deg is None
+    assert p.culmination_azimuth_deg is None
+    assert p.set_azimuth_deg is None
+
+
+def test_pass_with_azimuths():
+    rise = Epoch.from_iso("2024-01-01T00:00:00", scale=TimeScale.UTC)
+    p = Pass(
+        rise=rise,
+        culmination=rise.shifted_by(300.0),
+        set=rise.shifted_by(600.0),
+        max_elevation_deg=45.0,
+        peak_magnitude=-2.1,
+        sunlit_at_culmination=True,
+        rise_azimuth_deg=331.5,
+        culmination_azimuth_deg=42.0,
+        set_azimuth_deg=118.7,
+    )
+    assert p.rise_azimuth_deg == 331.5
+    assert p.culmination_azimuth_deg == 42.0
+    assert p.set_azimuth_deg == 118.7
+    with pytest.raises(FrozenInstanceError):
+        p.rise_azimuth_deg = 0.0

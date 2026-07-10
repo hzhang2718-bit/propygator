@@ -55,6 +55,13 @@ EXPECTED_NAMES = [
     # v0.5.0 general upgrades (ux-improvements)
     "USTimeZone",
     "ProgressCallback",
+    # Feature 1.5 — passes
+    "find_passes",
+    "passes_to_dataframe",
+    "export_passes_csv",
+    "export_passes_ics",
+    "plot_sky_chart",
+    "plot_pass_timeline",
 ]
 
 _MU = 3.986004418e14  # WGS84, matches the propagator's Earth GM

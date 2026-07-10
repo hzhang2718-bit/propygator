@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-07-09
+
+### Added
+
+- Satellite pass finder from TLE data. The pass finder takes in TLE and outputs 5
+  possible results: a pandas dataframe, sky view with passes labeled by brightness,
+  pass timeline graphic, pass CSV export, and pass ICS export.
 
 ## [0.5.0] - 2026-07-07
 
