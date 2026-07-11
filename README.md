@@ -226,7 +226,7 @@ ordering:
 - [`07_tle_fitting.ipynb`](notebooks/07_tle_fitting.ipynb) — fit a shareable TLE
   to a numerical trajectory, quantify the lossiness, and read the fit diagnostics.
 
-Rendered HTML versions will be posted on the projects page _(link to be added)_.
+Rendered HTML versions will be posted on the projects page in the future.
 
 ## Architecture
 
@@ -237,7 +237,7 @@ key architectural decisions — lives in
 ## Acknowledgments
 
 Built on [Orekit](https://www.orekit.org/) (Apache 2.0) and
-[orekit_jpype](https://gitlab.orekit.org/orekit-labs/python-wrapper), the
+[orekit_jpype](https://gitlab.orekit.org/orekit/orekit_jpype), the
 JPype-based Python wrapper for Orekit.
 
 ## License
