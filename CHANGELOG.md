@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-07-11
+
+### Fixed
+
+- The size determination of the cone end-marker in 3D plots is shifted from the
+  bounding box of the trajectory to the largest fixed axis-range span. This allows
+  the cone to stay visible even for very short trajectories.
+
 ## [0.7.0] - 2026-07-11
 
 ### Added

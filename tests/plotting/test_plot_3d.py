@@ -19,15 +19,21 @@ import pytest
 from propygator import Frame
 from propygator.core.states import Trajectory, _default_metadata
 from propygator.plotting.style import TIME_COLOR_END, TIME_COLOR_START, TIMESERIES_COLOR
-from propygator.plotting.trajectories import _scene_aspect_ratio, plot_3d
+from propygator.plotting.trajectories import (
+    _CONE_SIZE_FRACTION,
+    _scene_aspect_ratio,
+    plot_3d,
+)
 
 pytestmark = pytest.mark.usefixtures("orekit")
 
 _MU = 3.986004418e14
 
 
-def _inclined_trajectory(n: int = 60, name: str | None = None) -> Trajectory:
-    radius_m, step_s, inc = 7.0e6, 60.0, math.radians(51.6)
+def _inclined_trajectory(
+    n: int = 60, name: str | None = None, radius_m: float = 7.0e6
+) -> Trajectory:
+    step_s, inc = 60.0, math.radians(51.6)
     v = math.sqrt(_MU / radius_m)
     omega = v / radius_m
     t = np.arange(n) * step_s
@@ -139,6 +145,24 @@ def test_endpoint_markers() -> None:
     assert {stop[1] for stop in end.colorscale} == {TIME_COLOR_END}
     # The cone carries the "end" legend entry (a cone defaults showlegend off).
     assert end.showlegend is True
+
+
+def test_end_cone_sized_to_scene_not_arc() -> None:
+    """A short arc far from Earth still gets a visible end cone.
+
+    go.Cone sizes in data units, so the cone must track the *rendered scene* extent
+    (which show_earth=True clamps to enclose the globe), not the arc's own extent: a
+    ~1000 km arc at 100,000 km radius sized to itself would be sub-pixel. Pin
+    sizeref to the documented fraction of the largest fixed axis-range span.
+    """
+    fig = plot_3d(_inclined_trajectory(n=10, radius_m=1.0e8))
+    end = _named_trace(fig, "end")
+    scene = fig.layout.scene
+    scene_span = max(
+        axis.range[1] - axis.range[0]
+        for axis in (scene.xaxis, scene.yaxis, scene.zaxis)
+    )
+    assert end.sizeref == pytest.approx(_CONE_SIZE_FRACTION * scene_span)
 
 
 def test_scene_axis_ranges_explicit() -> None:

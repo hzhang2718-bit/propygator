@@ -106,10 +106,13 @@ _MARKER_SIZE_3D = 6
 # End-of-trajectory velocity cone (plot_3d). go.Cone has no pixel size mode, so its
 # size lives in *data units*; a hardcoded size would shrink to nothing on a large (GEO
 # ~6x, escape-guard partial up to ~50x) scene. Size it relative to the scene instead —
-# ``sizeref = _CONE_SIZE_FRACTION x (max position span)`` — so the cone holds constant
-# *visual* weight on every orbit. ``_CONE_ANCHOR = "tip"`` pins the apex at the final
-# sample so the cone points tip-forward along the velocity. Both are cosmetic and may be
-# retuned (re-records the 3-D snapshots).
+# ``sizeref = _CONE_SIZE_FRACTION x (largest fixed axis-range span)`` — so the cone
+# holds constant *visual* weight on every scene. The ranges, not the orbit's own
+# extent: a short arc far from Earth spans little itself while show_earth clamps the
+# scene to enclose the globe, so an arc-sized cone would vanish there.
+# ``_CONE_ANCHOR = "tip"`` pins the apex at the final sample so the cone points
+# tip-forward along the velocity. Both are cosmetic and may be retuned (re-records the
+# 3-D snapshots).
 _CONE_SIZE_FRACTION = 0.05
 _CONE_ANCHOR = "tip"
 
@@ -730,9 +733,16 @@ def plot_3d(
     )
 
     traces.append(_start_marker(x[0], y[0], z[0]))
-    # Scene-relative cone: size from the orbit's own extent so it stays visible whether
-    # the scene is LEO or GEO (go.Cone has no pixel size mode).
-    scene_span = float(np.ptp(pos_km, axis=0).max())
+
+    x_range, y_range, z_range = _scene_axis_ranges(pos_km, show_earth=show_earth)
+    # Scene-relative cone: sized from the fixed axis ranges, not the orbit's own
+    # extent — a short arc far from Earth spans little itself while show_earth clamps
+    # the scene to enclose the globe, and an arc-sized cone would be invisible there.
+    scene_span = max(
+        x_range[1] - x_range[0],
+        y_range[1] - y_range[0],
+        z_range[1] - z_range[0],
+    )
     traces.append(
         _velocity_cone(
             pos_km[-1],
@@ -743,7 +753,6 @@ def plot_3d(
         )
     )
 
-    x_range, y_range, z_range = _scene_axis_ranges(pos_km, show_earth=show_earth)
     aspect_ratio = _scene_aspect_ratio(x_range, y_range, z_range)
     fig = go.Figure(data=traces)
     _apply_plotly_template(fig)
