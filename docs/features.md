@@ -607,6 +607,8 @@ traj = pgr.propagate_numerical(initial, duration=86400 * 7, output_step=60,
 ## 1.2 TLE fitter
 
 > **Status: DRAFTED (2026-07-07), NOT BUILT.** This section is now the **binding contract** for `fit_tle`, superseding the architecture §8 sketch (§8 updated in step and points here). The signature extends that sketch with four deliberate, maintainer-approved additions (`spacecraft`, `fit_bstar`, `norad_id`, `name`) plus the `progress` parameter committed by general-upgrades-1 §"Civil Time Zones & Progress Reporting" Part B. Built **last** (architecture §12) and treated as a plus, not a blocker. Orekit literal spellings named under "Fit mechanism" are to be verified against the 13.1.x javadoc at implementation (the §1.1 `PredefinedTarget` convention — a wrong name is a compile-time error); numeric internals (measurement cap, sigmas, `positionScale`, convergence thresholds, internal reference grid) are **tunable placeholders, not contract** (the §1.4 buffer-magnitudes precedent).
+>
+> **Amended 2026-07-10 at Chunk 0 / Checkpoint A (maintainer-approved, GO recorded).** The feasibility probe (`experiments/tle-fitting/`; all 19 fits converged) resolved two flagged items into contract: the default seed is now the **fixed-point refinement** (Fit mechanism step 1), and the maintainer exercised the architecture §13 `FitResult` revisit on the residuals-are-free finding — **`fit_tle_detailed` + `FitResult` are in-contract** (new subsection below).
 
 Fit a TLE to an observed orbit by least squares, so a high-fidelity numerical result — or user-supplied observations — can be re-expressed as a shareable TLE under SGP4. This is the repo's first *estimation* feature: every shipped verb is a forward model whose failures are exceptions, while `fit_tle` runs an iterative differential-correction loop whose defining failure mode is **non-convergence** — a numerical behavior to scope and report honestly, not a condition to catch.
 
@@ -636,6 +638,44 @@ Everything after `reference` is keyword-only (the §1.1 default-argument convent
 - **`fit_bstar`** — the B\*-handling decision. `True` estimates B\* inside the least squares (right for LEO, where the 2-day default span makes drag observable and a drag-free TLE diverges immediately); `False` holds it at the seed's value (`0.0` without a guess). The docstring warns that short spans and drag-free regimes (GEO) make B\* unobservable — the estimate can wander, absorbing along-track error — and to pass `False` there.
 - **`norad_id` / `name`** — output identity, mirroring `TLE.from_state_unfitted`'s kwargs. Resolution order: explicit kwarg → inherited from `initial_guess` → placeholder (`00000` / unnamed).
 
+### `FitResult` and `fit_tle_detailed` (added 2026-07-10, Checkpoint A)
+
+The Chunk-0 probe showed the fit diagnostics fall out of the estimator essentially free — the `BatchLSObserver` receives an `EstimationsProvider` (observed + estimated values per measurement) and the LS `Evaluation` (`getRMS`/`getResiduals`/`getCost`) every iteration — so the maintainer exercised the architecture §13 revisit: the diagnostics ship in this feature rather than staying deferred.
+
+```python
+def fit_tle_detailed(
+    reference: State | Trajectory,
+    *,
+    fitting_span: float = 86400.0 * 2,
+    force_models: ForceModelConfig | None = None,
+    spacecraft: SpacecraftConfig | None = None,
+    initial_guess: TLE | None = None,
+    max_iterations: int = 100,
+    fit_bstar: bool = True,
+    norad_id: int | None = None,
+    name: str | None = None,
+    progress: bool | ProgressCallback = True,
+) -> FitResult:
+```
+
+Parameters are **identical to `fit_tle`**, row for row — `fit_tle_detailed` *is* the engine, and `fit_tle` is the thin wrapper returning `fit_tle_detailed(...).tle` (one implementation, no drift; a test pins the equality). Both are top-level exports.
+
+```python
+@dataclass(frozen=True)
+class FitResult:
+    tle: TLE                               # the fitted TLE (exactly what fit_tle returns)
+    iterations: int                        # LS iterations consumed
+    evaluations: int                       # LS evaluations (>= iterations; LM may re-evaluate within an iteration)
+    rms_m: float                           # final position RMS over the fit measurements, meters
+    residuals_m: np.ndarray                # per-measurement final position residual norms, meters, shape (N,)
+    measurement_epochs: tuple[Epoch, ...]  # the N measurement epochs, aligned with residuals_m
+```
+
+- Lives in `tle/fitter.py` beside its verbs (the `ForceModelConfig`-in-`propagation/` precedent: a verb-owned output type, not `core/` — nothing in `io/` consumes it); pure-Python, JVM-free constructible + validating (safe before init).
+- `rms_m` is the observed-vs-estimated position RMS over the N fit measurements at convergence — the same quantity the final progress line quotes (there in km). It is deliberately **not** the propagate-back residual over the caller's full grid; that is one `propagate_tle` call away and the docstring shows it.
+- `residuals_m` follows the array-backed value-type invariant (defensive copy, read-only contents, value-based `__eq__`/`__hash__` — the `State`/`Orientation` pattern).
+- **No `converged` flag** — a deliberate deviation from the architecture §13 sketch: non-convergence raises `TLEFitError` with no partial result (Failure modes), so a `FitResult` only exists for converged fits and the flag would be a constant `True`.
+
 ### Reference-input paths
 
 The three user paths from architecture §8 stand unchanged (worked examples there):
@@ -648,9 +688,9 @@ The three user paths from architecture §8 stand unchanged (worked examples ther
 
 Orekit's batch least squares over the TLE parameterization — the documented Orekit "fit TLE to ephemeris" recipe:
 
-1. **Template TLE.** The seed anchors the fit: `initial_guess` when supplied, else `TLE.from_state_unfitted` on the first reference sample (its osculating-in-mean-slots offset is exactly what the iteration absorbs). The template's **epoch is the reference start** (first sample in the fitting span) — all measurements sit forward of epoch, and the fitted TLE reads as "this arc, from where it began". (At build, probe Orekit's `FixedPointTleGenerationAlgorithm` as a possibly better seed; an internal choice, not contract.)
+1. **Template TLE.** The seed anchors the fit at the **reference start** (first sample in the fitting span) — all measurements sit forward of epoch, and the fitted TLE reads as "this arc, from where it began". **Mechanism (Chunk-0-resolved, 2026-07-10):** the builder's template is the **fixed-point refinement** — `FixedPointTleGenerationAlgorithm().generate(first_sample, template)` with `template = initial_guess` when supplied, else `TLE.from_state_unfitted(first_sample)` — which iterates the mean elements until the TLE's own SGP4 osculating output reproduces the first sample: a local osculating→mean inversion at the start epoch. (The probe measured ~7 km initial fit residual vs ~1100 km for the unrefined template — the osculating-in-mean-slots offset — and 14 vs 22 / 18 vs 22 / 2 vs 24 iterations across the three scenarios; same optimum either way.) `generate` requires an orbit-defined `SpacecraftState`, so the first sample is wrapped as a `CartesianOrbit` in TEME with `TLEConstants.MU` (the TLE world's WGS-72 GM, already in SI; Orekit 13.1.x's `Constants` has **no** `WGS72_EARTH_MU`, and `State.to_orekit()`'s `AbsolutePVCoordinates` form defines no orbit). The template supplies B\* (held when `fit_bstar=False`) while the refinement re-derives the six elements at the start epoch — so an `initial_guess` at **any** epoch is legal, and identity fields are resolved separately at final assembly (field policy below). If the fixed-point generation itself fails, the raw `from_state_unfitted` template (carrying the guess's B\*, if any) is the fallback seed — the probe's unrefined-seed legs prove the fit converges from there.
 2. **Measurements.** `PV` measurements sampled from the reference trajectory, subsampled evenly to an internal cap (~300; tunable), with internal sigma/weight constants.
-3. **Estimator.** `TLEPropagatorBuilder(template, PositionAngleType, positionScale, generation_algorithm)` + `BatchLSEstimator` with a Levenberg–Marquardt optimizer; `max_iterations` bounds both iterations and evaluations. B\* is the builder's `BSTAR` propagation parameter driver, selected for estimation iff `fit_bstar`. The per-iteration hook is a `BatchLSObserver` `@JImplements` proxy feeding the progress reporter — the known JPype default-method trap applies (implement every method the Java caller invokes; test inside a real fit, the repo-standard discipline).
+3. **Estimator.** `TLEPropagatorBuilder(template, PositionAngleType, positionScale, generation_algorithm)` + `BatchLSEstimator` with a Levenberg–Marquardt optimizer; `max_iterations` bounds both iterations and evaluations. B\* is the builder's `BSTAR` propagation parameter driver, selected for estimation iff `fit_bstar`. The per-iteration hook is a `BatchLSObserver` `@JImplements` proxy feeding the progress reporter — the known JPype default-method trap was the flagged risk, and Chunk 0 retired it: the interface has a **single abstract method and no defaults** (verified by reflection and live in 19 real fits; the test-inside-a-real-fit discipline still applies to the shipped proxy).
 4. **Branch.** SDP4 comes free: the near-Earth/deep-space branch follows from the fitted mean motion exactly as in 1.3's `selectExtrapolator` — no user-facing knob.
 
 ### Fitted-TLE field policy
@@ -673,7 +713,7 @@ The mean-motion derivatives look like a fidelity loss but aren't: SGP4 ignores t
 
 ### Progress reporting (indeterminate mode — pinned here)
 
-`fit_tle` is the reporter's **indeterminate-mode** consumer (general-upgrades-1 Part B left the mode's callable semantics "pinned by 1.2's own contract" — this is that pin). The built-in reporter (`progress=True`) prints a `start` line, a phase line while the `State`-path reference propagates (`fit_tle: building reference trajectory | 48.0 h`), one line per LS iteration (`fit_tle: iter 3 | rms 0.42 km`), and an honest final line on every exit path: `done | converged in 7 iterations | rms 0.18 km`, or `failed at iter 100 | not converged | last rms 3.9 km`. A **callable** receives `min(iteration / max_iterations, 1.0)` — documented as *fraction of the iteration budget consumed*, not fraction of work: monotonic, 0→1-typed, honest about what it measures. `progress=False` is silent; `logger.info` milestones fire regardless (§1.1's convention). The final-line RMS doubles as v1's quality report (the deferred `FitResult`'s job, minus the object).
+`fit_tle` is the reporter's **indeterminate-mode** consumer (general-upgrades-1 Part B left the mode's callable semantics "pinned by 1.2's own contract" — this is that pin). The built-in reporter (`progress=True`) prints a `start` line, a phase line while the `State`-path reference propagates (`fit_tle: building reference trajectory | 48.0 h`), one line per LS iteration (`fit_tle: iter 3 | rms 0.42 km`), and an honest final line on every exit path: `done | converged in 7 iterations | rms 0.18 km`, or `failed at iter 100 | not converged | last rms 3.9 km`. A **callable** receives `min(iteration / max_iterations, 1.0)` — documented as *fraction of the iteration budget consumed*, not fraction of work: monotonic, 0→1-typed, honest about what it measures. `progress=False` is silent; `logger.info` milestones fire regardless (§1.1's convention). The final-line RMS doubles as `fit_tle`'s quality report; the full object is one call away (`fit_tle_detailed`). One Chunk-0-observed nuance: Orekit's observer fires per **evaluation**, and LM may re-evaluate within an iteration — the reporter dedupes on the iteration counter so exactly one `iter N | rms` line prints per iteration. `fit_tle_detailed` shares this contract verbatim.
 
 ### Failure modes
 
@@ -688,6 +728,8 @@ The mean-motion derivatives look like a fidelity loss but aren't: SGP4 ignores t
 | No convergence within `max_iterations`, or the LS diverges | **`TLEFitError`** — a new `PropygatorError` subclass in `core/exceptions.py`, a *sibling* of `PropagationError` (fitting is not propagation), message carrying the iteration count and last RMS, never a raw Java trace; **no partial TLE** |
 | Internal reference propagation fails (`State` path) | the underlying `NumericalPropagationError` propagates unchanged |
 
+`fit_tle_detailed` shares this table row for row — in particular, **no partial `FitResult`** on non-convergence.
+
 ### Validated domain & de-risking
 
 The headline validated domain is **LEO** (paths (a) and (c)); one deep-space case validates the SDP4 branch. High-eccentricity / resonant regimes (Molniya-class) are where TLE fitting is historically finicky — the contract's answer is scoping, not solving: outside the validated domain, `TLEFitError` is an honest outcome (the ECEF-InPlaneTracking "LEO is the validated domain" precedent). The build **front-loads a Chunk-0 feasibility probe** (the Tier-B / ECEF-attitudes rhythm): a throwaway script against the shipped stack fits an ISS TLE from its own `propagate_tle` trajectory (must recover it) and one 2-day numerical LEO reference (record the residual); **Checkpoint A = GO/STOP on those two numbers** before any propygator surface is written. Named fallback if the estimator route proves unworkable through JPype: hand-rolled differential correction in pure NumPy (7 parameters, finite-difference Jacobian over cheap SGP4 evaluations, `numpy.linalg.lstsq` — no scipy); taken only if forced.
@@ -699,6 +741,7 @@ The headline validated domain is **LEO** (paths (a) and (c)); one deep-space cas
 - **B\* recovery.** A drag-dominated LEO case: `fit_bstar=True` recovers a plausible B\* and beats `fit_bstar=False` on residual.
 - **Deep-space branch.** A Molniya-class case (the Vallado 08195 vector already in the suite) exercising SDP4.
 - **Failure paths.** `TLEFitError` via a garbage `initial_guess` / `max_iterations=1`; the `ValueError` table; the Trajectory-path warning.
+- **`fit_tle` / `fit_tle_detailed` agreement.** `fit_tle(...)` returns `fit_tle_detailed(...).tle` by construction (one engine); a test pins the wrapper equality and the `FitResult` field invariants (residuals shape/read-only, `rms_m` consistent with `residuals_m`, epochs aligned).
 - All JVM-touching tests acquire the JVM via the `orekit` fixture (conftest ordering rule).
 
 ### Resolved decisions for 1.2
@@ -706,19 +749,29 @@ The headline validated domain is **LEO** (paths (a) and (c)); one deep-space cas
 - **Signature** — the architecture §8 sketch plus `spacecraft` (State-path only), `fit_bstar` (default `True`), output-identity `norad_id`/`name`, and the committed `progress`; all keyword-only after `reference`.
 - **Mechanism** — Orekit `TLEPropagatorBuilder` + `BatchLSEstimator` (Levenberg–Marquardt) over subsampled PV measurements; `BatchLSObserver` proxy for per-iteration reporting; SDP4 automatic.
 - **Fitted epoch** — the reference start (first sample); measurements all forward of epoch.
-- **Seed** — `initial_guess`, else `TLE.from_state_unfitted` on the first sample (Orekit's fixed-point generator probed at build as an internal alternative).
+- **Seed** — the **fixed-point refinement** (`FixedPointTleGenerationAlgorithm`) of the template — `initial_guess` when supplied, else `TLE.from_state_unfitted` on the first sample — anchored at the reference start (Chunk-0 probe, 2026-07-10: same optimum, roughly half the iterations; the raw template is the fallback if generation fails).
 - **Frames** — `Trajectory` accepted in any frame (TLE carries none; §10 sanctions internal conversion); `State` must be EME2000.
 - **Field policy** — identity inherits (kwargs win), physics fitted-or-zeroed; ṅ/n̈ always zeroed.
 - **Non-convergence** — the new `TLEFitError` (sibling of `PropagationError`), no partial result.
-- **Quality reporting** — final-line + `logger.info` RMS; `FitResult` stays deferred (architecture §13).
+- **Quality reporting** — final-line + `logger.info` RMS for `fit_tle`; **`fit_tle_detailed` returns the full `FitResult`** (added 2026-07-10 at Checkpoint A on the residuals-are-free finding — the architecture §13 revisit, exercised; no `converged` flag, since non-convergence raises).
 
 ### Still open / deferred for 1.2
 
-- **`FitResult`** return type (RMS residual, iteration count, convergence flag) — deferred, backward-compatible to add (architecture §13).
+- ~~**`FitResult`** return type — deferred~~ **resolved 2026-07-10**: in-contract as `fit_tle_detailed` (see "`FitResult` and `fit_tle_detailed`" above).
 - **Epoch at span midpoint** (minimizes max in-span error) as an alternative anchor — deferred; start-anchored for v1.
 - **Forwarding determinate progress through the State-path internal propagation** (today: suppressed + a phase line) — a polish item, deferred.
 - **Convergence thresholds / measurement weighting** — internal constants, tuned at build against the probe cases.
 - **The pure-NumPy differential-correction fallback** — named, not built; taken only if the Orekit estimator route fails at the JPype boundary.
+
+### Outcome (as-built — Feature 1.2 shipped)
+
+Built as six chunks (0–5) on branch `feature/tle-fitter`; the contract above — as amended 2026-07-10 at Checkpoint A (fixed-point seed, `fit_tle_detailed` + `FitResult`) — held as written. Probe evidence at `experiments/tle-fitting/` (all 19 fits converged; GO recorded); build plan retired to `docs/history/build-plan-feature-1.2.md`.
+
+- **As-built internals** (tunable placeholders in `tle/fitter.py`, pre-tuned by the Chunk-0 probe — its `positionScale` 1–1000 m and threshold 1e-2–1e-4 sweeps were flat, so the baselines stand): ~300-sample internal State-path grid, 300-measurement even-subsample cap, σ_pos 1 m / σ_vel 1 mm/s, weight 1, `positionScale` 1 m, parameters convergence threshold 1e-3, `PositionAngleType.MEAN`; `max_iterations` bounds iterations **and** evaluations.
+- **Seed:** the fixed-point refinement exactly as amended; the fallback on a failed generation is the raw `from_state_unfitted` template at the reference start, carrying the guess's B\* (and a guess at any epoch is re-anchored there).
+- **The honest numbers (pinned in `tests/tle/test_fitter.py`):** the self-fit gate (path (c)) recovers its source to < 1 m propagate-back RMS with B\* exact — the contract's "tens-of-meters" bound was conservative by orders of magnitude; the 2-day numerical fit (path (a)) lands ~495 m RMS / ~1119 m max against a `leo_default` reference (test bounds 1 km / 1.5 km — the documented lossiness); B\* on beats B\* off (495 m vs 541 m) and the fitted B\* is a fit residual, not the catalog value; the Molniya/SDP4 self-fit is likewise essentially exact; path (b) `from_arrays` lands < 10 m.
+- **One implementation-discovered failure row** (in the docstrings, warn-and-proceed in spirit with the table): a guard-**terminated** State-path internal reference (features §1.1 stop-and-report) is not silently fitted short — the realized-arc fit proceeds under a `UserWarning`, and an immediately-terminated (< 2-sample) reference raises the clean too-few-samples `ValueError`.
+- **Surface:** `fit_tle` / `fit_tle_detailed` / `FitResult` top-level (`FitResult` beside its verbs in `tle/fitter.py`); `TLEFitError` in `core/exceptions.py`, top-level. The progress lines print per *iteration* (deduped against Orekit's per-evaluation observer firing, as amended); a sub-metre RMS renders in metres rather than the contract's km example shape (a converged self-fit sits at ~1e-6 m, unreadable in km).
 
 ## 1.3 TLE propagator
 

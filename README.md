@@ -5,10 +5,10 @@ A Python library for orbital simulation and satellite tracking, built on [Orekit
 [![CI](https://github.com/hzhang2718-bit/propygator/actions/workflows/ci.yml/badge.svg)](https://github.com/hzhang2718-bit/propygator/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Status: under construction.** Four of the five v1 features are implemented — the
-> **numerical propagator (1.1)**, **TLE propagator (1.3)**, **real-time tracking
-> (1.4)**, and **ground-pass prediction (1.5)** — each with its plot + CSV/output
-> surface (examples below). Only **TLE fitting (1.2)** remains. See
+> **Status: v1 feature-complete.** All five v1 features are implemented — the
+> **numerical propagator (1.1)**, **TLE fitting (1.2)**, **TLE propagator (1.3)**,
+> **real-time tracking (1.4)**, and **ground-pass prediction (1.5)** — each with
+> its plot + CSV/output surface (examples below). See
 > [`docs/architecture.md`](docs/architecture.md) for the full design.
 
 ## Install
@@ -157,6 +157,38 @@ pgr.export_passes_ics(passes, "iss_passes.ics", name="ISS")        # add to a ca
 pgr.plot_sky_chart(iss, durham, passes)                            # where to look
 ```
 
+### TLE fitting (Feature 1.2)
+
+Re-express any reference orbit — a high-fidelity numerical propagation, a
+user-assembled trajectory, or another TLE's output — as a shareable TLE, via
+Orekit's batch least squares over the SGP4 mean elements (+ B\*). The faithful
+sibling of `TLE.from_state_unfitted`: this one actually round-trips.
+
+```python
+import propygator as pgr
+
+# Fit a TLE to 2 days of high-fidelity propagation from `initial` (the quick
+# example's state — the State path builds the reference internally with
+# leo_default physics). Or pass any Trajectory to fit it directly.
+result = pgr.fit_tle_detailed(
+    initial, fitting_span=86400 * 2, norad_id=90001, name="MYSAT"
+)
+fitted = result.tle                      # exactly what fit_tle(...) returns
+print(fitted.line1)
+print(fitted.line2)
+print(f"converged in {result.iterations} iterations, rms {result.rms_m:.0f} m")
+
+# Round-trip check: propagate the fitted TLE back over the fitted span.
+back = pgr.propagate_tle(fitted, 86400 * 2, output_step=600, start=initial.epoch)
+```
+
+**The fit is inherently lossy** — SGP4 is a simplified model, so a full-force
+numerical orbit can never be reproduced exactly. Expect a few hundred meters
+RMS over a 2-day LEO span (~495 m in our validation fits); an SGP4-generated
+reference is recovered essentially exactly. Non-convergence raises
+`TLEFitError` (no partial result). A walkthrough lives in
+[`notebooks/07_tle_fitting.ipynb`](notebooks/07_tle_fitting.ipynb).
+
 ## Features
 
 v1 feature set (✅ = implemented):
@@ -172,7 +204,9 @@ v1 feature set (✅ = implemented):
   estimated visual magnitude (`find_passes`), plus table / CSV / iCalendar / sky-chart
   / timeline output (`passes_to_dataframe`, `export_passes_csv`, `export_passes_ics`,
   `plot_sky_chart`, `plot_pass_timeline`).
-- **TLE fitting** — least-squares fit of a TLE against a reference trajectory.
+- ✅ **TLE fitting** — least-squares fit of a TLE against a reference trajectory
+  (`fit_tle`, plus `fit_tle_detailed` for the fit diagnostics), with the
+  lossiness quantified and non-convergence raised honestly.
 
 ## Notebooks
 
@@ -189,6 +223,8 @@ ordering:
   primitives, the observer sky view, and the live tracking dashboard.
 - [`06_pass_prediction.ipynb`](notebooks/06_pass_prediction.ipynb) — find visible
   passes, tabulate and export them (CSV / iCalendar), and plot the sky chart + timeline.
+- [`07_tle_fitting.ipynb`](notebooks/07_tle_fitting.ipynb) — fit a shareable TLE
+  to a numerical trajectory, quantify the lossiness, and read the fit diagnostics.
 
 Rendered HTML versions will be posted on the projects page _(link to be added)_.
 

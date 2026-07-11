@@ -114,6 +114,28 @@ class TLEPropagationError(PropagationError):
     """
 
 
+class TLEFitError(PropygatorError):
+    """Raised when :func:`fit_tle` / :func:`fit_tle_detailed` fails to converge.
+
+    A *sibling* of :class:`PropagationError`, deliberately not a subclass —
+    fitting is estimation, not propagation (features.md §1.2). Raised when the
+    batch least squares does not converge within ``max_iterations`` (Hipparchus'
+    too-many-iterations / too-many-evaluations conditions) or diverges outright.
+    The message carries the iteration count and the last residual RMS so the
+    failure is diagnosable from the exception alone; the underlying
+    Orekit/Hipparchus failure is carried as a message string only — no raw Java
+    stack trace (architecture §3). **No partial ``TLE`` or ``FitResult`` is
+    attached** — a non-converged fit has no honest result to return.
+
+    Input-validation problems (non-positive ``fitting_span``, too few reference
+    samples, an unbound reference orbit, a non-inertial ``State``) raise
+    ``ValueError`` pre-flight instead, and a failed *internal reference
+    propagation* on the ``State`` path raises
+    :class:`NumericalPropagationError` unchanged (features.md §1.2 Failure
+    modes).
+    """
+
+
 class StaleTLEWarning(UserWarning):
     """The category of :func:`propagate_tle`'s stale-TLE warning (features.md §1.4).
 

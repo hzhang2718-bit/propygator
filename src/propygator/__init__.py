@@ -19,7 +19,9 @@ Feature 1.4 adds the realtime verbs (``current_state`` /
 ``ProgressCallback`` (the type of a long-running verb's ``progress=`` callable).
 Feature 1.5 adds the pass-prediction surface (``find_passes`` /
 ``passes_to_dataframe`` / ``export_passes_csv`` / ``export_passes_ics`` /
-``plot_sky_chart`` / ``plot_pass_timeline``).
+``plot_sky_chart`` / ``plot_pass_timeline``). Feature 1.2 adds the TLE fitter
+(``fit_tle`` / ``fit_tle_detailed`` / ``FitResult``, with ``TLEFitError`` on
+non-convergence) — the faithful sibling of ``TLE.from_state_unfitted``.
 """
 
 import logging
@@ -34,6 +36,7 @@ from .core.exceptions import (
     PropygatorError,
     StaleTLEWarning,
     TLEFetchError,
+    TLEFitError,
     TLEPropagationError,
 )
 from .core.frames import Frame
@@ -79,7 +82,7 @@ from .propagation import (
     VariableCd,
     propagate_numerical,
 )
-from .tle import fetch_tle, propagate_tle
+from .tle import FitResult, fetch_tle, fit_tle, fit_tle_detailed, propagate_tle
 from .tracking import (
     current_ground_position,
     current_state,
@@ -107,6 +110,7 @@ __all__ = [
     "NumericalPropagationError",
     "TLEPropagationError",
     "TLEFetchError",
+    "TLEFitError",
     "StaleTLEWarning",
     "Epoch",
     "TimeScale",
@@ -150,6 +154,10 @@ __all__ = [
     # Feature 1.3 — TLE propagator
     "propagate_tle",
     "fetch_tle",
+    # Feature 1.2 — TLE fitter (built last; architecture §12)
+    "fit_tle",
+    "fit_tle_detailed",
+    "FitResult",
     # Feature 1.4 — realtime primitives + live dashboard
     "current_state",
     "current_ground_position",

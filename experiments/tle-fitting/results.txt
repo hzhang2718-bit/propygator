@@ -1,0 +1,498 @@
+TLE-fitting feasibility probe (Feature 1.2, Chunk 0)
+run date: 2026-07-09 23:13:28
+propygator 0.6.0 | orekit_jpype 13.1.4.0 | numpy 2.4.6
+constants: N_MEAS=300 sigmaPos=1 m sigmaVel=0.001 m/s weight=1 positionScale=1 m threshold=0.001 maxIter=100 maxEval=100
+
+==============================================================================
+SCENARIO (i): SGP4 self-fit -- ISS 25544, 2 d @ 60 s (TEME)
+==============================================================================
+  reference: 2881 samples | 2 d @ 60 s | frame TEME
+  seed A (from_state_unfitted) L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+  seed A (from_state_unfitted) L2: 2 25544  51.6526 284.1189 0007836  55.4438 304.6300 15.47116427    07
+  seed B (fixed-point)         L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+  seed B (fixed-point)         L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  --- seed A/unfitted | bstar on  ---
+  [builder] propagation frame: TEME
+  [builder] orbital parameter drivers (defaults):
+      Px selected=True
+      Py selected=True
+      Pz selected=True
+      Vx selected=True
+      Vy selected=True
+      Vz selected=True
+  [builder] propagation parameter drivers (defaults):
+      BSTAR selected=False
+  seed A/unfitted | bstar on : 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms    1.10034e+06 m | normalized rms 6.764603e+05
+    iter   1 | eval   2 | pos rms    1.10033e+06 m | normalized rms 6.764546e+05
+    iter   2 | eval   3 | pos rms    1.10031e+06 m | normalized rms 6.764431e+05
+    iter   3 | eval   4 | pos rms    1.10027e+06 m | normalized rms 6.764202e+05
+    iter   4 | eval   5 | pos rms     1.1002e+06 m | normalized rms 6.763744e+05
+    iter   5 | eval   6 | pos rms    1.10005e+06 m | normalized rms 6.762829e+05
+    iter   6 | eval   7 | pos rms    1.09975e+06 m | normalized rms 6.760997e+05
+    iter   7 | eval   8 | pos rms    1.09915e+06 m | normalized rms 6.757337e+05
+    iter   8 | eval   9 | pos rms    1.09796e+06 m | normalized rms 6.750025e+05
+    iter   9 | eval  10 | pos rms    1.09559e+06 m | normalized rms 6.735432e+05
+    iter  10 | eval  11 | pos rms    1.09086e+06 m | normalized rms 6.706377e+05
+    iter  11 | eval  12 | pos rms    1.08149e+06 m | normalized rms 6.648777e+05
+    iter  12 | eval  13 | pos rms    1.06307e+06 m | normalized rms 6.535581e+05
+    iter  13 | eval  14 | pos rms    1.02749e+06 m | normalized rms 6.316897e+05
+    iter  14 | eval  15 | pos rms         960976 m | normalized rms 5.908103e+05
+    iter  15 | eval  16 | pos rms         827851 m | normalized rms 5.089839e+05
+    iter  16 | eval  17 | pos rms         561147 m | normalized rms 3.450244e+05
+    iter  17 | eval  18 | pos rms        46558.1 m | normalized rms 2.827412e+04
+    iter  18 | eval  19 | pos rms         4248.9 m | normalized rms 2.576763e+03
+    iter  19 | eval  20 | pos rms        3050.39 m | normalized rms 1.876096e+03
+    iter  20 | eval  21 | pos rms     0.00810334 m | normalized rms 4.206868e-03
+    iter  21 | eval  22 | pos rms      1.701e-06 m | normalized rms 1.046181e-06
+    iter  22 | eval  23 | pos rms    7.79071e-07 m | normalized rms 4.791666e-07
+  seed A/unfitted | bstar on : converged in 22 iterations / 23 evaluations (3.5 s)
+    final obs-vs-est pos rms 7.79071e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+    element deltas (fitted - source):
+      mean motion (rev/day)  source       15.493330880 | fitted       15.493330880 | delta +0.000e+00
+      eccentricity           source        0.000455700 | fitted        0.000455700 | delta +0.000e+00
+      inclination (deg)      source       51.632700000 | fitted       51.632700000 | delta +0.000e+00
+      RAAN (deg)             source      284.118900000 | fitted      284.118900000 | delta +0.000e+00
+      arg perigee (deg)      source      208.519400000 | fitted      208.519400000 | delta +0.000e+00
+      mean anomaly (deg)     source      151.554500000 | fitted      151.554500000 | delta +0.000e+00
+      B* (1/Re)              source        0.000166000 | fitted        0.000166000 | delta +0.000e+00
+  --- seed A/unfitted | bstar off ---
+  seed A/unfitted | bstar off: 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms    1.10034e+06 m | normalized rms 6.764603e+05
+    iter   1 | eval   2 | pos rms    1.10033e+06 m | normalized rms 6.764551e+05
+    iter   2 | eval   3 | pos rms    1.10031e+06 m | normalized rms 6.764445e+05
+    iter   3 | eval   4 | pos rms    1.10028e+06 m | normalized rms 6.764235e+05
+    iter   4 | eval   5 | pos rms    1.10021e+06 m | normalized rms 6.763815e+05
+    iter   5 | eval   6 | pos rms    1.10007e+06 m | normalized rms 6.762974e+05
+    iter   6 | eval   7 | pos rms     1.0998e+06 m | normalized rms 6.761292e+05
+    iter   7 | eval   8 | pos rms    1.09925e+06 m | normalized rms 6.757932e+05
+    iter   8 | eval   9 | pos rms    1.09816e+06 m | normalized rms 6.751217e+05
+    iter   9 | eval  10 | pos rms    1.09598e+06 m | normalized rms 6.737815e+05
+    iter  10 | eval  11 | pos rms    1.09164e+06 m | normalized rms 6.711121e+05
+    iter  11 | eval  12 | pos rms    1.08302e+06 m | normalized rms 6.658173e+05
+    iter  12 | eval  13 | pos rms    1.06607e+06 m | normalized rms 6.553991e+05
+    iter  13 | eval  14 | pos rms    1.03324e+06 m | normalized rms 6.352227e+05
+    iter  14 | eval  15 | pos rms         971578 m | normalized rms 5.973218e+05
+    iter  15 | eval  16 | pos rms         848234 m | normalized rms 5.215068e+05
+    iter  16 | eval  17 | pos rms         601269 m | normalized rms 3.696902e+05
+    iter  17 | eval  18 | pos rms         107018 m | normalized rms 6.575750e+04
+    iter  18 | eval  19 | pos rms        3445.45 m | normalized rms 2.060795e+03
+    iter  19 | eval  20 | pos rms        1741.32 m | normalized rms 1.071051e+03
+    iter  20 | eval  21 | pos rms        1188.17 m | normalized rms 7.307124e+02
+    iter  21 | eval  22 | pos rms        1188.17 m | normalized rms 7.307124e+02
+  seed A/unfitted | bstar off: converged in 21 iterations / 22 evaluations (2.9 s)
+    final obs-vs-est pos rms 1188.17 m | propagate-back rms 1181.24 m | max 2619.31 m
+    B* seed 0.000000e+00 -> fitted 0.000000e+00 (held: True)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+    fitted L2: 2 25544  51.6327 284.1189 0004561 208.6772 151.3745 15.49351615    03
+    element deltas (fitted - source):
+      mean motion (rev/day)  source       15.493330880 | fitted       15.493516150 | delta +1.853e-04
+      eccentricity           source        0.000455700 | fitted        0.000456100 | delta +4.000e-07
+      inclination (deg)      source       51.632700000 | fitted       51.632700000 | delta +0.000e+00
+      RAAN (deg)             source      284.118900000 | fitted      284.118900000 | delta +0.000e+00
+      arg perigee (deg)      source      208.519400000 | fitted      208.677200000 | delta +1.578e-01
+      mean anomaly (deg)     source      151.554500000 | fitted      151.374500000 | delta -1.800e-01
+      B* (1/Re)              source        0.000166000 | fitted        0.000000000 | delta -1.660e-04
+  --- seed B/fixed-point | bstar on  ---
+  seed B/fixed-point | bstar on : 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms        7095.18 m | normalized rms 4.364012e+03
+    iter   1 | eval   2 | pos rms        7085.88 m | normalized rms 4.358298e+03
+    iter   2 | eval   3 | pos rms        7067.36 m | normalized rms 4.346902e+03
+    iter   3 | eval   4 | pos rms        7030.51 m | normalized rms 4.324240e+03
+    iter   4 | eval   5 | pos rms        6957.66 m | normalized rms 4.279434e+03
+    iter   5 | eval   6 | pos rms        6815.26 m | normalized rms 4.191845e+03
+    iter   6 | eval   7 | pos rms        6543.07 m | normalized rms 4.024417e+03
+    iter   7 | eval   8 | pos rms        6045.05 m | normalized rms 3.718051e+03
+    iter   8 | eval   9 | pos rms        5059.73 m | normalized rms 3.111780e+03
+    iter   9 | eval  10 | pos rms        3173.93 m | normalized rms 1.950705e+03
+    iter  10 | eval  11 | pos rms        1186.13 m | normalized rms 7.270825e+02
+    iter  11 | eval  12 | pos rms        425.882 m | normalized rms 2.579836e+02
+    iter  12 | eval  13 | pos rms       0.316835 m | normalized rms 1.946441e-01
+    iter  13 | eval  14 | pos rms    1.63657e-06 m | normalized rms 1.006539e-06
+    iter  14 | eval  15 | pos rms    3.60775e-07 m | normalized rms 2.219015e-07
+  seed B/fixed-point | bstar on : converged in 14 iterations / 15 evaluations (2.1 s)
+    final obs-vs-est pos rms 3.60775e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+    element deltas (fitted - source):
+      mean motion (rev/day)  source       15.493330880 | fitted       15.493330880 | delta +0.000e+00
+      eccentricity           source        0.000455700 | fitted        0.000455700 | delta +0.000e+00
+      inclination (deg)      source       51.632700000 | fitted       51.632700000 | delta +0.000e+00
+      RAAN (deg)             source      284.118900000 | fitted      284.118900000 | delta +0.000e+00
+      arg perigee (deg)      source      208.519400000 | fitted      208.519400000 | delta +0.000e+00
+      mean anomaly (deg)     source      151.554500000 | fitted      151.554500000 | delta +0.000e+00
+      B* (1/Re)              source        0.000166000 | fitted        0.000166000 | delta +0.000e+00
+  --- seed B/fixed-point | bstar off ---
+  seed B/fixed-point | bstar off: 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms        7095.18 m | normalized rms 4.364012e+03
+    iter   1 | eval   2 | pos rms        7086.71 m | normalized rms 4.358807e+03
+    iter   2 | eval   3 | pos rms        7069.83 m | normalized rms 4.348425e+03
+    iter   3 | eval   4 | pos rms        7036.26 m | normalized rms 4.327775e+03
+    iter   4 | eval   5 | pos rms        6969.83 m | normalized rms 4.286920e+03
+    iter   5 | eval   6 | pos rms        6839.84 m | normalized rms 4.206962e+03
+    iter   6 | eval   7 | pos rms         6590.8 m | normalized rms 4.053773e+03
+    iter   7 | eval   8 | pos rms        6133.22 m | normalized rms 3.772270e+03
+    iter   8 | eval   9 | pos rms        5230.63 m | normalized rms 3.216837e+03
+    iter   9 | eval  10 | pos rms         3516.9 m | normalized rms 2.161484e+03
+    iter  10 | eval  11 | pos rms        1722.72 m | normalized rms 1.047733e+03
+    iter  11 | eval  12 | pos rms        1701.67 m | normalized rms 1.032587e+03
+    iter  12 | eval  13 | pos rms        1659.51 m | normalized rms 1.005467e+03
+    iter  13 | eval  14 | pos rms        1591.13 m | normalized rms 9.616204e+02
+    iter  14 | eval  15 | pos rms        1493.88 m | normalized rms 9.023563e+02
+    iter  15 | eval  16 | pos rms        1351.21 m | normalized rms 8.214495e+02
+    iter  16 | eval  17 | pos rms        1198.84 m | normalized rms 7.366435e+02
+    iter  17 | eval  18 | pos rms        1188.17 m | normalized rms 7.307163e+02
+    iter  18 | eval  19 | pos rms        1188.17 m | normalized rms 7.307124e+02
+    iter  19 | eval  20 | pos rms        1188.17 m | normalized rms 7.307124e+02
+  seed B/fixed-point | bstar off: converged in 19 iterations / 20 evaluations (2.7 s)
+    final obs-vs-est pos rms 1188.17 m | propagate-back rms 1181.24 m | max 2619.3 m
+    B* seed 0.000000e+00 -> fitted 0.000000e+00 (held: True)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+    fitted L2: 2 25544  51.6327 284.1189 0004561 208.6773 151.3744 15.49351615    03
+    element deltas (fitted - source):
+      mean motion (rev/day)  source       15.493330880 | fitted       15.493516150 | delta +1.853e-04
+      eccentricity           source        0.000455700 | fitted        0.000456100 | delta +4.000e-07
+      inclination (deg)      source       51.632700000 | fitted       51.632700000 | delta +0.000e+00
+      RAAN (deg)             source      284.118900000 | fitted      284.118900000 | delta +0.000e+00
+      arg perigee (deg)      source      208.519400000 | fitted      208.677300000 | delta +1.579e-01
+      mean anomaly (deg)     source      151.554500000 | fitted      151.374400000 | delta -1.801e-01
+      B* (1/Re)              source        0.000166000 | fitted        0.000000000 | delta -1.660e-04
+
+building scenario (ii) numerical reference (leo_default + high_precision, 2 d) ...
+  numerical reference built in 22.0 s
+
+==============================================================================
+SCENARIO (ii): numerical fit -- leo_default / high_precision, 2 d @ 600 s
+==============================================================================
+  reference: 289 samples | 2 d @ 600 s | frame TEME
+  seed A (from_state_unfitted) L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+  seed A (from_state_unfitted) L2: 2 25544  51.6526 284.1189 0007836  55.4438 304.6300 15.47116427    07
+  seed B (fixed-point)         L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+  seed B (fixed-point)         L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  --- seed A/unfitted | bstar on  ---
+  seed A/unfitted | bstar on : 289 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms    1.09275e+06 m | normalized rms 6.717872e+05
+    iter   1 | eval   2 | pos rms    1.09275e+06 m | normalized rms 6.717814e+05
+    iter   2 | eval   3 | pos rms    1.09273e+06 m | normalized rms 6.717697e+05
+    iter   3 | eval   4 | pos rms    1.09269e+06 m | normalized rms 6.717464e+05
+    iter   4 | eval   5 | pos rms    1.09261e+06 m | normalized rms 6.716997e+05
+    iter   5 | eval   6 | pos rms    1.09246e+06 m | normalized rms 6.716064e+05
+    iter   6 | eval   7 | pos rms    1.09216e+06 m | normalized rms 6.714198e+05
+    iter   7 | eval   8 | pos rms    1.09155e+06 m | normalized rms 6.710469e+05
+    iter   8 | eval   9 | pos rms    1.09034e+06 m | normalized rms 6.703020e+05
+    iter   9 | eval  10 | pos rms    1.08792e+06 m | normalized rms 6.688154e+05
+    iter  10 | eval  11 | pos rms     1.0831e+06 m | normalized rms 6.658559e+05
+    iter  11 | eval  12 | pos rms    1.07356e+06 m | normalized rms 6.599901e+05
+    iter  12 | eval  13 | pos rms    1.05481e+06 m | normalized rms 6.484678e+05
+    iter  13 | eval  14 | pos rms    1.01862e+06 m | normalized rms 6.262269e+05
+    iter  14 | eval  15 | pos rms         951091 m | normalized rms 5.847203e+05
+    iter  15 | eval  16 | pos rms         815924 m | normalized rms 5.016377e+05
+    iter  16 | eval  17 | pos rms         545152 m | normalized rms 3.351773e+05
+    iter  17 | eval  18 | pos rms        32512.4 m | normalized rms 1.961894e+04
+    iter  18 | eval  19 | pos rms        3979.95 m | normalized rms 2.400287e+03
+    iter  19 | eval  20 | pos rms        3499.28 m | normalized rms 2.149635e+03
+    iter  20 | eval  21 | pos rms        495.354 m | normalized rms 2.897691e+02
+    iter  21 | eval  22 | pos rms        495.354 m | normalized rms 2.897691e+02
+    iter  22 | eval  23 | pos rms        495.354 m | normalized rms 2.897691e+02
+  seed A/unfitted | bstar on : converged in 22 iterations / 23 evaluations (6.0 s)
+    final obs-vs-est pos rms 495.354 m | propagate-back rms 495.392 m | max 1118.8 m
+    B* seed 0.000000e+00 -> fitted 3.043883e-05 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  30439-4 0    01
+    fitted L2: 2 25544  51.6329 284.1242 0004312 212.6603 147.4143 15.49328018    06
+  --- seed A/unfitted | bstar off ---
+  seed A/unfitted | bstar off: 289 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms    1.09275e+06 m | normalized rms 6.717872e+05
+    iter   1 | eval   2 | pos rms    1.09275e+06 m | normalized rms 6.717818e+05
+    iter   2 | eval   3 | pos rms    1.09273e+06 m | normalized rms 6.717711e+05
+    iter   3 | eval   4 | pos rms    1.09269e+06 m | normalized rms 6.717497e+05
+    iter   4 | eval   5 | pos rms    1.09262e+06 m | normalized rms 6.717069e+05
+    iter   5 | eval   6 | pos rms    1.09248e+06 m | normalized rms 6.716212e+05
+    iter   6 | eval   7 | pos rms    1.09221e+06 m | normalized rms 6.714499e+05
+    iter   7 | eval   8 | pos rms    1.09165e+06 m | normalized rms 6.711075e+05
+    iter   8 | eval   9 | pos rms    1.09054e+06 m | normalized rms 6.704234e+05
+    iter   9 | eval  10 | pos rms    1.08831e+06 m | normalized rms 6.690581e+05
+    iter  10 | eval  11 | pos rms    1.08389e+06 m | normalized rms 6.663390e+05
+    iter  11 | eval  12 | pos rms    1.07512e+06 m | normalized rms 6.609467e+05
+    iter  12 | eval  13 | pos rms    1.05786e+06 m | normalized rms 6.503410e+05
+    iter  13 | eval  14 | pos rms    1.02447e+06 m | normalized rms 6.298174e+05
+    iter  14 | eval  15 | pos rms         961841 m | normalized rms 5.913231e+05
+    iter  15 | eval  16 | pos rms         836563 m | normalized rms 5.143186e+05
+    iter  16 | eval  17 | pos rms         585722 m | normalized rms 3.601197e+05
+    iter  17 | eval  18 | pos rms        83839.5 m | normalized rms 5.148776e+04
+    iter  18 | eval  19 | pos rms         4260.5 m | normalized rms 2.518802e+03
+    iter  19 | eval  20 | pos rms         2727.4 m | normalized rms 1.674397e+03
+    iter  20 | eval  21 | pos rms        540.809 m | normalized rms 3.192194e+02
+    iter  21 | eval  22 | pos rms        540.809 m | normalized rms 3.192194e+02
+    iter  22 | eval  23 | pos rms        540.809 m | normalized rms 3.192194e+02
+  seed A/unfitted | bstar off: converged in 22 iterations / 23 evaluations (5.4 s)
+    final obs-vs-est pos rms 540.809 m | propagate-back rms 540.83 m | max 1365.54 m
+    B* seed 0.000000e+00 -> fitted 0.000000e+00 (held: True)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+    fitted L2: 2 25544  51.6329 284.1242 0004313 212.6903 147.3803 15.49331413    05
+  --- seed B/fixed-point | bstar on  ---
+  seed B/fixed-point | bstar on : 289 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms        1143.91 m | normalized rms 6.799019e+02
+    iter   1 | eval   2 | pos rms        1136.79 m | normalized rms 6.753992e+02
+    iter   2 | eval   3 | pos rms        1123.01 m | normalized rms 6.666688e+02
+    iter   3 | eval   4 | pos rms        1097.12 m | normalized rms 6.502543e+02
+    iter   4 | eval   5 | pos rms        1051.41 m | normalized rms 6.212126e+02
+    iter   5 | eval   6 | pos rms        967.216 m | normalized rms 5.674880e+02
+    iter   6 | eval   7 | pos rms         837.48 m | normalized rms 4.839377e+02
+    iter   7 | eval   8 | pos rms        770.529 m | normalized rms 4.389068e+02
+    iter   8 | eval   9 | pos rms        758.984 m | normalized rms 4.294313e+02
+    iter   9 | eval  10 | pos rms        753.848 m | normalized rms 4.252307e+02
+    iter  10 | eval  11 | pos rms        745.472 m | normalized rms 4.197262e+02
+    iter  11 | eval  12 | pos rms        730.935 m | normalized rms 4.104450e+02
+    iter  12 | eval  13 | pos rms        708.059 m | normalized rms 3.969721e+02
+    iter  13 | eval  14 | pos rms        670.742 m | normalized rms 3.774697e+02
+    iter  14 | eval  15 | pos rms        605.166 m | normalized rms 3.445768e+02
+    iter  15 | eval  16 | pos rms         515.72 m | normalized rms 3.000914e+02
+    iter  16 | eval  17 | pos rms        495.368 m | normalized rms 2.897747e+02
+    iter  17 | eval  18 | pos rms        495.354 m | normalized rms 2.897691e+02
+    iter  18 | eval  19 | pos rms        495.354 m | normalized rms 2.897691e+02
+  seed B/fixed-point | bstar on : converged in 18 iterations / 19 evaluations (5.0 s)
+    final obs-vs-est pos rms 495.354 m | propagate-back rms 495.392 m | max 1118.8 m
+    B* seed 0.000000e+00 -> fitted 3.043883e-05 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  30439-4 0    01
+    fitted L2: 2 25544  51.6329 284.1242 0004312 212.6603 147.4143 15.49328018    06
+  --- seed B/fixed-point | bstar off ---
+  seed B/fixed-point | bstar off: 289 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms        1143.91 m | normalized rms 6.799019e+02
+    iter   1 | eval   2 | pos rms         1137.3 m | normalized rms 6.757254e+02
+    iter   2 | eval   3 | pos rms        1124.47 m | normalized rms 6.676054e+02
+    iter   3 | eval   4 | pos rms        1100.23 m | normalized rms 6.522560e+02
+    iter   4 | eval   5 | pos rms        1056.99 m | normalized rms 6.248089e+02
+    iter   5 | eval   6 | pos rms        976.593 m | normalized rms 5.735813e+02
+    iter   6 | eval   7 | pos rms         848.02 m | normalized rms 4.909219e+02
+    iter   7 | eval   8 | pos rms        772.444 m | normalized rms 4.396510e+02
+    iter   8 | eval   9 | pos rms        770.107 m | normalized rms 4.379019e+02
+    iter   9 | eval  10 | pos rms        765.405 m | normalized rms 4.347063e+02
+    iter  10 | eval  11 | pos rms        757.446 m | normalized rms 4.292981e+02
+    iter  11 | eval  12 | pos rms        743.572 m | normalized rms 4.199104e+02
+    iter  12 | eval  13 | pos rms        722.315 m | normalized rms 4.062297e+02
+    iter  13 | eval  14 | pos rms        691.169 m | normalized rms 3.896124e+02
+    iter  14 | eval  15 | pos rms         637.94 m | normalized rms 3.640753e+02
+    iter  15 | eval  16 | pos rms        562.527 m | normalized rms 3.291426e+02
+    iter  16 | eval  17 | pos rms         540.81 m | normalized rms 3.192195e+02
+    iter  17 | eval  18 | pos rms        540.809 m | normalized rms 3.192194e+02
+    iter  18 | eval  19 | pos rms        540.809 m | normalized rms 3.192194e+02
+  seed B/fixed-point | bstar off: converged in 18 iterations / 19 evaluations (4.4 s)
+    final obs-vs-est pos rms 540.809 m | propagate-back rms 540.83 m | max 1365.54 m
+    B* seed 0.000000e+00 -> fitted 0.000000e+00 (held: True)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  00000-0 0    08
+    fitted L2: 2 25544  51.6329 284.1242 0004313 212.6903 147.3803 15.49331413    05
+
+==============================================================================
+SCENARIO (iii): Molniya 08195 SDP4 self-fit -- 2 d @ 60 s (TEME)
+==============================================================================
+  reference: 2881 samples | 2 d @ 60 s | frame TEME
+  seed A (from_state_unfitted) L1: 1 08195U 00000    06176.33215444  .00000000  00000-0  00000-0 0    02
+  seed A (from_state_unfitted) L2: 2 08195  64.1798 279.0303 6867109 264.8198  20.1497  2.00392336    00
+  seed B (fixed-point)         L1: 1 08195U 00000    06176.33215444  .00000000  00000-0  00000-0 0    02
+  seed B (fixed-point)         L2: 2 08195  64.1586 279.0717 6877146 264.7651  20.2257  2.00491383    06
+  --- seed A/unfitted | bstar on  ---
+  seed A/unfitted | bstar on : 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms         229354 m | normalized rms 1.003567e+05
+    iter   1 | eval   2 | pos rms         229341 m | normalized rms 1.003510e+05
+    iter   2 | eval   3 | pos rms         229315 m | normalized rms 1.003398e+05
+    iter   3 | eval   4 | pos rms         229264 m | normalized rms 1.003173e+05
+    iter   4 | eval   5 | pos rms         229161 m | normalized rms 1.002722e+05
+    iter   5 | eval   6 | pos rms         228956 m | normalized rms 1.001823e+05
+    iter   6 | eval   7 | pos rms         228547 m | normalized rms 1.000028e+05
+    iter   7 | eval   8 | pos rms         227733 m | normalized rms 9.964529e+04
+    iter   8 | eval   9 | pos rms         226116 m | normalized rms 9.893583e+04
+    iter   9 | eval  10 | pos rms         222933 m | normalized rms 9.753913e+04
+    iter  10 | eval  11 | pos rms         216766 m | normalized rms 9.483203e+04
+    iter  11 | eval  12 | pos rms         205177 m | normalized rms 8.974318e+04
+    iter  12 | eval  13 | pos rms         182174 m | normalized rms 7.963450e+04
+    iter  13 | eval  14 | pos rms         137244 m | normalized rms 5.984205e+04
+    iter  14 | eval  15 | pos rms        60136.7 m | normalized rms 2.549701e+04
+    iter  15 | eval  16 | pos rms        37198.8 m | normalized rms 1.537222e+04
+    iter  16 | eval  17 | pos rms        34039.8 m | normalized rms 1.407178e+04
+    iter  17 | eval  18 | pos rms        29963.1 m | normalized rms 1.239249e+04
+    iter  18 | eval  19 | pos rms        22233.9 m | normalized rms 9.215353e+03
+    iter  19 | eval  20 | pos rms        11298.5 m | normalized rms 4.766510e+03
+    iter  20 | eval  21 | pos rms        6047.39 m | normalized rms 2.577133e+03
+    iter  21 | eval  22 | pos rms         1976.5 m | normalized rms 8.656046e+02
+    iter  22 | eval  23 | pos rms      0.0229684 m | normalized rms 9.631913e-03
+    iter  23 | eval  24 | pos rms    8.77115e-08 m | normalized rms 3.751610e-08
+    iter  24 | eval  25 | pos rms    1.37187e-06 m | normalized rms 6.011787e-07
+  seed A/unfitted | bstar on : converged in 24 iterations / 25 evaluations (11.2 s)
+    final obs-vs-est pos rms 1.37187e-06 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.187300e-04 (held: False)
+    fitted L1: 1 08195U 00000    06176.33215444  .00000000  00000-0  11873-3 0    05
+    fitted L2: 2 08195  64.1586 279.0717 6877146 264.7651  20.2257  2.00491383    06
+    element deltas (fitted - source):
+      mean motion (rev/day)  source        2.004913830 | fitted        2.004913830 | delta +0.000e+00
+      eccentricity           source        0.687714600 | fitted        0.687714600 | delta +0.000e+00
+      inclination (deg)      source       64.158600000 | fitted       64.158600000 | delta +0.000e+00
+      RAAN (deg)             source      279.071700000 | fitted      279.071700000 | delta +0.000e+00
+      arg perigee (deg)      source      264.765100000 | fitted      264.765100000 | delta +0.000e+00
+      mean anomaly (deg)     source       20.225700000 | fitted       20.225700000 | delta +0.000e+00
+      B* (1/Re)              source        0.000118730 | fitted        0.000118730 | delta +0.000e+00
+  --- seed A/unfitted | bstar off ---
+  seed A/unfitted | bstar off: 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms         229354 m | normalized rms 1.003567e+05
+    iter   1 | eval   2 | pos rms         229342 m | normalized rms 1.003515e+05
+    iter   2 | eval   3 | pos rms         229319 m | normalized rms 1.003413e+05
+    iter   3 | eval   4 | pos rms         229272 m | normalized rms 1.003207e+05
+    iter   4 | eval   5 | pos rms         229178 m | normalized rms 1.002797e+05
+    iter   5 | eval   6 | pos rms         228991 m | normalized rms 1.001978e+05
+    iter   6 | eval   7 | pos rms         228618 m | normalized rms 1.000341e+05
+    iter   7 | eval   8 | pos rms         227875 m | normalized rms 9.970804e+04
+    iter   8 | eval   9 | pos rms         226398 m | normalized rms 9.906050e+04
+    iter   9 | eval  10 | pos rms         223487 m | normalized rms 9.778370e+04
+    iter  10 | eval  11 | pos rms         217829 m | normalized rms 9.530134e+04
+    iter  11 | eval  12 | pos rms         207130 m | normalized rms 9.060665e+04
+    iter  12 | eval  13 | pos rms         187963 m | normalized rms 8.219015e+04
+    iter  13 | eval  14 | pos rms         150208 m | normalized rms 6.558336e+04
+    iter  14 | eval  15 | pos rms          80016 m | normalized rms 3.449056e+04
+    iter  15 | eval  16 | pos rms        39586.5 m | normalized rms 1.643336e+04
+    iter  16 | eval  17 | pos rms        37875.3 m | normalized rms 1.573174e+04
+    iter  17 | eval  18 | pos rms          34661 m | normalized rms 1.441639e+04
+    iter  18 | eval  19 | pos rms        28531.2 m | normalized rms 1.191693e+04
+    iter  19 | eval  20 | pos rms        18378.4 m | normalized rms 7.807400e+03
+    iter  20 | eval  21 | pos rms        10327.5 m | normalized rms 4.456603e+03
+    iter  21 | eval  22 | pos rms        2798.18 m | normalized rms 1.225503e+03
+    iter  22 | eval  23 | pos rms      0.0633502 m | normalized rms 2.665401e-02
+    iter  23 | eval  24 | pos rms       0.050795 m | normalized rms 2.169043e-02
+    iter  24 | eval  25 | pos rms       0.050795 m | normalized rms 2.169042e-02
+  seed A/unfitted | bstar off: converged in 24 iterations / 25 evaluations (7.4 s)
+    final obs-vs-est pos rms 0.050795 m | propagate-back rms 0.287186 m | max 1.26058 m
+    B* seed 0.000000e+00 -> fitted 0.000000e+00 (held: True)
+    fitted L1: 1 08195U 00000    06176.33215444  .00000000  00000-0  00000-0 0    02
+    fitted L2: 2 08195  64.1586 279.0717 6877146 264.7651  20.2257  2.00491383    06
+    element deltas (fitted - source):
+      mean motion (rev/day)  source        2.004913830 | fitted        2.004913830 | delta +0.000e+00
+      eccentricity           source        0.687714600 | fitted        0.687714600 | delta +0.000e+00
+      inclination (deg)      source       64.158600000 | fitted       64.158600000 | delta +0.000e+00
+      RAAN (deg)             source      279.071700000 | fitted      279.071700000 | delta +0.000e+00
+      arg perigee (deg)      source      264.765100000 | fitted      264.765100000 | delta +0.000e+00
+      mean anomaly (deg)     source       20.225700000 | fitted       20.225700000 | delta +0.000e+00
+      B* (1/Re)              source        0.000118730 | fitted        0.000000000 | delta -1.187e-04
+  --- seed B/fixed-point | bstar on  ---
+  seed B/fixed-point | bstar on : 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms       0.288904 m | normalized rms 1.265865e-01
+    iter   1 | eval   2 | pos rms    2.24869e-06 m | normalized rms 9.838957e-07
+    iter   2 | eval   3 | pos rms    7.31068e-07 m | normalized rms 3.187552e-07
+  seed B/fixed-point | bstar on : converged in 2 iterations / 3 evaluations (0.9 s)
+    final obs-vs-est pos rms 7.31068e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.187300e-04 (held: False)
+    fitted L1: 1 08195U 00000    06176.33215444  .00000000  00000-0  11873-3 0    05
+    fitted L2: 2 08195  64.1586 279.0717 6877146 264.7651  20.2257  2.00491383    06
+    element deltas (fitted - source):
+      mean motion (rev/day)  source        2.004913830 | fitted        2.004913830 | delta +0.000e+00
+      eccentricity           source        0.687714600 | fitted        0.687714600 | delta +0.000e+00
+      inclination (deg)      source       64.158600000 | fitted       64.158600000 | delta +0.000e+00
+      RAAN (deg)             source      279.071700000 | fitted      279.071700000 | delta +0.000e+00
+      arg perigee (deg)      source      264.765100000 | fitted      264.765100000 | delta +0.000e+00
+      mean anomaly (deg)     source       20.225700000 | fitted       20.225700000 | delta +0.000e+00
+      B* (1/Re)              source        0.000118730 | fitted        0.000118730 | delta +0.000e+00
+  --- seed B/fixed-point | bstar off ---
+  seed B/fixed-point | bstar off: 300 PV measurements | positionScale 1 m | convergence threshold 0.001
+    iter   0 | eval   1 | pos rms       0.288904 m | normalized rms 1.265865e-01
+    iter   1 | eval   2 | pos rms      0.0645027 m | normalized rms 2.811921e-02
+    iter   2 | eval   3 | pos rms      0.0521839 m | normalized rms 2.249761e-02
+    iter   3 | eval   4 | pos rms       0.050795 m | normalized rms 2.169042e-02
+    iter   4 | eval   5 | pos rms       0.050795 m | normalized rms 2.169042e-02
+    iter   4 | eval   6 | pos rms       0.050795 m | normalized rms 2.169042e-02
+    iter   4 | eval   7 | pos rms       0.050795 m | normalized rms 2.169042e-02
+    iter   4 | eval   8 | pos rms       0.050795 m | normalized rms 2.169042e-02
+    iter   4 | eval   9 | pos rms       0.050795 m | normalized rms 2.169042e-02
+  seed B/fixed-point | bstar off: converged in 4 iterations / 9 evaluations (2.4 s)
+    final obs-vs-est pos rms 0.050795 m | propagate-back rms 0.287186 m | max 1.26058 m
+    B* seed 0.000000e+00 -> fitted 0.000000e+00 (held: True)
+    fitted L1: 1 08195U 00000    06176.33215444  .00000000  00000-0  00000-0 0    02
+    fitted L2: 2 08195  64.1586 279.0717 6877146 264.7651  20.2257  2.00491383    06
+    element deltas (fitted - source):
+      mean motion (rev/day)  source        2.004913830 | fitted        2.004913830 | delta +0.000e+00
+      eccentricity           source        0.687714600 | fitted        0.687714600 | delta +0.000e+00
+      inclination (deg)      source       64.158600000 | fitted       64.158600000 | delta +0.000e+00
+      RAAN (deg)             source      279.071700000 | fitted      279.071700000 | delta +0.000e+00
+      arg perigee (deg)      source      264.765100000 | fitted      264.765100000 | delta +0.000e+00
+      mean anomaly (deg)     source       20.225700000 | fitted       20.225700000 | delta +0.000e+00
+      B* (1/Re)              source        0.000118730 | fitted        0.000000000 | delta -1.187e-04
+
+==============================================================================
+SWEEP: positionScale / convergence threshold sensitivity
+(scenario (i) reference, seed A, BSTAR on; quiet observer)
+==============================================================================
+  positionScale sweep at threshold 0.001:
+  positionScale       1 m: converged in 22 iterations / 23 evaluations (3.5 s)
+    final obs-vs-est pos rms 7.79071e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  positionScale      10 m: converged in 21 iterations / 22 evaluations (3.6 s)
+    final obs-vs-est pos rms 6.57945e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  positionScale     100 m: converged in 21 iterations / 22 evaluations (3.3 s)
+    final obs-vs-est pos rms 2.6616e-06 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  positionScale    1000 m: converged in 21 iterations / 22 evaluations (4.0 s)
+    final obs-vs-est pos rms 9.67776e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  convergence-threshold sweep at positionScale 1 m:
+  threshold     0.01: converged in 21 iterations / 22 evaluations (3.7 s)
+    final obs-vs-est pos rms 1.701e-06 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  threshold    0.001: converged in 22 iterations / 23 evaluations (3.7 s)
+    final obs-vs-est pos rms 7.79071e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+  threshold   0.0001: converged in 22 iterations / 23 evaluations (3.5 s)
+    final obs-vs-est pos rms 7.79071e-07 m | propagate-back rms 0 m | max 0 m
+    B* seed 0.000000e+00 -> fitted 1.660000e-04 (held: False)
+    fitted L1: 1 25544U 00000    26171.41461525  .00000000  00000-0  16600-3 0    04
+    fitted L2: 2 25544  51.6327 284.1189 0004557 208.5194 151.5545 15.49333088    09
+
+==============================================================================
+SUMMARY (all fits)
+==============================================================================
+  label                                        conv iter eval   back rms (m)   back max (m)   time
+  -- scenario (i) self-fit
+  seed A/unfitted | bstar on                   yes    22   23              0              0   3.5s
+  seed A/unfitted | bstar off                  yes    21   22        1181.24        2619.31   2.9s
+  seed B/fixed-point | bstar on                yes    14   15              0              0   2.1s
+  seed B/fixed-point | bstar off               yes    19   20        1181.24         2619.3   2.7s
+  -- scenario (ii) numerical fit
+  seed A/unfitted | bstar on                   yes    22   23        495.392         1118.8   6.0s
+  seed A/unfitted | bstar off                  yes    22   23         540.83        1365.54   5.4s
+  seed B/fixed-point | bstar on                yes    18   19        495.392         1118.8   5.0s
+  seed B/fixed-point | bstar off               yes    18   19         540.83        1365.54   4.4s
+  -- scenario (iii) Molniya/SDP4 self-fit
+  seed A/unfitted | bstar on                   yes    24   25              0              0  11.2s
+  seed A/unfitted | bstar off                  yes    24   25       0.287186        1.26058   7.4s
+  seed B/fixed-point | bstar on                yes     2    3              0              0   0.9s
+  seed B/fixed-point | bstar off               yes     4    9       0.287186        1.26058   2.4s
+  -- sensitivity sweep (self-fit, seed A, bstar on)
+  positionScale       1 m                      yes    22   23              0              0   3.5s
+  positionScale      10 m                      yes    21   22              0              0   3.6s
+  positionScale     100 m                      yes    21   22              0              0   3.3s
+  positionScale    1000 m                      yes    21   22              0              0   4.0s
+  threshold     0.01                           yes    21   22              0              0   3.7s
+  threshold    0.001                           yes    22   23              0              0   3.7s
+  threshold   0.0001                           yes    22   23              0              0   3.5s
+
+RESIDUAL AVAILABILITY (FitResult-revisit input, Checkpoint A item 3):
+  Per-measurement residuals ARE essentially free: BatchLSObserver
+  receives an EstimationsProvider (observed + estimated values per
+  measurement) and the LS Evaluation (getRMS/getResiduals/getCost)
+  every iteration; this probe's physical position RMS is computed
+  from exactly that data. Iteration count and convergence flag come
+  from the estimator (getIterationsCount / normal-vs-exceptional exit).
+
+total wall time: 106 s

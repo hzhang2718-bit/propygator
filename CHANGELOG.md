@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-07-11
+
+### Added
+
+- `fit_tle` and `fit_tle_detailed` functions, which take a state or a trajectory
+  to a fitted tle through iterative fitting.
+- Experiment demonstrating general success of the fitting procedure, as well as
+  how fixed-point refinement can produce a seed that converges faster.
+- `TLEFitError` and progress reporting wired to `fit_tle` and `fit_tle_detailed`.
+
 ## [0.6.0] - 2026-07-09
 
 ### Added
