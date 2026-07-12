@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-**propygator** is a Python library for orbital simulation and satellite tracking, built on [Orekit](https://www.orekit.org/) via the `orekit_jpype` wrapper. The package is installable, JVM-free on import, and 1053 tests pass. **All five architecture §12 features are shipped** — v1 is feature-complete and fully released (`v0.7.0`, 2026-07-11). Post-v1 work is maintenance and polish; no next feature is scheduled.
+**propygator** is a Python library for orbital simulation and satellite tracking, built on [Orekit](https://www.orekit.org/) via the `orekit_jpype` wrapper. The package is installable, JVM-free on import, and 1053 tests pass. **All five architecture §12 features are shipped** — v1 is feature-complete and fully released (`v0.7.0`, 2026-07-11; the `v0.7.1` patch followed the same day). Post-v1 work is maintenance and polish; no next feature is scheduled.
 
 **Shipped on `main`** (each release was its own branch — or, for `v0.5.0`, a batch of five — squash-merged and tagged; designs + build plans archived under `docs/history/`):
 - `v0.1.0` — Feature 1.1 numerical propagator + its drag-validity & altitude-guards addendum
@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `v0.5.0` (2026-07-07) — the five-part "general upgrades" batch: Tier B `BoxFaceCd` drag, the live-dashboard mutate-in-place layer, ECEF `InPlaneTracking`, the lumped planetary third body, and civil time zones + progress reporting — each its own branch squash-merged untagged, one tag after the last (details in the five paragraphs below)
 - `v0.6.0` (2026-07-09) — Feature 1.5 ground passes + brightness (`find_passes` + the table/CSV/ICS/sky-chart/timeline output surface)
 - `v0.7.0` (2026-07-11) — Feature 1.2 TLE fitter (`fit_tle` / `fit_tle_detailed` / `FitResult` — the batch-least-squares fit of a TLE to a reference state or trajectory)
+- `v0.7.1` (2026-07-11) — patch (committed directly, not a feature branch): fixed the 3D-plot cone end-marker sizing so it stays visible for very short trajectories
 
 The five `v0.5.0` upgrades (binding designs in `docs/history/general-upgrades-1.md`; build plans archived under `docs/history/`, Supercessions folded back into `features.md`/`architecture.md`):
 

@@ -45,6 +45,9 @@ Thumbs.db
 orekit-data/
 docs/_build/
 
+# real-world-validation truth files (never committed; ~10 MB/day GNV1B, SP3 weeks)
+experiments/real-world-validation/data/
+
 # personal propagation scripts + outputs
 /run/
 
