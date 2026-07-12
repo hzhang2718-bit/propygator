@@ -179,7 +179,7 @@ wrap-up: squash-merge; the optional `v0.7.2` tag follows
 
 ---
 
-## Chunk 0 — LAGEOS-2: truth data, SP3 parser, the first 7-day diff → Checkpoint A
+## Chunk 0 — LAGEOS-2: truth data, SP3 parser, the first 7-day diff → Checkpoint A - Done
 
 **Goal:** the complete conservative-force diagnostic running end-to-end — truth
 in, `propagate_numerical` out, residuals decomposed — so Checkpoint A reads one
@@ -226,7 +226,7 @@ commit the evidence.
 **Verify:** parser round-trips a truth epoch bit-cleanly; the t₀+ε diff is
 ~0 (≪ 1 m); the 1/3/7-day residual table prints and is committed.
 
-> ### ⛔ Checkpoint A — GO / INVESTIGATE (maintainer's call)
+> ### ⛔ Checkpoint A — GO / INVESTIGATE (maintainer's call) - GO
 > Read the day-1 residual against three tiers:
 > 1. **≲ 20 m/day → GO.** The conservative-force wiring is proven at the level
 >    this study needs (literature floor for this force set is meters/day —
