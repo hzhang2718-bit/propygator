@@ -46,3 +46,47 @@ LAGEOS-2 vs ILRS precise orbit -- Chunk 0 conservative-force diagnostic
 [checkpoint A]
   day-1 3D residual: rms 3.624 m, max 6.194 m; |dr| at t0+24h = 6.194 m
   tiers: <=20 m/day GO | ~20-500 m/day INVESTIGATE inputs (Cr/mass/area, second AC's SP3) | >500 m/day INVESTIGATE wiring
+
+==========================================================================
+Chunk 1 -- LAGEOS-2 ablation matrix: the per-toggle wiring proof
+==========================================================================
+[data] esa.orb.lageos2.230422.v70.sp3.gz: 5041 epochs, 7.000 days (the Chunk 0 arc)
+[expected orders]  computed along the truth orbit (nothing quoted)
+  central gravity at r = 12162 km: 2.695e+00 m/s2
+  force                       a (m/s2)         a/g   1-day bound (m)
+  srp                        3.548e-09   1.316e-09            13.241
+  relativity                 2.950e-09   1.095e-09            11.012
+  tides                      5.742e-08   2.131e-08           214.331
+  sun+moon                   3.213e-06   1.192e-06         11993.379
+  gravity>20                 8.717e-12   3.235e-12             0.033
+  gravity>8                  3.904e-08   1.449e-08           145.708
+  planets                    7.099e-12   2.634e-12             0.026
+  bound = a*t^2/2, a secular upper limit -- orbit-periodic forces
+  average 1-2 orders below it; a bound << 1 m predicts a null row.
+[ablation matrix A -- wiring proof]  8 x 7-day propagations, 85 s wall
+  effect = |case - baseline| trajectory difference, 3D RMS (m)
+  case                        eff d1 rms  eff d7 rms     bound1d  flag
+  srp off                          0.826       5.869      13.241  OK
+  relativity off                   0.643       4.502      11.012  OK
+  tides off (solid+ocean)          2.936      14.064     214.331  OK
+  sun+moon third body off        149.564     780.787   11993.379  OK
+  gravity 20x20                    0.000       0.001       0.033  null OK
+  gravity 8x8                      4.350      25.631     145.708  OK
+  planets third body ON            0.000       0.001       0.026  null OK
+[ablation matrix B -- agreement vs truth]  3D RMS (m); along@7d signed
+  case                        day1 rms     delta  day7 rms     delta  along@7d
+  baseline (Chunk 0)             3.624        --    23.649        --     -40.5
+  srp off                        4.141    +0.516    27.286    +3.637     -35.4
+  relativity off                 2.981    -0.643    19.149    -4.500     -32.6
+  tides off (solid+ocean)        1.166    -2.458    13.516   -10.133     -27.9
+  sun+moon third body off      152.673  +149.049   797.071  +773.422    -390.8
+  gravity 20x20                  3.624    -0.000    23.648    -0.001     -40.5
+  gravity 8x8                    7.938    +4.314    49.237   +25.588     -83.6
+  planets third body ON          3.624    -0.000    23.649    +0.000     -40.5
+[checks]
+  wiring (table A): every effect inside its predicted-order window, nulls null: PASS
+  vs-truth improvements (table B): relativity off, tides off (solid+ocean)
+  reading: those contributions partially oppose the unmodeled
+  along-track floor (ERP + thermal thrust) over this week -- see the
+  along@7d signs. The wiring proof is table A; the sign-level
+  attribution is a findings-doc note, not resolvable from one week.

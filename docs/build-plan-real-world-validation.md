@@ -245,7 +245,7 @@ commit the evidence.
 
 ---
 
-## Chunk 1 — LAGEOS-2 ablation matrix: the per-toggle wiring proof
+## Chunk 1 — LAGEOS-2 ablation matrix: the per-toggle wiring proof - Done
 
 **Goal:** direct evidence that every `ForceModelConfig` boolean actually reaches
 Orekit — the class of bug internal tests structurally cannot see.

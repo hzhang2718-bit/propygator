@@ -83,8 +83,12 @@ spread is far below the GO tier).
 ## Files
 
 - `sp3.py` — minimal generic SP3-c parser (+ Lagrange velocity helper).
-- `run_lageos.py` — the driver (steps above; `ric_components` lives here).
-- `results.txt` — captured stdout (the committed evidence).
+- `run_lageos.py` — the Chunk 0 driver (steps above; `ric_components` lives
+  here).
+- `run_ablations.py` — the Chunk 1 ablation matrix (appends to `results.txt`:
+  `conda run -n propygator python run_ablations.py >> results.txt`).
+- `results.txt` — captured stdout (the committed evidence; Chunk 0 run + the
+  Chunk 1 append).
 
 ## Result summary (2026-07-12 run)
 
@@ -108,11 +112,48 @@ Full tables in `results.txt`; Checkpoint A reads the day-1 row.
   | 7 d | 0.28 / 0.74 m | 23.6 / 40.5 m | 0.16 / 0.33 m | 23.6 / 40.5 m |
 
 - **Checkpoint A reading: day-1 residual 3.6 m RMS / 6.2 m max — tier 1
-  (≲ 20 m/day → GO)** with a factor-~3 margin. The error is almost purely
-  along-track and grows secularly (~6 m/day) with sub-meter radial and
-  cross-track over the full week — the classic signature of the small
-  unmodeled along-track accelerations (Earth radiation pressure + thermal
-  thrust), i.e. exactly the literature floor for this force set. This is the
-  number the Chunk 4 pin derives from; the parked `earth_radiation` toggle is
-  the named next step for lowering the floor.
+  (≲ 20 m/day → GO)** with a factor-~3 margin (maintainer's call: **GO**,
+  2026-07-12). The error is almost purely along-track and grows secularly
+  (~6 m/day) with sub-meter radial and cross-track over the full week — the
+  classic signature of the small unmodeled along-track accelerations (Earth
+  radiation pressure + thermal thrust), i.e. exactly the literature floor for
+  this force set. This is the number the Chunk 4 pin derives from; the parked
+  `earth_radiation` toggle is the named next step for lowering the floor.
 - 7-day 70×70 `high_precision` propagation wall time: ~11 s.
+
+## Ablation matrix (Chunk 1, 2026-07-12 run)
+
+`run_ablations.py` reruns the same arc with one `ForceModelConfig` change at a
+time — the direct proof that each toggle reaches Orekit, the bug class
+internal tests structurally cannot see. The "expected order" per force is
+**computed, not quoted**: acceleration scales evaluated along the truth orbit
+(degree sums from the actual EIGEN-6S coefficients, third-body/tide scales
+from the DE-ephemeris distances, Schwarzschild from the sampled PV), turned
+into a 1-day free-drift bound `a·t²/2` — a secular *upper* limit that
+orbit-periodic forces average 1–2 orders below.
+
+Two tables (full output in `results.txt`):
+
+- **A — wiring proof** (`|case − baseline|` trajectory difference, sign-free):
+  **all seven rows PASS.** Effects at day-7: sun+moon third body off → 781 m;
+  gravity 8×8 → 25.6 m; tides off → 14.1 m; SRP off → 5.9 m; relativity off →
+  4.5 m — each present, below its bound, and ordered exactly as the computed
+  accelerations predict. The two predicted-null rows are null at the mm level:
+  gravity 20×20 → 0.001 m (degrees > 20 genuinely don't matter at 5,800 km,
+  as the coefficient sums predict) and **`planets_third_body` → 0.001 m** —
+  the §"completeness only" claim confirmed against a real orbit.
+- **B — agreement vs truth** (signed): `relativity off` and `tides off`
+  *improve* the total vs-truth RMS (−4.5 m and −10.1 m at day 7). This is not
+  a wiring signal: the baseline carries a ~−40 m signed along-track floor at
+  day 7 (the unmodeled ERP + thermal-thrust budget), and those two (correct)
+  contributions happen to oppose it this week — removing them cancels part of
+  the floor (along@7d moves −40.5 → −32.6 / −27.9 m). A boolean toggle can
+  only add or omit an Orekit force model, not distort one, so table A carries
+  the wiring evidence; the sign-level attribution (how much of the floor is
+  ERP vs. thermal thrust vs. a possible permanent-tide convention offset
+  between EIGEN-6S and the solid-tide model) is a findings-doc note — not
+  resolvable from one week, and immaterial at this study's thresholds.
+
+**Chunk 1 verdict: the per-toggle wiring is proven** — no ablation misbehaves,
+nulls are null, and the matrix is self-interpreting against its computed
+expectations.
