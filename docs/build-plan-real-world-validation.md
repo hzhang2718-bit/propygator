@@ -153,12 +153,15 @@ fixtures small enough to live as literals.
 
 ## How to use this plan
 
-- **6 chunks (0–4, with 2b inserted after 2)**, each sized for one Claude Code
+- **7 chunks (0–5, with 2b inserted after 2)**, each sized for one Claude Code
   session:
   - **Chunk 0 is the diagnostic gate** (LAGEOS end-to-end → Checkpoint A).
   - **Chunks 1–3 (2b included) are the evidence body**; **Chunk 4 is wrap-up**
-    (the only chunk that touches `src/`-adjacent surfaces: `tests/`, docs,
-    README).
+    (the only *study* chunk that touches `src/`-adjacent surfaces: `tests/`,
+    docs, README).
+  - **Chunk 5 is order-independent maintenance** (the `box_face_default`
+    negative-leeward grid fix discovered by Chunk 2b) — its own branch off
+    `main`, addressable in isolation at any time; no study chunk depends on it.
 - Each chunk lists **Goal / Create-Edit / Reuse / You provide / You run / Verify**.
 - **Checkpoint A (after Chunk 0) is GO / INVESTIGATE** — never a silent shrug: a
   bad diff reroutes the plan into localized bug-hunting (the t₀ diff, then the
@@ -330,7 +333,7 @@ visible in the fitted Cd / residual ratio.
 
 ---
 
-## Chunk 2b — Runs 4 & 5: the a-priori Cd-table probe (Checkpoint B geometry evidence)
+## Chunk 2b — Runs 4 & 5: the a-priori Cd-table probe (Checkpoint B geometry evidence) - Done
 
 **Goal:** measure what propygator's *generated* drag tables predict for a real
 orbit with **no reference Cd supplied** — the isotropic `VariableCd.sphere_default`
@@ -549,8 +552,13 @@ future wiring regression, the findings doc, the README claim.
   2.65–4.5 band vs. the Run-3 fitted Cd — the direct Checkpoint-B geometry
   evidence), the fitter-vs-catalog table, and the honest caveats (density
   10–30%; Cr sensitivity; sphere-equivalent geometry; the box is DSMC-consistent
-  but adds only *absorbable* scale for ram-dominated GRACE; the parked
-  `earth_radiation` toggle as the named next step for the LAGEOS floor).
+  but adds only *absorbable* scale for ram-dominated GRACE; **the
+  error-cancellation caveat on the Runs 4/5 ranking** — the sphere's smaller
+  no-fit residual is the NRLMSISE density bias partially cancelling its too-low
+  Cd, not higher fidelity, so Run 4 < Run 5 must not be read as a table ranking
+  (2026-07-12 discussion); the `box_face_default` negative-leeward grid noise →
+  Chunk 5; the parked `earth_radiation` toggle as the named next step for the
+  LAGEOS floor).
   Non-binding findings doc, `prospective-forces-…` style; archived to
   `docs/history/` when superseded.
 - **`README.md`** — a short "Validation" note: SGP4 (Vallado), passes (Skyfield),
@@ -571,6 +579,63 @@ flag printing the literal arrays beats hand-copying).
 **Verify:** full suite green including the three new test files; the README
 numbers match `results.txt`; `import propygator` still JVM-free; this plan
 retires to `docs/history/`.
+
+---
+
+## Chunk 5 — `box_face_default` negative-leeward grid fix (order-independent maintenance)
+
+> **Normal-fix-path item, folded in as its own chunk (maintainer's 2026-07-12
+> request) so it can be addressed in isolation.** It touches `scripts/` +
+> `data/` + `src/` + `tests/` on its **own branch off `main`** (not the study
+> branch), at any time — no study chunk depends on it, and it needs nothing from
+> the study's data. Discovered by Chunk 2b's Verify-4 probe.
+
+**Evidence (measured 2026-07-12; recorded so no session re-derives it):** the
+shipped `data/box_face_cd_default.npz` grid (shape 26 × 25 × 65) carries
+noise-level **negative** entries over the leeward half — 11,325 of 42,250 values
+(27%) are < 0, most-negative −5.77e-4, and the entire θ = π slice is ≤ 0 (max
+−3.4e-11). Physically Cd_leeward → 0⁺; the negatives are numerical noise
+(hypothesis to confirm at chunk time: erfc/exp cancellation in the generator's
+leeward Sentman closed form, committed with no physical floor).
+
+**Symptom that bit:** table lookups tolerate the negatives (no per-lookup
+validation on the `from_table` path), but `BoxFaceCd.from_callable` **rejects**
+any returned Cd < 0 — so wrapping the shipped table in a callable (e.g. scaling
+it, as Chunk 2b's Verify 4 does) raises `ValueError` **mid-propagation**. The
+experiment clamps at zero (`run_gracefo.py::_scaled_box_cd`). Orbit-level impact
+of the noise itself: ≤ ~1e-3 m² of Cd·A (≤ 0.01% of the GRACE face-sum) —
+cosmetic in effect, but a real factory asymmetry: `from_table` accepts a grid
+that `from_callable` would refuse to serve.
+
+**Create / edit:**
+- `scripts/generate_box_face_cd_table.py` — floor the assembled grid at 0.0 (the
+  physical bound) before writing; document the floor in the script docstring.
+- Regenerate `data/box_face_cd_default.npz` and rerun the generator's
+  cross-validation gate (the change is ≤ 5.8e-4 absolute — far inside the Tier B
+  "≪ 1% on CdA" acceptance).
+- `src/propygator/propagation/spacecraft.py` — validate grid ≥ 0 in
+  `BoxFaceCd.from_table` (and `VariableCd.from_table`, same rule, cheap) so the
+  asymmetry closes at construction; leave `from_callable`'s strict runtime check
+  as is.
+- Tests (`tests/propagation/test_spacecraft.py`, pure-Python, no JVM): the
+  shipped grid min ≥ 0 (both tables — the sphere's is trivially true, its Cd
+  never approaches 0); `from_table` rejects a grid containing a negative entry;
+  an identity `from_callable` wrap of the default table returns ≥ 0 at θ = π.
+
+**Reuse:** the existing generator + its cross-validation harness. The committed
+default-table tests assert *ranges*, not exact values (verified 2026-07-12), and
+run metadata is name-based (`Cd=table:box_face_default`), not content-based — so
+nothing pinned moves.
+
+**You provide / run:** the branch (suggest `fix/box-face-cd-leeward-floor`); the
+generator rerun; CHANGELOG + the patch release per `docs/release-process.md`
+(the version number depends on whether the study's optional tag has been taken
+by then).
+
+**Verify:** regenerated npz min ≥ 0; full suite + pre-commit green. Interaction
+with Chunk 4's optional face-sum pin: if the pin lands *before* this fix, its
+generous-margin tolerance already absorbs the ≤ 1e-3 m² shift; if after, pin
+against the regenerated table.
 
 ---
 
