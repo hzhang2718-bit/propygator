@@ -87,9 +87,12 @@ as a propygator defect.
   conservative-force floor is established (otherwise drag residuals are
   uninterpretable).
 - **GRACE-FO geometry starts as a sphere-equivalent frontal area.** The
-  `box_and_panels` + `NadirPointing` fidelity upgrade is a **named deferral**,
-  taken only if Checkpoint B shows residuals that a constant cross-section can't
-  explain.
+  `box_and_panels` geometry-fidelity upgrade is a **named deferral**, taken only
+  if Checkpoint B shows residuals that a constant cross-section can't explain.
+  (Chunk 2b already *probes* that geometry no-fit with `InPlaneTracking` — which
+  for this near-circular, ram-dominated body is drag-equivalent to the physically
+  faithful `NadirPointing`, flight-path angle ≲ 0.1°; the deferral is the *fitted*
+  box run, not the probe.)
 - **The ablation matrix is the wiring proof** — each force toggle flipped
   individually must move the LAGEOS residual by roughly its literature-predicted
   order (and `planets_third_body` must move ~nothing, testing the completeness
@@ -150,21 +153,25 @@ fixtures small enough to live as literals.
 
 ## How to use this plan
 
-- **5 chunks (0–4)**, each sized for one Claude Code session:
+- **6 chunks (0–4, with 2b inserted after 2)**, each sized for one Claude Code
+  session:
   - **Chunk 0 is the diagnostic gate** (LAGEOS end-to-end → Checkpoint A).
-  - **Chunks 1–3 are the evidence body**; **Chunk 4 is wrap-up** (the only chunk
-    that touches `src/`-adjacent surfaces: `tests/`, docs, README).
+  - **Chunks 1–3 (2b included) are the evidence body**; **Chunk 4 is wrap-up**
+    (the only chunk that touches `src/`-adjacent surfaces: `tests/`, docs,
+    README).
 - Each chunk lists **Goal / Create-Edit / Reuse / You provide / You run / Verify**.
 - **Checkpoint A (after Chunk 0) is GO / INVESTIGATE** — never a silent shrug: a
   bad diff reroutes the plan into localized bug-hunting (the t₀ diff, then the
   ablations, are the localization tools) and any confirmed defect exits to the
   normal fix path before the study resumes.
-- **Checkpoint B (after Chunk 2)** decides what is pinnable and whether the
-  GRACE-FO geometry upgrade is warranted.
+- **Checkpoint B (after the GRACE-FO leg — Chunk 2 + 2b)** decides what is
+  pinnable and whether the GRACE-FO geometry upgrade is warranted (Runs 4 & 5 are
+  the geometry evidence).
 - **Commits, CHANGELOG entries, chunk-header "done" marks, downloads, and any
   release are the maintainer's.** Claude writes scripts/tests/docs and runs
   read-only/test commands.
-- **Mergeable chunks:** 2 + 3 share the GNV1B data and can run in one session.
+- **Mergeable chunks:** 2, 2b, and 3 share the GNV1B data; adjacent ones can run
+  in one session (with 2 done, 2b + 3 is the natural remaining pairing).
 
 ---
 
@@ -276,7 +283,7 @@ Any row that misbehaves = a located wiring bug → the Checkpoint A item-3 exit.
 
 ---
 
-## Chunk 2 — GRACE-FO GNV1B: the drag stack, quiet + active
+## Chunk 2 — GRACE-FO GNV1B: the drag stack, quiet + active - Done
 
 **Goal:** the full drag pipeline (NRLMSISE-00 + real CSSI space weather + the
 shared `DragSensitive` proxy) measured against a real drag-perturbed orbit, with
@@ -321,12 +328,150 @@ as before.
 Run 2 materially beats Run 1; Run 3 ≤ Run 2; the quiet-vs-active contrast is
 visible in the fitted Cd / residual ratio.
 
+---
+
+## Chunk 2b — Runs 4 & 5: the a-priori Cd-table probe (Checkpoint B geometry evidence)
+
+**Goal:** measure what propygator's *generated* drag tables predict for a real
+orbit with **no reference Cd supplied** — the isotropic `VariableCd.sphere_default`
+and the per-face `BoxFaceCd.default`. This is the direct evidence for Checkpoint B's
+geometry decision, and it answers the pre-flight-Cd question behind the maintainer's
+solar-sail use case: before flight data comes back, these tables are the only Cd
+estimate available, so it matters what they predict against a real orbit. A scratch
+probe (retained as `gracefo/probe_tables.py`; **superseded geometry** — its
+docstring and the ISSUE notes below say how) already queried the tables at
+GRACE-FO conditions; Runs 4 & 5 turn that table lookup into committed *orbit*
+residuals.
+
+**Physics framing (resolved 2026-07-12 discussion; do not relitigate):**
+- An orbit residual constrains only the **ρ·Cd·A product**, so a no-fit table run is
+  **density-limited** — it exposes NRLMSISE-00's density bias, it does not test the
+  Cd in isolation. Expect *both* tables to **over-predict** drag in the quiet window
+  (NRLMSISE over-models solar-min density). That is the finding, not a defect.
+- On a **common frontal reference** (`A_ram = 1.027 m²`) the tables are physically
+  credible and DSMC-consistent (Mehta 2013; arXiv 2503.21651 give Cd ≈ 2.65–4.5):
+  sphere ≈ 2.9, box ≈ 4.3, vs. the density-depressed fitted ≈ 2.0. The box is the
+  **more complete** model (it adds edge-on skin-friction the sphere structurally
+  cannot see); it is *not* over-estimating. The alarming sphere-vs-box gap in the
+  scratch probe was a reference-area artifact (sphere referenced to A = 1.0, box to
+  its real face areas) plus the density confound — not a box bug, Sentman fault, or
+  table-setup error (verified by reading both generators + the per-face closed form).
+- GRACE is a **bluff, ram-dominated body**, not the edge-on feathered plate BoxFaceCd
+  exists for — so the box's extra fidelity here is nearly all **absorbable by a
+  scalar** (the `BoxFaceCd` docstring's "face-on / nadir-held → < 1% along-track"
+  regime). Its non-absorbable payoff belongs to the sail's own study.
+
+**Geometry — base-averaged rectangle at real dimensions (method resolved 2026-07-12):**
+GRACE-FO is a trapezoidal prism; propygator models a rectangular box. Averaging the
+two parallel widths gives a rectangle that **preserves the ram (frontal) area
+exactly** and under-counts the wetted side area by ~9.5% (→ ~2% of Cd·A, far below
+the density confound this run measures). **Do not** length-correct the baseline box:
+that swaps a traceable dimension for a fictitious one and buys false precision
+against larger dropped effects (the trapezoid's nadir/zenith asymmetry at a few
+degrees of angle-of-attack). The +0.33 m length-corrected box is a one-off
+sensitivity check only (Verify 5).
+
+Citable dimensions (JPL GRACE-FO Launch Press Kit; cross-checked vs. eoPortal
+FLEXBUS/Astrium):
+
+| Quantity | Value | Note |
+|---|---|---|
+| length L (along-track) | 3.123 m | long axis; rides the wind |
+| height h (radial) | 0.780 m | |
+| bottom width (nadir) | 1.943 m | |
+| top width (zenith) | 0.690 m | |
+| **base-averaged width w** | **1.3165 m** | (1.943 + 0.690)/2 |
+| **ram area A_ram** | **1.027 m²** | ½(1.943 + 0.690)·0.780 = w·h (exact) |
+
+Box mapping (matches `InPlaneTracking`'s axes — body **+Y on the wind**, +Z
+best-effort on the orbit normal): `x_length_m = 0.780` (radial/height),
+`y_length_m = 3.123` (along-track/ram, the long axis), `z_length_m = 1.3165`
+(cross-track/width). Then the ram + leeward faces are the ±Y faces (area
+`x·z = 1.027 m²` = A_ram ✓), nadir/zenith are the ±X faces (4.111 m² each), and the
+slant sides are the ±Z faces (2.436 m² each) — total wetted side 13.09 m² (the ~9.5%
+under-count of the true 14.47 m²).
+
+**Create / edit** (`experiments/real-world-validation/gracefo/run_gracefo.py`;
+ASCII-only prints; `progress=False`):
+- Two new **no-fit** runs appended per window, sharing the Run 2/3 force set
+  (conservative + NRLMSISE-00) and the same 1-day arc:
+  - **Run 4 — sphere table:** `SpacecraftGeometry.sphere(area_m2=1.027,
+    drag_coefficient=VariableCd.sphere_default(), reflectivity_coefficient=1.3)`;
+    the driver's default attitude (a sphere's Cd is isotropic — attitude-independent).
+  - **Run 5 — box table:** `SpacecraftGeometry.box_and_panels(x_length_m=0.780,
+    y_length_m=3.123, z_length_m=1.3165, solar_array_area_m2=0.0,
+    drag_coefficient=BoxFaceCd.default())` (SRP optics default; negligible at 500 km)
+    with attitude `InPlaneTracking(velocity_reference="ecef")`.
+- A **Cd-table diagnostic block**: the arc-mean effective Cd on the common `A_ram`
+  reference for each table, printed beside the Run 3 fitted Cd and the DSMC band —
+  the findings-doc mini-table. For Run 5 assemble `Σ Cd_i·A_i` over the realized
+  attitude (the probe's hand-sum). Simplification (noted 2026-07-12): because
+  `InPlaneTracking(ecef)` holds body +Y *exactly* on the wind, the face-flow
+  angles are constant by construction (ram θ = 0, leeward θ = π, all four sides
+  θ = π/2) — the "arc-mean" varies only through the table's (radius, density)
+  inputs along the orbit; no per-substep attitude reconstruction is needed.
+  > **⚠ ISSUE (flagged 2026-07-12):** Runs 1–3 reference Cd to `A = 1.0 m²`; Runs
+  > 4–5 reference to `A_ram = 1.027 m²` (a 2.7% area difference). The Run-3 fitted
+  > Cd (2.03 / 3.40, on A = 1.0) and the table Cd (on 1.027) are therefore on
+  > *different* references — restate the fitted Cd on the common `A_ram` reference
+  > (× 1.0/1.027) in the diagnostic block and findings mini-table so the DSMC
+  > comparison is apples-to-apples.
+- Two new rows (Run 4, Run 5) in the RIC RMS table + the growth-profile rows, and a
+  one-line reading.
+
+**Reuse:** the Run 1–3 machinery in `run_gracefo.py` (parse, config, propagate, RIC,
+growth); `VariableCd.sphere_default` / `BoxFaceCd.default` / `InPlaneTracking` (all
+shipped); `probe_tables.py` (retained beside the driver) as the diagnostic template
+— mechanism only, its geometry is superseded (its docstring says how).
+
+**You provide:** nothing new (both windows' GNV1B already on disk).
+
+**You run:** the extended driver per window; commit.
+
+**Verify:**
+1. **Axis-convention live check (load-bearing):** Run 5's arc-mean effective Cd·A ≈
+   **6 m² absolute** (≈ 4.3 referenced to A_ram). If it prints ~13 m², a large face
+   is accidentally the ram face → the box↔attitude axis mapping is wrong; fix that
+   before reading anything else.
+   > **⚠ ISSUE (flagged 2026-07-12 — recompute at build time):** these two figures
+   > do **not** reconcile against the refined geometry — 6 m² / `A_ram` 1.027 m² =
+   > **5.8**, not 4.3. The "4.3" traces to the scratch probe's *superseded*
+   > reference area (`A_ram` = 1.9·0.8 = 1.52 → 6/1.52 ≈ 4), and the probe's side
+   > areas (16.74 m²) are ~22% larger than the refined 13.09 m², so the ≈6 m² gate
+   > itself will shift. Recompute **both** numbers against `A_ram = 1.027` /
+   > 13.09 m² when Run 5 runs, and make the diagnostic block state *which* quantity
+   > each printed number is (raw `Σ Cd_i·A_i` face-sum vs. along-wind effective
+   > Cd·A vs. Cd referenced to `A_ram`) — the parenthetical currently conflates two.
+2. Both no-fit residuals exceed Run 3 (fitted); Run 5 (box, larger Cd·A) ≥ Run 4
+   (sphere) in the quiet window — the density confound amplified by the
+   physically-larger, more-correct box.
+3. Common-reference effective Cd (a reading, not a gate): sphere near the DSMC
+   band's (2.65–4.5) low edge; the **quiet-window** fitted Cd below the band (the
+   density bias) — window-scoped, because the active-window fitted (3.40 → ~3.31
+   on `A_ram`) sits *inside* the band, consistent with roughly unbiased solar-max
+   density. The box is expected near the band but may land at or above its 4.5
+   top once recomputed per Verify 1's ISSUE (a sharp-edged box with full-length
+   flat sides plausibly out-drags the real trapezoid's DSMC) — coherent either
+   way; record what it prints.
+4. *(Optional)* a single scale factor re-fit on the box Cd·A collapses Run 5 to
+   ≈ Run 3 — direct proof the box adds no non-absorbable structure for ram-dominated
+   GRACE.
+5. *(Optional)* the +0.33 m length-corrected box moves the residual by ≪ the density
+   confound — geometry-insensitivity, i.e. the residual is density-limited.
+
+---
+
 > ### ✅ Checkpoint B — pinnable bounds + geometry decision (maintainer's call)
 > 1. From the measured numbers, set the Chunk 4 pin bounds (generous margins —
 >    see Chunk 4's tolerance policy).
-> 2. Decide the named deferral: does the sphere-equivalent explain the residuals,
->    or is the `box_and_panels` + `NadirPointing` upgrade warranted? (Default:
->    defer — record the evidence either way.)
+> 2. Decide the named deferral with **Runs 4 & 5 as direct evidence**: the
+>    sphere-equivalent + scalar fit (Runs 1–3) already drives the residual to
+>    single-metre-class; the expectation — to be read off the measured Run 5, not
+>    assumed — is that the `box_and_panels` + `InPlaneTracking` upgrade adds only
+>    *absorbable* scale for ram-dominated GRACE (its non-absorbable payoff is the
+>    edge-on sail regime GRACE doesn't exercise). Default: **defer** — the box
+>    validated as physically sound (DSMC-consistent) but not warranted for this
+>    bluff body; record either way.
 > 3. Optional stretch case noted, not built: a storm window as a density stress
 >    test.
 
@@ -384,7 +529,13 @@ future wiring regression, the findings doc, the README claim.
     asserts RMS below the Checkpoint-A number × a generous margin.
   - `tests/propagation/test_real_world_gracefo.py` — the drag-off signal present
     within a wide band + drag-on materially better (ratio bound, not absolute
-    meters), from the Checkpoint-B numbers.
+    meters), from the Checkpoint-B numbers. **Optional (strong, cheap) wiring
+    pin:** the Run-5 box `Σ Cd_i·A_i` at the `InPlaneTracking` ram orientation —
+    a pure table × face-sum × attitude-mapping quantity that guards the axis
+    convention (Chunk 2b Verify 1) independently of the density pipeline the
+    ratio bound covers. Evaluate the table at **fixed** `(radius, density, θ)`
+    inputs (as the scratch probe does at ρ = 1e-12), not "arc-mean over real
+    conditions", so the pin stays independent of orekit-data CSSI refreshes.
   - `tests/tle/test_fitter_real_world.py` — the fit converges on the pinned real
     subsample; post-fit RMS bounded.
   - **Tolerance policy (binding):** every threshold = measured × margin
@@ -393,9 +544,13 @@ future wiring regression, the findings doc, the README claim.
     Thresholds prove "the wiring didn't regress", not "the number is exact".
 - **`docs/real-world-validation-findings.md`** — methodology, provenance
   (products, spans, parameter citations), the residual tables, the ablation
-  matrix, the fitted-Cd story, the fitter-vs-catalog table, and the honest
-  caveats (density 10–30%; Cr sensitivity; sphere-equivalent geometry; the
-  parked `earth_radiation` toggle as the named next step for the LAGEOS floor).
+  matrix, the fitted-Cd story, the **a-priori-Cd-table mini-table** (Runs 4 & 5:
+  the sphere/box effective Cd on the common `A_ram` reference vs. the DSMC
+  2.65–4.5 band vs. the Run-3 fitted Cd — the direct Checkpoint-B geometry
+  evidence), the fitter-vs-catalog table, and the honest caveats (density
+  10–30%; Cr sensitivity; sphere-equivalent geometry; the box is DSMC-consistent
+  but adds only *absorbable* scale for ram-dominated GRACE; the parked
+  `earth_radiation` toggle as the named next step for the LAGEOS floor).
   Non-binding findings doc, `prospective-forces-…` style; archived to
   `docs/history/` when superseded.
 - **`README.md`** — a short "Validation" note: SGP4 (Vallado), passes (Skyfield),
@@ -442,8 +597,11 @@ retires to `docs/history/`.
   conservative diagnostic; a GNSS bus needs box-wing SRP to be interesting).
 - **ISS OEM leg** — NASA publishes ephemerides *with* ballistic inputs; a nice
   third drag case, deferred.
-- **GRACE-FO `box_and_panels` + `NadirPointing` geometry** — the Checkpoint B
-  named deferral.
+- **GRACE-FO `box_and_panels` geometry** (fitted box run) — the Checkpoint B
+  named deferral. Chunk 2b probes the geometry no-fit with `InPlaneTracking`
+  (drag-equivalent to the faithful `NadirPointing` for this ram-dominated body);
+  the deferred step is the *fitted* box, taken only if the sphere-equivalent
+  leaves residuals a constant cross-section can't explain.
 - **Storm-window density stress case** — noted at Checkpoint B, not built.
 - **`earth_radiation`** — upstream-blocked (the Knocke horizon bug); when the
   fixed Orekit wrapper lands, the LAGEOS arc from this study is the ready-made
