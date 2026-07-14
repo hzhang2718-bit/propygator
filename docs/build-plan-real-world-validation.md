@@ -115,7 +115,8 @@ as a propygator defect.
 - **GRACE-FO satellite + windows.** Default: GRACE-FO 1 (NORAD 43476); one quiet
   week (2019, deep solar minimum, F10.7 ≈ 70) + one active week (2023–24,
   F10.7 ≳ 150, screened storm-free). Exact weeks screened maneuver-free at chunk
-  time.
+  time. **Amended 2026-07-13:** a third, storm window added by the elected
+  Chunk 2c (Gannon storm, May 2024).
 - **The GO/INVESTIGATE call at Checkpoint A** and the **pinnable-bounds call at
   Checkpoint B** are the maintainer's.
 - **Tag `v0.7.2` at wrap-up?** Maintainer's call (current version 0.7.1).
@@ -153,10 +154,10 @@ fixtures small enough to live as literals.
 
 ## How to use this plan
 
-- **7 chunks (0–5, with 2b inserted after 2)**, each sized for one Claude Code
-  session:
+- **8 chunks (0–5, with 2b and 2c inserted after 2)**, each sized for one
+  Claude Code session:
   - **Chunk 0 is the diagnostic gate** (LAGEOS end-to-end → Checkpoint A).
-  - **Chunks 1–3 (2b included) are the evidence body**; **Chunk 4 is wrap-up**
+  - **Chunks 1–3 (2b and 2c included) are the evidence body**; **Chunk 4 is wrap-up**
     (the only *study* chunk that touches `src/`-adjacent surfaces: `tests/`,
     docs, README).
   - **Chunk 5 is order-independent maintenance** (the `box_face_default`
@@ -173,8 +174,9 @@ fixtures small enough to live as literals.
 - **Commits, CHANGELOG entries, chunk-header "done" marks, downloads, and any
   release are the maintainer's.** Claude writes scripts/tests/docs and runs
   read-only/test commands.
-- **Mergeable chunks:** 2, 2b, and 3 share the GNV1B data; adjacent ones can run
-  in one session (with 2 done, 2b + 3 is the natural remaining pairing).
+- **Mergeable chunks:** 2, 2b, 2c, and 3 share the GNV1B data pipeline; adjacent
+  ones can run in one session (with 2 + 2b done, 2c + 3 is the natural remaining
+  pairing).
 
 ---
 
@@ -475,8 +477,134 @@ shipped); `probe_tables.py` (retained beside the driver) as the diagnostic templ
 >    edge-on sail regime GRACE doesn't exercise). Default: **defer** — the box
 >    validated as physically sound (DSMC-consistent) but not warranted for this
 >    bluff body; record either way.
-> 3. Optional stretch case noted, not built: a storm window as a density stress
->    test.
+> 3. Optional stretch case noted at the call and **elected 2026-07-13**: a storm
+>    window as a density stress test → **Chunk 2c** (does not reopen items 1–2).
+
+---
+
+## Chunk 2c — Gannon-storm window: the density stress case + the box-table sign test - Done
+
+> **Elected 2026-07-13 (maintainer's call), promoting Checkpoint B's item-3
+> stretch case to a built chunk.** Checkpoint B's resolved decisions (pin
+> bounds, geometry deferral) stand — this chunk adds density-stress evidence to
+> the findings doc; it reopens nothing.
+
+**Goal:** the identical Run 1–5 battery over the strongest geomagnetic storm of
+the GRACE-FO era, breaking the two-window degeneracy in the Cd-table reading
+and exercising the one NRLMSISE-00 input path no committed window touches.
+
+**Physics framing (resolved 2026-07-13 discussion):**
+- **What quiet + active cannot separate.** An orbit residual constrains only
+  ρ·Cd·A, and the physical Cd is near-constant across windows (the tables
+  themselves move only ~8–10% quiet→active) — so the fitted-Cd *swing* across
+  windows is a density-bias measurement. The committed windows already flip the
+  **sphere** table's sign (1.47× over → 0.80× under the fitted product) but not
+  the **box**'s (2.23× → 1.21×, over both times). Two readings stay open:
+  **(H1)** the box's residual over-prediction is more density bias — storm
+  densities flip its sign too; **(H2)** the box genuinely over-drags this bluff
+  body by ~20% (Chunk 2b Verify 3's sharp-edge expectation) — the
+  over-prediction persists. The storm discriminates, and **either outcome is a
+  recordable finding** (H1 clears the table; H2 is a real characterization of
+  `box_face_default` on bluff bodies, worth documenting).
+- **Expected sign, not pre-committed:** the storm-time literature has
+  NRLMSISE-00 typically *under*-predicting peak storm density and lagging
+  recovery, so the expectation is the fitted Cd rising past the box table's
+  ~4.1 — but the model can also over-respond in phases; record what prints.
+- **Wiring coverage:** both committed windows are geomagnetically dead (daily
+  Ap 2 / 4), so NRLMSISE-00's ap-driven storm terms and the
+  `CssiSpaceWeatherData` 3-hourly-ap plumbing are *unexercised* — squarely this
+  study's risk class. The storm drives 3-hourly ap to 400. **Data verified
+  present (2026-07-13):** the local orekit-data CSSI file carries the window
+  deep inside its OBSERVED block — 2024-05-10 daily Ap 105 / 2024-05-11 daily
+  Ap 271, 3-hourly ap to 400, Kp 9, F10.7 ≈ 227.
+- **Truth stays valid in a storm:** GNV1B reduced-dynamic orbits are
+  GPS-determined (cm-class through storms) — the storm stresses the model, not
+  the truth.
+- **The scalar-Cd fit will not collapse the residual** to the quiet/active
+  Run-3 class: the density bias varies hour-to-hour inside the arc, so one
+  scalar absorbs an arc-mean only. A large Run-3 residual is the expected
+  reading — the findings doc's "what a storm does to a scalar-Cd fit" caveat
+  (the solar-sail operational takeaway), not a pipeline defect.
+
+**Window (Gannon storm, May 2024):** primary arc **t₀ = 2024-05-11 00:00**, the
+full-storm day (uniformly disturbed → the cleanest arc-mean fitted-Cd
+interpretation), loaded span 05-11 → 05-13. Optional secondary: the **onset
+arc** t₀ = 2024-05-10 (≈17 h pre-storm, main phase from ~17:00 UT — the
+model-lag probe) via `--start-date=2024-05-10`.
+
+**Create / edit** (`experiments/real-world-validation/gracefo/`; driver changes
+prepared 2026-07-13 alongside this section):
+- `run_gracefo.py`:
+  - `storm_2024` registered in `WINDOWS` (now a dict carrying an optional
+    first-loaded-day filter; the on-disk 05-10 onset day is skipped by default
+    so t₀ opens the full-storm arc); `--start-date=YYYY-MM-DD` override.
+  - Cd-fit coarse bracket parameterized: storm windows scan to **Cd 8.0** (the
+    shipped `_SOFT_CD_LIMIT` = 5 only *warns*, and a storm fitted Cd is a
+    density-bias absorber, not a physical Cd); a fit railing at the edge prints
+    a NOTE and is recorded as "> 8" — itself a density-bias bound.
+  - Storm-aware maneuver-screen note: a real storm onset is itself a slope
+    kink, so the deg-5 departure documents the storm signature rather than a
+    burn — actual-burn detection falls back to the GRACE-FO SDS monthly
+    reports (check May 2024; operators do maneuver around big storms).
+  - Space-weather block enriched for all windows: per-loaded-day F10.7/Ap/Kp +
+    the max 3-hourly ap over the primary arc — the live proof the storm
+    reaches the model.
+  - **As-built addition (2026-07-13, onset-arc discussion):** `--fixed-cd=X` —
+    one extra no-fit propagation at a Cd calibrated elsewhere, printing RIC RMS
+    + a 3-hourly signed along-track profile. Run on the onset arc at the
+    active_2023 fitted **3.405** as the **"storm-surprise" case** (how fast a
+    pre-storm-calibrated prediction diverges when the storm arrives — the
+    operationally realistic scenario, and the solar-sail takeaway). Framing
+    rule: the onset arc's *fitted* Cd and s-factors blend ~17 quiet + ~7 storm
+    hours and are reported flagged, never as a fourth column in the
+    three-window fitted-Cd story.
+- Storm results appended to `results.txt`; README storm-window provenance +
+  result reading.
+
+**Reuse:** the entire Run 1–5 battery, Cd-table diagnostic block, and s-factor
+consistency check, unchanged — the sign test reads directly off the
+already-printed s-factors.
+
+**You provide:** four PO.DAAC daily tarballs into `data/gracefo/storm_2024/` —
+`gracefo_1B_2024-05-10_RL04.ascii.noLRI.tgz` through `…2024-05-13…` (same
+dataset as the committed windows; verify the RL04 path covers May 2024 at
+download time per the data-access rule).
+
+**You run:**
+`conda run -n propygator python run_gracefo.py storm_2024 >> results.txt`
+(the onset arc — elected at run time — appended the same way with
+`--start-date=2024-05-10 --fixed-cd=3.405`); commit.
+
+**Verify:**
+1. The space-weather block shows the storm reaching the model (2024-05-11 daily
+   Ap 271; arc max 3-hourly ap 400) — if not, the CSSI wiring is the finding.
+2. Run 1 (drag-off) clears the active window's ~1.06 km/day by a wide margin
+   (multi-km/day class at storm densities).
+3. **The sign test (the point):** extend the s-factor sequence quiet → active →
+   storm — sphere 1.47 → 0.80 → s₄; box 2.23 → 1.21 → s₅. Box s₅ < 1 ⇒ **H1**
+   (the over-prediction was density bias; the storm flips it). Box s₅ still > 1
+   at daily Ap 271 ⇒ evidence for **H2** (a genuine ~20% geometric over-drag).
+   Record either way, beside the fitted Cd on A_ram vs. the DSMC band.
+4. The fitted Cd is off the scan rails (or recorded as "> 8"); Run 3's residual
+   is expected well above the quiet/active Run-3 numbers — record it as the
+   storm caveat number, not a defect.
+5. Findings-doc handoff: the Chunk 4 mini-table gains the storm column; the
+   pinned tests are **unchanged by default** (if any storm number is pinned,
+   only relationships, under the same generous-margin tolerance policy).
+
+> **As-run note (2026-07-13):** all gates passed; both arcs run (peak + onset).
+> **Sign test → H1** — box s: 2.23 → 1.21 → **0.97** (fitted Cd on A_ram
+> 1.98 → 3.32 → 3.97 vs box table 4.42 → 4.06 → 3.88; the curves cross at the
+> storm). Fitted Cd 4.08, off the rails; peak Run 3 residual 119 m (the storm
+> scalar-fit caveat). The onset arc exposed an **unplanned finding**: Orekit's
+> `NRLMSISE00` at default switches (propygator's construction) is
+> **daily-Ap-driven**, smearing the evening storm across May 10's quiet
+> morning — the onset fitted Cd 1.78 is that smearing artifact, and the
+> storm-surprise run was +614 m *before onset* (+2.24 km/day total). Mechanism
+> proven by the committed `probe_ap_driving.py` (1.92× density at constant
+> real-time ap = the fitted-Cd ratio). Named follow-on, not built: the
+> ap-history mode (`withSwitch(9, -1)`). Evidence: two `results.txt` blocks +
+> the README "Storm window" section.
 
 ---
 
@@ -547,7 +675,9 @@ future wiring regression, the findings doc, the README claim.
     Thresholds prove "the wiring didn't regress", not "the number is exact".
 - **`docs/real-world-validation-findings.md`** — methodology, provenance
   (products, spans, parameter citations), the residual tables, the ablation
-  matrix, the fitted-Cd story, the **a-priori-Cd-table mini-table** (Runs 4 & 5:
+  matrix, the fitted-Cd story (all three windows — quiet / active / the Chunk 2c
+  storm — the density-bias lever, plus the storm-window scalar-Cd caveat), the
+  **a-priori-Cd-table mini-table** (Runs 4 & 5:
   the sphere/box effective Cd on the common `A_ram` reference vs. the DSMC
   2.65–4.5 band vs. the Run-3 fitted Cd — the direct Checkpoint-B geometry
   evidence), the fitter-vs-catalog table, and the honest caveats (density
@@ -667,7 +797,8 @@ against the regenerated table.
   (drag-equivalent to the faithful `NadirPointing` for this ram-dominated body);
   the deferred step is the *fitted* box, taken only if the sphere-equivalent
   leaves residuals a constant cross-section can't explain.
-- **Storm-window density stress case** — noted at Checkpoint B, not built.
+- **Storm-window density stress case** — noted at Checkpoint B, **elected
+  2026-07-13 → Chunk 2c** (no longer deferred).
 - **`earth_radiation`** — upstream-blocked (the Knocke horizon bug); when the
   fixed Orekit wrapper lands, the LAGEOS arc from this study is the ready-made
   acceptance test (ties into `experiments/earth-radiation/`'s resume kit).

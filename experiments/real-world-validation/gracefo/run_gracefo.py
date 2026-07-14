@@ -1,11 +1,12 @@
 """GRACE-FO vs. GNV1B reduced-dynamic orbit -- the Chunk 2 + 2b drag diagnostics.
 
-Evidence for ``docs/build-plan-real-world-validation.md`` Chunks 2 and 2b: the
-full drag pipeline (NRLMSISE-00 + real CSSI space weather + the shared
+Evidence for ``docs/build-plan-real-world-validation.md`` Chunks 2, 2b and 2c:
+the full drag pipeline (NRLMSISE-00 + real CSSI space weather + the shared
 ``DragSensitive`` proxy) measured against a real drag-perturbed LEO orbit, with
 the residual decomposed into "pipeline" vs. "density model" by construction. Run
-once per window -- a solar-quiet week (2019) and a solar-active week (2023) -- so
-the quiet-vs-active contrast is visible in the fitted Cd and the residual ratio.
+once per window -- a solar-quiet week (2019), a solar-active week (2023), and
+the Chunk 2c Gannon-storm window (May 2024) -- so the quiet/active/storm
+contrast is visible in the fitted Cd and the residual ratio.
 
 Five runs over a 1-day arc from the truth t0 (Chunk 2 runs 1-3, Chunk 2b 4-5):
 
@@ -36,10 +37,23 @@ arXiv 2503.21651), with each printed number labeled as exactly one quantity
 (the build plan's flagged reference-area ISSUE fix; the retained scratch
 ``probe_tables.py`` mixed references and is superseded).
 
+**Chunk 2c (storm window):** the same battery over the 2024-05-11 Gannon-storm
+day (daily Ap 271, 3-hourly ap to 400 -- the strongest storm of the GRACE-FO
+era) breaks the two-window degeneracy in the table reading: the physical Cd is
+near-constant across windows, so the fitted-Cd swing is a density-bias
+measurement, and the storm decides whether the box table's persistent
+over-prediction is density bias (its sign flips) or genuine geometric over-drag
+(it persists). It is also the only window exercising NRLMSISE-00's ap-driven
+storm terms (the committed windows sit at daily Ap 2-4). Storm expectations: the
+scalar-Cd fit will NOT collapse the residual to the quiet/active Run-3 class
+(the density bias varies hour-to-hour inside the arc), and the maneuver screen's
+deg-5 kink test documents the storm signature rather than a burn (the SDS
+monthly reports are the actual-burn cross-check).
+
 Before the runs: a t0 frame/time sanity diff (must be ~0), a maneuver screen (a
-drag-on arc scanned for the slope kink a thruster burn would leave), and the
-window's F10.7 / Ap context read from the same CssiSpaceWeatherData the drag force
-consumes.
+drag-on arc scanned for the slope kink a thruster burn would leave), and
+per-loaded-day F10.7 / Ap context plus the arc-max 3-hourly ap, read from the
+same CssiSpaceWeatherData the drag force consumes.
 
 Reference-only: not shipped, not in CI, outside ``testpaths``. Runs in the
 propygator conda env (starts the JVM, needs orekit-data); cwd-independent:
@@ -47,9 +61,16 @@ propygator conda env (starts the JVM, needs orekit-data); cwd-independent:
     cd experiments/real-world-validation/gracefo
     conda run -n propygator python run_gracefo.py quiet_2019 >  results.txt
     conda run -n propygator python run_gracefo.py active_2023 >> results.txt
+    conda run -n propygator python run_gracefo.py storm_2024 >> results.txt
 
 Stdout is ASCII-only (captured under cp1252); progress is silenced. ``--parse-only``
 stops before the JVM-touching steps (parser checks only).
+``--start-date=YYYY-MM-DD`` overrides the window's first loaded day (Chunk 2c's
+optional onset arc: ``--start-date=2024-05-10``). ``--fixed-cd=X`` adds one
+no-fit propagation at a Cd calibrated elsewhere, with a 3-hourly signed
+along-track profile -- on the onset arc, ``--fixed-cd=3.405`` (the active_2023
+fitted value) is the "storm-surprise" case: how fast a pre-storm-calibrated
+prediction diverges when the storm arrives.
 """
 
 from __future__ import annotations
@@ -119,7 +140,24 @@ SUBSAMPLE_S = 60.0
 LOAD_DAYS = 3  # consecutive days loaded (screen span); the runs use a 1-day arc
 ARC_DAYS = 1.0  # the primary run/fit arc
 
-WINDOWS = ("quiet_2019", "active_2023")
+# window -> first loaded day (a tarball-name date filter; None = all files).
+# The runs load the first LOAD_DAYS files that survive the filter, so the filter
+# picks t0. --start-date=YYYY-MM-DD overrides it at the command line.
+WINDOWS: dict[str, str | None] = {
+    "quiet_2019": None,  # F10.7 ~ 70, daily Ap ~ 2 (deep solar minimum)
+    "active_2023": None,  # F10.7 ~ 190, daily Ap ~ 4 (solar max, storm-free)
+    # Chunk 2c -- Gannon storm: skip the on-disk 2024-05-10 onset day so t0
+    # opens the full-storm arc (2024-05-11: daily Ap 271, 3-hourly ap to 400,
+    # Kp 9). --start-date=2024-05-10 selects the optional onset arc instead.
+    "storm_2024": "2024-05-11",
+}
+
+# Cd-fit coarse-scan upper edge. The shipped _SOFT_CD_LIMIT = 5 only *warns*,
+# and a storm-window fitted Cd is a density-bias absorber rather than a
+# physical Cd, so the storm scan runs to 8 (a fit railing there is itself a
+# finding -- a lower bound on NRLMSISE-00's storm density under-prediction).
+CD_FIT_HI_DEFAULT = 5.0
+CD_FIT_HI_STORM = 8.0
 
 
 def _spacecraft(
@@ -215,6 +253,20 @@ def _space_weather(mid_iso: str) -> str:
     return (
         f"F10.7 = {f107:.1f} (81-day avg {f107a:.1f}) sfu, "
         f"daily Ap = {ap_daily:.1f}, daily Kp = {kp:.2f}"
+    )
+
+
+def _ap_max_over_arc(eph, n_arc: int, step: int = 30) -> float:
+    """Max 3-hourly ap over the arc -- NRLMSISE-00's storm driver (getAp()[1]).
+
+    At daily Ap 2-4 (the quiet/active windows) this is a near-constant few; in
+    the Chunk 2c storm window it is the live proof the storm reaches the model.
+    """
+    from org.orekit.models.earth.atmosphere.data import CssiSpaceWeatherData
+
+    cssi = CssiSpaceWeatherData(CssiSpaceWeatherData.DEFAULT_SUPPORTED_NAMES)
+    return max(
+        float(cssi.getAp(eph.epochs[k].to_orekit())[1]) for k in range(0, n_arc, step)
     )
 
 
@@ -350,7 +402,13 @@ def _table_diagnostics(
     return out
 
 
-def _fit_cd(state0: State, span_s: float, eph, n_arc: int) -> tuple[float, float, int]:
+def _fit_cd(
+    state0: State,
+    span_s: float,
+    eph,
+    n_arc: int,
+    cd_hi: float = CD_FIT_HI_DEFAULT,
+) -> tuple[float, float, int]:
     """Coarse scan + golden-section refine on scalar Cd minimizing 1-day along RMS.
 
     Returns ``(best_cd, best_along_rms, n_evaluations)``. The objective is smooth and
@@ -370,9 +428,11 @@ def _fit_cd(state0: State, span_s: float, eph, n_arc: int) -> tuple[float, float
         print(f"    Cd = {cd:6.3f}  ->  along RMS = {rms:10.3f} m", file=sys.stderr)
         return rms
 
-    # Coarse bracket over the physically plausible Cd span (the 5.0 upper edge is the
-    # spacecraft soft limit; a real free-molecular Cd sits well below it).
-    grid = np.linspace(1.5, 5.0, 7)
+    # Coarse bracket over the plausible Cd span. The default 5.0 upper edge is
+    # the spacecraft soft-warn limit (a real free-molecular Cd sits well below
+    # it); the storm window scans wider -- there the fitted Cd absorbs a
+    # storm-size density bias and may legitimately exceed 5 (warns, allowed).
+    grid = np.linspace(1.5, cd_hi, 7)
     vals = [objective(cd) for cd in grid]
     k = int(np.argmin(vals))
     lo = float(grid[max(k - 1, 0)])
@@ -409,22 +469,38 @@ def _growth_row(label: str, diff: np.ndarray, eph, n_arc: int) -> None:
 
 def main() -> None:
     parse_only = "--parse-only" in sys.argv
+    start_date = None
+    fixed_cd = None
+    for a in sys.argv[1:]:
+        if a.startswith("--start-date="):
+            start_date = a.split("=", 1)[1]
+        elif a.startswith("--fixed-cd="):
+            fixed_cd = float(a.split("=", 1)[1])
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     window = args[0] if args else "quiet_2019"
     if window not in WINDOWS:
-        raise SystemExit(f"unknown window {window!r}; choose one of {WINDOWS}")
+        raise SystemExit(f"unknown window {window!r}; choose one of {tuple(WINDOWS)}")
+    if start_date is None:
+        start_date = WINDOWS[window]
+    is_storm = window.startswith("storm")
 
+    chunks = "2 + 2b + 2c" if is_storm else "2 + 2b"
     print(
-        "GRACE-FO 1 vs GNV1B reduced-dynamic orbit -- Chunk 2 + 2b drag diagnostics"
+        f"GRACE-FO 1 vs GNV1B reduced-dynamic orbit -- Chunk {chunks} drag diagnostics"
     )
     print("=" * 74)
-    print(f"[window] {window}")
+    print(f"[window] {window}" + (f" (first loaded day {start_date})" if start_date else ""))
 
     window_dir = DATA_ROOT / window
     files = find_window_files(window_dir, GRACEFO_SAT_ID)
+    if start_date is not None:
+        # Tarball names embed the ISO date, so a lexical bound selects the day.
+        files = [f for f in files if f.name >= f"gracefo_1B_{start_date}"]
     if not files:
         raise SystemExit(
-            f"no GNV1B files under {window_dir} -- download the GRACE-FO week first "
+            f"no GNV1B files under {window_dir}"
+            + (f" on/after {start_date}" if start_date else "")
+            + " -- download the GRACE-FO week first "
             "(see README.md; raw truth files are never committed)"
         )
     load = files[:LOAD_DAYS]
@@ -483,15 +559,25 @@ def main() -> None:
         f"|dv| = {np.linalg.norm(back.velocity - eph.velocities_ms[0]):.3e} m/s"
     )
 
-    # --- space-weather context (the same source NRLMSISE-00 consumes) --------
-    mid_iso = eph.epochs[n // 2].to_iso()
-    print("[space weather]  at window midpoint (CssiSpaceWeatherData)")
-    print(f"  {mid_iso} ~ {_space_weather(mid_iso)}")
-
     n_arc = int(ARC_DAYS * 86400 / SUBSAMPLE_S) + 1  # inclusive of the 24 h endpoint
     arc_span_s = ARC_DAYS * 86400.0
     if n_arc > n:
         raise SystemExit(f"arc needs {n_arc} truth samples but only {n} loaded")
+
+    # --- space-weather context (the same source NRLMSISE-00 consumes) --------
+    # Per-loaded-day daily context + the arc-max 3-hourly ap: the proof a storm
+    # actually reaches the model (Chunk 2c Verify 1). Near-constant for the
+    # quiet/active windows.
+    print("[space weather]  per loaded day (CssiSpaceWeatherData)")
+    per_day = int(86400 / SUBSAMPLE_S)
+    for day in range(LOAD_DAYS):
+        k = min(day * per_day + per_day // 2, n - 1)  # local noon of each day
+        day_iso = eph.epochs[k].to_iso()
+        print(f"  {day_iso[:10]} ~ {_space_weather(day_iso)}")
+    print(
+        f"  max 3-hourly ap over the {ARC_DAYS:.0f}-day arc: "
+        f"{_ap_max_over_arc(eph, n_arc):.0f}"
+    )
 
     # --- maneuver screen: drag-on arc scanned for a burn's slope kink --------
     print(f"[maneuver screen]  drag-on over the {LOAD_DAYS}-day load, along-track")
@@ -518,7 +604,13 @@ def main() -> None:
         if k < ns:
             print(f"  along @ {day} d: {along_screen[k]:+12.1f} m")
     print(f"  screen ({t_screen:.0f} s wall): {'CLEAN' if clean else 'REVIEW -- kink'}")
-    if not clean:
+    if is_storm:
+        print(
+            "  storm window: a real storm onset is itself a slope kink, so the "
+            "deg-5 departure documents the storm signature, not a burn -- the "
+            "SDS monthly report is the actual-maneuver cross-check."
+        )
+    elif not clean:
         print(
             "  a slope kink = an unmodeled burn: slide the window (SDS monthly "
             "maneuver reports as the cross-check) before trusting the drag numbers."
@@ -542,12 +634,18 @@ def main() -> None:
 
     # --- Run 3: scalar Cd fit ------------------------------------------------
     print("[Cd fit]  golden-section on along-track RMS (progress on stderr)")
+    cd_hi = CD_FIT_HI_STORM if is_storm else CD_FIT_HI_DEFAULT
     t_wall = _time.perf_counter()
-    best_cd, best_rms, evals = _fit_cd(state0, arc_span_s, eph, n_arc)
+    best_cd, best_rms, evals = _fit_cd(state0, arc_span_s, eph, n_arc, cd_hi=cd_hi)
     t_fit = _time.perf_counter() - t_wall
     pos3 = _propagate_itrf(state0, arc_span_s, drag=True, cd=best_cd)
     d3 = pos3[:n_arc] - eph.positions_m[:n_arc]
     print(f"  fitted Cd = {best_cd:.3f} in {evals} evals ({t_fit:.0f} s wall)")
+    if best_cd >= cd_hi - 0.05:
+        print(
+            f"  NOTE: fit railed at the {cd_hi} scan edge -- read as "
+            f"'fitted Cd > {cd_hi}' (a density-bias bound, not a converged fit)"
+        )
 
     # --- Chunk 2b: Runs 4 & 5 -- the a-priori Cd-table probe ------------------
     sphere_table = VariableCd.sphere_default()
@@ -655,6 +753,33 @@ def main() -> None:
         "  agreement here confirms the box/attitude axis mapping live (Verify 1) "
         "-- the realized drag matches the hand-summed face table."
     )
+
+    # --- Optional fixed-Cd run (--fixed-cd=X): the "storm-surprise" case ------
+    # One no-fit propagation at a Cd calibrated elsewhere (e.g. the active_2023
+    # fitted 3.405) -- on the Chunk 2c onset arc this measures how fast a
+    # pre-storm-calibrated prediction diverges when the storm arrives. The
+    # 3-hourly signed along-track profile localizes the breakaway (Gannon onset
+    # ~17:00 UT on the 2024-05-10 onset arc).
+    if fixed_cd is not None:
+        t_wall = _time.perf_counter()
+        posf = _propagate_itrf(state0, arc_span_s, drag=True, cd=fixed_cd)
+        tf = _time.perf_counter() - t_wall
+        df = posf[:n_arc] - eph.positions_m[:n_arc]
+        rf = ric_rms(df)
+        alongf = _along_track(df, eph, n_arc)
+        print(
+            f"[fixed-Cd run]  Cd = {fixed_cd} held fixed, no fit -- the "
+            f"storm-surprise case ({tf:.0f} s wall)"
+        )
+        print(
+            f"  RIC RMS (m): radial {rf[0]:.2f}, along {rf[1]:.2f}, "
+            f"cross {rf[2]:.2f}, 3D {rf[3]:.2f}"
+        )
+        cells = []
+        for hours in range(3, 25, 3):
+            k = min(int(hours * 3600 / SUBSAMPLE_S), n_arc - 1)
+            cells.append(f"{hours}h {alongf[k]:+.0f}")
+        print("  signed along-track profile (m): " + "  ".join(cells))
 
     # --- Verify 4 (optional): scale collapse of the box run ------------------
     # One propagation at the analytically predicted scale (no re-fit): scaling

@@ -154,3 +154,170 @@ GRACE-FO 1 vs GNV1B reduced-dynamic orbit -- Chunk 2 + 2b drag diagnostics
   reading: Run 2 << Run 1 proves the drag pipeline carries the signal; Run 3 <= Run 2 shows a single scalar Cd absorbs most model error, and the fitted Cd vs the 2.3 nominal is the density x Cd bias for this window.
   chunk 2b, on the common A_ram = 1.027 m^2: sphere table Cd 2.70 / box table Cd 4.06 / fitted Cd 3.32; DSMC band 2.65-4.5
   chunk 2b geometry evidence: no-fit along RMS sphere 210.6 m / box 222.6 m vs fitted 6.4 m; scale-collapsed box 6.4 m (~ Run 3 => the box adds only absorbable scale); +0.33 m length check moves it +35.7 m (density-limited, not dimension-limited).
+GRACE-FO 1 vs GNV1B reduced-dynamic orbit -- Chunk 2 + 2b + 2c drag diagnostics
+==========================================================================
+[window] storm_2024 (first loaded day 2024-05-11)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  platform: 'GRACE C', product version 04
+  source files (3): gracefo_1B_2024-05-11_RL04.ascii.noLRI.tgz, gracefo_1B_2024-05-12_RL04.ascii.noLRI.tgz, gracefo_1B_2024-05-13_RL04.ascii.noLRI.tgz
+  1 Hz records read: 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+  seam gaps > 1.5 s: 0 (max gap 1.0 s)
+  span: 2024-05-11T00:00:19 -> 2024-05-13T23:59:19 TAI (2.999 days loaded)
+  frame: coord_ref 'E' -> Frame.ITRF (ITRF-realization class)
+[parser checks]
+  from_iso(to_iso()) == epoch for all 4320 epochs: True
+  grid uniformity: max |dt - 60 s| = 0.000e+00 s over 4319 intervals
+  |r0| = 6855.4 km (altitude ~ 477 km)
+[t0 sanity]
+  ITRF -> EME2000 -> ITRF round trip at t0: |dr| = 4.755e-09 m, |dv| = 7.355e-12 m/s
+[space weather]  per loaded day (CssiSpaceWeatherData)
+  2024-05-11 ~ F10.7 = 217.8 (81-day avg 177.1) sfu, daily Ap = 271.0, daily Kp = 8.38
+  2024-05-12 ~ F10.7 = 218.6 (81-day avg 178.0) sfu, daily Ap = 53.0, daily Kp = 4.59
+  2024-05-13 ~ F10.7 = 217.6 (81-day avg 179.1) sfu, daily Ap = 27.0, daily Kp = 3.50
+  max 3-hourly ap over the 1-day arc: 400
+[maneuver screen]  drag-on over the 3-day load, along-track
+  along-track signal (max |.|): 11687.9 m; departure from a smooth deg-5 fit: 45.6 m
+  along @ 1 d:      -3360.1 m
+  along @ 2 d:      -7597.7 m
+  screen (29 s wall): CLEAN
+  storm window: a real storm onset is itself a slope kink, so the deg-5 departure documents the storm signature, not a burn -- the SDS monthly report is the actual-maneuver cross-check.
+[runs]  1-day arc from t0, sphere-equiv A = 1.0 m2, m = 600.0 kg, Cr = 1.3
+  first propagated sample (t0) vs truth: |dr| = 4.755e-09 m  (17 s wall, 2 arcs)
+[Cd fit]  golden-section on along-track RMS (progress on stderr)
+  fitted Cd = 4.080 in 20 evals (167 s wall)
+[Cd tables]  shipped a-priori tables at arc conditions (Chunk 2b)
+  NRLMSISE-00 over the arc (145 samples): rho mean 3.894e-12 kg/m^3 (min 1.854e-12, max 6.429e-12)
+  face-flow angles under InPlaneTracking(ecef), constant by construction:
+    ram +Y theta=0 (A 1.027 m^2), leeward -Y theta=pi, 4 sides theta=pi/2 (2x4.111 + 2x2.436 = 13.09 m^2)
+  per-face box Cd at arc-mean conditions: ram 2.715, side 0.091, leeward -0.000
+  quantity labels -- each number below is exactly one thing:
+    [CdA] = raw face-sum Sigma Cd_i*A_i in m^2 = along-wind effective Cd*A (identical by table construction: incidence is baked into each face Cd)
+    [Cd]  = dimensionless Cd referenced to the common A_ram = 1.027 m^2
+  sphere_default : [CdA] 2.580 m^2 arc-mean (rho-weighted 2.564)   [Cd] 2.51
+  box_face_default: [CdA] 3.983 m^2 arc-mean (rho-weighted 3.967)   [Cd] 3.88
+  fitted (Run 3)  : [CdA] 4.080 m^2 (= Cd 4.080 on the driver's 1.0 m^2)   [Cd] 3.97
+  DSMC physical band on the frontal reference: Cd 2.65-4.5 (Mehta 2013; arXiv 2503.21651)
+  [axis check]  Sigma Cd_i*A_i by which body face rides the wind:
+    +Y ram, the wired mapping :   3.98 m^2  <- must be smallest
+    +X ram (nadir/zenith face):  11.80 m^2  (wrong mapping)
+    +Z ram (slant-side face)  :   7.55 m^2  (wrong mapping)
+    wired mapping smallest: PASS
+[runs 4-5]  no-fit shipped Cd tables, same force set + 1-day arc
+  run 4: sphere_default on A_ram = 1.027 m^2, default attitude (13 s wall)
+  run 5: box_face_default on 0.78 x 3.123 x 1.3165 m box, InPlaneTracking(ecef) (22 s wall)
+[residuals]  1-day arc, propagated - truth, ITRF, RIC RMS (meters)
+  run                       radial       along     cross          3D
+  1: drag off                62.81     3812.47      0.86     3812.99
+  2: drag on (Cd=2.3)        25.37     1664.93      0.45     1665.12
+  3: drag on (Cd fit)         8.03      119.02      0.34      119.29
+  4: sphere table            21.12     1418.24      0.41     1418.40
+  5: box table (IPT)          6.69      155.62      0.29      155.76
+[growth]  3D |dr| propagated - truth (meters)
+  run                      6 h        12 h        18 h        24 h
+  1: drag off            563.7      2270.0      4912.8      8163.6
+  2: drag on nom         270.5      1065.3      2200.9      3360.2
+  3: drag on fit          43.4       132.3       101.3       361.4
+  4: sphere table        236.2       926.9      1889.6      2807.5
+  5: box table            57.3       191.9       234.5       127.7
+  reading: the no-fit tables carry 0.63x (sphere) / 0.97x (box) the fitted rho*Cd*A product; the along-track residual is that mismatch expressed through the drag pipeline -- density-limited by construction, not a table defect.
+[consistency]  predicted vs realized signed along-track @ 24 h
+  run 4 sphere: s = 0.63 -> predicted   -3034.4 m, realized   -2807.5 m
+  run 5 box   : s = 0.97 -> predicted    -226.7 m, realized    +125.2 m
+  agreement here confirms the box/attitude axis mapping live (Verify 1) -- the realized drag matches the hand-summed face table.
+[verify 4]  box Cd*A scaled onto the fitted product (x1.029)
+  scaled-box along RMS = 118.62 m vs Run 3 fitted 119.02 m (24 s wall)
+  collapse to ~Run 3 = the box adds only absorbable scale for ram-dominated GRACE (the Checkpoint B geometry evidence).
+[verify 5]  +0.33 m length-corrected box (y = 3.453 m)
+  along RMS = 119.90 m vs Run 5 baseline 155.62 m (delta -35.72 m; density confound |Run5 - Run3| = 36.60 m) (17 s wall)
+[checkpoint B inputs]
+  along-track RMS: drag-off 3812.5 m -> drag-on 1664.9 m (ratio 0.44) -> Cd-fit 119.0 m at Cd = 4.08
+  drag signal (Run 1) vs LAGEOS conservative floor (~4 m/day): 953x -- drag dominates as expected
+  reading: Run 2 << Run 1 proves the drag pipeline carries the signal; Run 3 <= Run 2 shows a single scalar Cd absorbs most model error, and the fitted Cd vs the 2.3 nominal is the density x Cd bias for this window.
+  chunk 2b, on the common A_ram = 1.027 m^2: sphere table Cd 2.51 / box table Cd 3.88 / fitted Cd 3.97; DSMC band 2.65-4.5
+  chunk 2b geometry evidence: no-fit along RMS sphere 1418.2 m / box 155.6 m vs fitted 119.0 m; scale-collapsed box 118.6 m (~ Run 3 => the box adds only absorbable scale); +0.33 m length check moves it -35.7 m (density-limited, not dimension-limited).
+GRACE-FO 1 vs GNV1B reduced-dynamic orbit -- Chunk 2 + 2b + 2c drag diagnostics
+==========================================================================
+[window] storm_2024 (first loaded day 2024-05-10)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  platform: 'GRACE C', product version 04
+  source files (3): gracefo_1B_2024-05-10_RL04.ascii.noLRI.tgz, gracefo_1B_2024-05-11_RL04.ascii.noLRI.tgz, gracefo_1B_2024-05-12_RL04.ascii.noLRI.tgz
+  1 Hz records read: 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+  seam gaps > 1.5 s: 0 (max gap 1.0 s)
+  span: 2024-05-10T00:00:19 -> 2024-05-12T23:59:19 TAI (2.999 days loaded)
+  frame: coord_ref 'E' -> Frame.ITRF (ITRF-realization class)
+[parser checks]
+  from_iso(to_iso()) == epoch for all 4320 epochs: True
+  grid uniformity: max |dt - 60 s| = 0.000e+00 s over 4319 intervals
+  |r0| = 6850.9 km (altitude ~ 473 km)
+[t0 sanity]
+  ITRF -> EME2000 -> ITRF round trip at t0: |dr| = 1.920e-09 m, |dv| = 9.095e-13 m/s
+[space weather]  per loaded day (CssiSpaceWeatherData)
+  2024-05-10 ~ F10.7 = 218.5 (81-day avg 176.2) sfu, daily Ap = 105.0, daily Kp = 4.79
+  2024-05-11 ~ F10.7 = 217.8 (81-day avg 177.1) sfu, daily Ap = 271.0, daily Kp = 8.38
+  2024-05-12 ~ F10.7 = 218.6 (81-day avg 178.0) sfu, daily Ap = 53.0, daily Kp = 4.59
+  max 3-hourly ap over the 1-day arc: 300
+[maneuver screen]  drag-on over the 3-day load, along-track
+  along-track signal (max |.|): 6955.1 m; departure from a smooth deg-5 fit: 238.1 m
+  along @ 1 d:       +649.0 m
+  along @ 2 d:      -2720.0 m
+  screen (20 s wall): CLEAN
+  storm window: a real storm onset is itself a slope kink, so the deg-5 departure documents the storm signature, not a burn -- the SDS monthly report is the actual-maneuver cross-check.
+[runs]  1-day arc from t0, sphere-equiv A = 1.0 m2, m = 600.0 kg, Cr = 1.3
+  first propagated sample (t0) vs truth: |dr| = 1.920e-09 m  (8 s wall, 2 arcs)
+[Cd fit]  golden-section on along-track RMS (progress on stderr)
+  fitted Cd = 1.777 in 19 evals (118 s wall)
+[Cd tables]  shipped a-priori tables at arc conditions (Chunk 2b)
+  NRLMSISE-00 over the arc (145 samples): rho mean 2.682e-12 kg/m^3 (min 1.253e-12, max 4.812e-12)
+  face-flow angles under InPlaneTracking(ecef), constant by construction:
+    ram +Y theta=0 (A 1.027 m^2), leeward -Y theta=pi, 4 sides theta=pi/2 (2x4.111 + 2x2.436 = 13.09 m^2)
+  per-face box Cd at arc-mean conditions: ram 2.808, side 0.088, leeward -0.000
+  quantity labels -- each number below is exactly one thing:
+    [CdA] = raw face-sum Sigma Cd_i*A_i in m^2 = along-wind effective Cd*A (identical by table construction: incidence is baked into each face Cd)
+    [Cd]  = dimensionless Cd referenced to the common A_ram = 1.027 m^2
+  sphere_default : [CdA] 2.640 m^2 arc-mean (rho-weighted 2.617)   [Cd] 2.57
+  box_face_default: [CdA] 4.034 m^2 arc-mean (rho-weighted 4.012)   [Cd] 3.93
+  fitted (Run 3)  : [CdA] 1.777 m^2 (= Cd 1.777 on the driver's 1.0 m^2)   [Cd] 1.73
+  DSMC physical band on the frontal reference: Cd 2.65-4.5 (Mehta 2013; arXiv 2503.21651)
+  [axis check]  Sigma Cd_i*A_i by which body face rides the wind:
+    +Y ram, the wired mapping :   4.03 m^2  <- must be smallest
+    +X ram (nadir/zenith face):  12.15 m^2  (wrong mapping)
+    +Z ram (slant-side face)  :   7.74 m^2  (wrong mapping)
+    wired mapping smallest: PASS
+[runs 4-5]  no-fit shipped Cd tables, same force set + 1-day arc
+  run 4: sphere_default on A_ram = 1.027 m^2, default attitude (9 s wall)
+  run 5: box_face_default on 0.78 x 3.123 x 1.3165 m box, InPlaneTracking(ecef) (14 s wall)
+[residuals]  1-day arc, propagated - truth, ITRF, RIC RMS (meters)
+  run                       radial       along     cross          3D
+  1: drag off                22.55     1152.54      0.39     1152.76
+  2: drag on (Cd=2.3)         5.18      341.19      0.14      341.23
+  3: drag on (Cd fit)         2.89       27.38      0.17       27.53
+  4: sphere table             8.67      545.91      0.14      545.98
+  5: box table (IPT)         25.05     1450.86      0.28     1451.08
+[growth]  3D |dr| propagated - truth (meters)
+  run                      6 h        12 h        18 h        24 h
+  1: drag off            161.5       624.5      1401.0      2664.2
+  2: drag on nom          56.6       212.4       456.2       649.0
+  3: drag on fit           7.0        22.3        34.2       104.7
+  4: sphere table         85.9       327.1       712.5      1106.1
+  5: box table           218.1       834.9      1839.7      3116.4
+  reading: the no-fit tables carry 1.47x (sphere) / 2.26x (box) the fitted rho*Cd*A product; the along-track residual is that mismatch expressed through the drag pipeline -- density-limited by construction, not a table defect.
+[consistency]  predicted vs realized signed along-track @ 24 h
+  run 4 sphere: s = 1.47 -> predicted   +1258.3 m, realized   +1106.1 m
+  run 5 box   : s = 2.26 -> predicted   +3350.8 m, realized   +3116.2 m
+  agreement here confirms the box/attitude axis mapping live (Verify 1) -- the realized drag matches the hand-summed face table.
+[fixed-Cd run]  Cd = 3.405 held fixed, no fit -- the storm-surprise case (8 s wall)
+  RIC RMS (m): radial 17.90, along 1057.54, cross 0.20, 3D 1057.69
+  signed along-track profile (m): 3h +43  6h +161  9h +352  12h +614  15h +945  18h +1348  21h +1801  24h +2241
+[verify 4]  box Cd*A scaled onto the fitted product (x0.443)
+  scaled-box along RMS = 27.35 m vs Run 3 fitted 27.38 m (12 s wall)
+  collapse to ~Run 3 = the box adds only absorbable scale for ram-dominated GRACE (the Checkpoint B geometry evidence).
+[verify 5]  +0.33 m length-corrected box (y = 3.453 m)
+  along RMS = 1530.69 m vs Run 5 baseline 1450.86 m (delta +79.83 m; density confound |Run5 - Run3| = 1423.49 m) (13 s wall)
+[checkpoint B inputs]
+  along-track RMS: drag-off 1152.5 m -> drag-on 341.2 m (ratio 0.30) -> Cd-fit 27.4 m at Cd = 1.78
+  drag signal (Run 1) vs LAGEOS conservative floor (~4 m/day): 288x -- drag dominates as expected
+  reading: Run 2 << Run 1 proves the drag pipeline carries the signal; Run 3 <= Run 2 shows a single scalar Cd absorbs most model error, and the fitted Cd vs the 2.3 nominal is the density x Cd bias for this window.
+  chunk 2b, on the common A_ram = 1.027 m^2: sphere table Cd 2.57 / box table Cd 3.93 / fitted Cd 1.73; DSMC band 2.65-4.5
+  chunk 2b geometry evidence: no-fit along RMS sphere 545.9 m / box 1450.9 m vs fitted 27.4 m; scale-collapsed box 27.3 m (~ Run 3 => the box adds only absorbable scale); +0.33 m length check moves it +79.8 m (density-limited, not dimension-limited).
