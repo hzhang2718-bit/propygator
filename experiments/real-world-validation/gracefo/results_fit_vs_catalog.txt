@@ -1,0 +1,172 @@
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] quiet_2019
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (4): gracefo_1B_2019-11-14_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-15_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-16_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-17_RL04.ascii.noLRI.tgz
+  1 Hz records read: 345600 (QC-dropped 0); subsampled to 60 s -> 5760 epochs
+  span: 2019-11-14T00:00:19 -> 2019-11-17T23:59:19 TAI (3.999 days loaded)
+  fit arc: first 1441 samples (24 h); prediction: 3 further days
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   19317.74687279 +.00000271 +00000-0 +98502-5 0  9994
+  2 43476 088.9970 166.9377 0018420 022.3999 337.8049 15.23932987082211
+  epoch 2019-11-13T17:55:29.809056 UTC (+6.07 h from truth t0 -- negative = after)
+[fit]  fit_tle_detailed on the fit-day trajectory (progress on stderr)
+  1 43476U 00000    19317.99979167  .00000000  00000-0  20686-3 0    00
+  2 43476  88.9957 166.9040 0018279  21.8156 284.9747 15.23928049    02
+  converged: 17 iterations, 18 evaluations; post-fit rms 633.5 m over 300 measurements
+  residuals (m): min 33.1, median 528.7, max 1398.6
+  residual RMS by fit-day quarter (m): 00-06h  586.5  06-12h  707.1  12-18h  697.7  18-24h  526.5
+  gate: post-fit rms sub-km-class -> PASS
+[prediction]  fit day + 3 forward days, ITRF diff vs truth
+  day             fitted 3D     along   catalog 3D     along  3D ratio
+  1 (fit day)         633.8     600.9        762.0     720.8      0.83
+  2 (+1)             2356.8    2345.1        886.6     834.6      2.66
+  3 (+2)             8045.0    8039.7        900.7     828.3      8.93
+  4 (+3)            17986.3   17982.7       1039.3     959.7     17.31
+  (RMS meters per UTC-day slice of the grid; along = RIC along-track)
+  signed along-track at day ends (m), fitted : 1d       -90  2d     +4140  3d    +10748  4d    +22185
+  signed along-track at day ends (m), catalog: 1d      +133  2d      +350  3d     -1498  4d     -2341
+[elements]  fitted vs catalog mean elements
+  epochs differ by 6.07 h -> i/RAAN/e/n compare directly; argp + M are epoch-dependent (fast angles), read with that offset
+  element                       fitted       catalog       delta
+  inclination_deg              88.9957       88.9970   -1.30e-03
+  raan_deg                    166.9040      166.9377   -3.37e-02
+  eccentricity               0.0018279     0.0018420   -1.41e-05
+  arg_perigee_deg              21.8156       22.3999   -5.84e-01
+  mean_anomaly_deg            284.9747      337.8049   -5.28e+01
+  mean_motion_revday       15.23928049   15.23932987   -4.94e-05
+  bstar                      2.069e-04     9.850e-06    1.97e-04
+  B* differs by design: the fitted B* is a fit residual absorbing SGP4/density model error over THIS arc, not a physical ballistic coefficient (features.md 1.2 documented behavior).
+[chunk 3 verdict inputs]
+  fit converged on real (non-propygator) data: 17 iters, post-fit rms 633.5 m (PASS)
+  forward-prediction 3D RMS ratio fitted/catalog over the 3 forward days: 2.66 .. 17.31 (parity band = same order, ~0.1 .. 10)
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] active_2023
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (4): gracefo_1B_2023-12-20_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-21_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-22_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-23_RL04.ascii.noLRI.tgz
+  1 Hz records read: 345600 (QC-dropped 0); subsampled to 60 s -> 5760 epochs
+  span: 2023-12-20T00:00:19 -> 2023-12-23T23:59:19 TAI (3.999 days loaded)
+  fit arc: first 1441 samples (24 h); prediction: 3 further days
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   23353.82590425  .00004407  00000-0  16167-3 0  9994
+  2 43476  88.9824 323.8854 0015957  51.6909 308.5772 15.27615336310325
+  epoch 2023-12-19T19:49:18.1272 UTC (+4.17 h from truth t0 -- negative = after)
+[fit]  fit_tle_detailed on the fit-day trajectory (progress on stderr)
+  1 43476U 00000    23353.99979167  .00000000  00000-0  46406-4 0    04
+  2 43476  88.9821 323.8616 0015874  51.3317 184.5430 15.27622445    09
+  converged: 16 iterations, 17 evaluations; post-fit rms 626.9 m over 300 measurements
+  residuals (m): min 74.6, median 506.7, max 1249.5
+  residual RMS by fit-day quarter (m): 00-06h  434.0  06-12h  688.9  12-18h  699.0  18-24h  645.8
+  gate: post-fit rms sub-km-class -> PASS
+[prediction]  fit day + 3 forward days, ITRF diff vs truth
+  day             fitted 3D     along   catalog 3D     along  3D ratio
+  1 (fit day)         626.7     594.2        797.7     769.5      0.79
+  2 (+1)             2003.2    1988.2       1848.6    1826.8      1.08
+  3 (+2)             7468.1    7461.9       4371.9    4357.7      1.71
+  4 (+3)            16679.8   16676.1       7927.7    7917.0      2.10
+  (RMS meters per UTC-day slice of the grid; along = RIC along-track)
+  signed along-track at day ends (m), fitted : 1d      +804  2d     -2484  3d    -10558  4d    -22078
+  signed along-track at day ends (m), catalog: 1d       +66  2d     -1353  3d     -5228  4d     -9980
+[elements]  fitted vs catalog mean elements
+  epochs differ by 4.17 h -> i/RAAN/e/n compare directly; argp + M are epoch-dependent (fast angles), read with that offset
+  element                       fitted       catalog       delta
+  inclination_deg              88.9821       88.9824   -3.00e-04
+  raan_deg                    323.8616      323.8854   -2.38e-02
+  eccentricity               0.0015874     0.0015957   -8.30e-06
+  arg_perigee_deg              51.3317       51.6909   -3.59e-01
+  mean_anomaly_deg            184.5430      308.5772   -1.24e+02
+  mean_motion_revday       15.27622445   15.27615336    7.11e-05
+  bstar                      4.641e-05     1.617e-04   -1.15e-04
+  B* differs by design: the fitted B* is a fit residual absorbing SGP4/density model error over THIS arc, not a physical ballistic coefficient (features.md 1.2 documented behavior).
+[chunk 3 verdict inputs]
+  fit converged on real (non-propygator) data: 16 iters, post-fit rms 626.9 m (PASS)
+  forward-prediction 3D RMS ratio fitted/catalog over the 3 forward days: 1.08 .. 2.10 (parity band = same order, ~0.1 .. 10)
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] quiet_2019 (fit_bstar=off)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (4): gracefo_1B_2019-11-14_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-15_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-16_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-17_RL04.ascii.noLRI.tgz
+  1 Hz records read: 345600 (QC-dropped 0); subsampled to 60 s -> 5760 epochs
+  span: 2019-11-14T00:00:19 -> 2019-11-17T23:59:19 TAI (3.999 days loaded)
+  fit arc: first 1441 samples (24 h); prediction: 3 further days
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   19317.74687279 +.00000271 +00000-0 +98502-5 0  9994
+  2 43476 088.9970 166.9377 0018420 022.3999 337.8049 15.23932987082211
+  epoch 2019-11-13T17:55:29.809056 UTC (+6.07 h from truth t0 -- negative = after)
+[fit]  fit_tle_detailed on the fit-day trajectory (progress on stderr); fit_bstar=False, B* held at the seed's 0.0
+  1 43476U 00000    19317.99979167  .00000000  00000-0  00000-0 0    05
+  2 43476  88.9957 166.9040 0018274  21.7914 284.9958 15.23933070    02
+  converged: 18 iterations, 19 evaluations; post-fit rms 654.7 m over 300 measurements
+  residuals (m): min 15.1, median 553.5, max 1278.5
+  residual RMS by fit-day quarter (m): 00-06h  650.7  06-12h  622.0  12-18h  707.5  18-24h  637.1
+  gate: post-fit rms sub-km-class -> PASS
+[prediction]  fit day + 3 forward days, ITRF diff vs truth
+  day             fitted 3D     along   catalog 3D     along  3D ratio
+  1 (fit day)         654.2     622.1        762.0     720.8      0.86
+  2 (+1)              732.8     695.0        886.6     834.6      0.83
+  3 (+2)             1261.6    1229.8        900.7     828.3      1.40
+  4 (+3)             2073.7    2047.9       1039.3     959.7      2.00
+  (RMS meters per UTC-day slice of the grid; along = RIC along-track)
+  signed along-track at day ends (m), fitted : 1d      -453  2d      -565  3d     -2593  4d     -4118
+  signed along-track at day ends (m), catalog: 1d      +133  2d      +350  3d     -1498  4d     -2341
+[elements]  fitted vs catalog mean elements
+  epochs differ by 6.07 h -> i/RAAN/e/n compare directly; argp + M are epoch-dependent (fast angles), read with that offset
+  element                       fitted       catalog       delta
+  inclination_deg              88.9957       88.9970   -1.30e-03
+  raan_deg                    166.9040      166.9377   -3.37e-02
+  eccentricity               0.0018274     0.0018420   -1.46e-05
+  arg_perigee_deg              21.7914       22.3999   -6.08e-01
+  mean_anomaly_deg            284.9958      337.8049   -5.28e+01
+  mean_motion_revday       15.23933070   15.23932987    8.30e-07
+  bstar                      0.000e+00     9.850e-06   -9.85e-06
+  B* differs by design: the fitted B* is a fit residual absorbing SGP4/density model error over THIS arc, not a physical ballistic coefficient (features.md 1.2 documented behavior).
+[chunk 3 verdict inputs]
+  fit converged on real (non-propygator) data: 18 iters, post-fit rms 654.7 m (PASS)
+  forward-prediction 3D RMS ratio fitted/catalog over the 3 forward days: 0.83 .. 2.00 (parity band = same order, ~0.1 .. 10)
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] active_2023 (fit_bstar=off)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (4): gracefo_1B_2023-12-20_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-21_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-22_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-23_RL04.ascii.noLRI.tgz
+  1 Hz records read: 345600 (QC-dropped 0); subsampled to 60 s -> 5760 epochs
+  span: 2023-12-20T00:00:19 -> 2023-12-23T23:59:19 TAI (3.999 days loaded)
+  fit arc: first 1441 samples (24 h); prediction: 3 further days
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   23353.82590425  .00004407  00000-0  16167-3 0  9994
+  2 43476  88.9824 323.8854 0015957  51.6909 308.5772 15.27615336310325
+  epoch 2023-12-19T19:49:18.1272 UTC (+4.17 h from truth t0 -- negative = after)
+[fit]  fit_tle_detailed on the fit-day trajectory (progress on stderr); fit_bstar=False, B* held at the seed's 0.0
+  1 43476U 00000    23353.99979167  .00000000  00000-0  00000-0 0    00
+  2 43476  88.9821 323.8616 0015873  51.3362 184.5377 15.27623702    05
+  converged: 16 iterations, 17 evaluations; post-fit rms 628.0 m over 300 measurements
+  residuals (m): min 82.6, median 501.1, max 1294.7
+  residual RMS by fit-day quarter (m): 00-06h  410.9  06-12h  680.8  12-18h  730.0  18-24h  640.8
+  gate: post-fit rms sub-km-class -> PASS
+[prediction]  fit day + 3 forward days, ITRF diff vs truth
+  day             fitted 3D     along   catalog 3D     along  3D ratio
+  1 (fit day)         628.1     595.7        797.7     769.5      0.79
+  2 (+1)             2597.9    2586.4       1848.6    1826.8      1.41
+  3 (+2)             9714.4    9709.7       4371.9    4357.7      2.22
+  4 (+3)            21637.6   21634.9       7927.7    7917.0      2.73
+  (RMS meters per UTC-day slice of the grid; along = RIC along-track)
+  signed along-track at day ends (m), fitted : 1d      +709  2d     -3666  3d    -13898  4d    -28645
+  signed along-track at day ends (m), catalog: 1d       +66  2d     -1353  3d     -5228  4d     -9980
+[elements]  fitted vs catalog mean elements
+  epochs differ by 4.17 h -> i/RAAN/e/n compare directly; argp + M are epoch-dependent (fast angles), read with that offset
+  element                       fitted       catalog       delta
+  inclination_deg              88.9821       88.9824   -3.00e-04
+  raan_deg                    323.8616      323.8854   -2.38e-02
+  eccentricity               0.0015873     0.0015957   -8.40e-06
+  arg_perigee_deg              51.3362       51.6909   -3.55e-01
+  mean_anomaly_deg            184.5377      308.5772   -1.24e+02
+  mean_motion_revday       15.27623702   15.27615336    8.37e-05
+  bstar                      0.000e+00     1.617e-04   -1.62e-04
+  B* differs by design: the fitted B* is a fit residual absorbing SGP4/density model error over THIS arc, not a physical ballistic coefficient (features.md 1.2 documented behavior).
+[chunk 3 verdict inputs]
+  fit converged on real (non-propygator) data: 16 iters, post-fit rms 628.0 m (PASS)
+  forward-prediction 3D RMS ratio fitted/catalog over the 3 forward days: 1.41 .. 2.73 (parity band = same order, ~0.1 .. 10)

@@ -154,7 +154,7 @@ fixtures small enough to live as literals.
 
 ## How to use this plan
 
-- **8 chunks (0–5, with 2b and 2c inserted after 2)**, each sized for one
+- **9 chunks (0–6, with 2b and 2c inserted after 2)**, each sized for one
   Claude Code session:
   - **Chunk 0 is the diagnostic gate** (LAGEOS end-to-end → Checkpoint A).
   - **Chunks 1–3 (2b and 2c included) are the evidence body**; **Chunk 4 is wrap-up**
@@ -163,6 +163,10 @@ fixtures small enough to live as literals.
   - **Chunk 5 is order-independent maintenance** (the `box_face_default`
     negative-leeward grid fix discovered by Chunk 2b) — its own branch off
     `main`, addressable in isolation at any time; no study chunk depends on it.
+  - **Chunk 6 is order-independent feature work** (the `FitResult` covariance
+    exposure elected from Chunk 3's B\* finding) — like Chunk 5 its own branch
+    off `main`, but on the normal *feature* path (it adds public surface);
+    no study chunk depends on it.
 - Each chunk lists **Goal / Create-Edit / Reuse / You provide / You run / Verify**.
 - **Checkpoint A (after Chunk 0) is GO / INVESTIGATE** — never a silent shrug: a
   bad diff reroutes the plan into localized bug-hunting (the t₀ diff, then the
@@ -608,7 +612,7 @@ download time per the data-access rule).
 
 ---
 
-## Chunk 3 — TLE fitter vs. reality
+## Chunk 3 — TLE fitter vs. reality - Done
 
 **Goal:** the question that motivated this study, answered with one table: *is a
 propygator-fitted TLE as good as an operational catalog TLE at predicting a real
@@ -643,6 +647,106 @@ the fit-day start), pasted as strings into the experiment folder.
 **Verify:** the fit converges on real (non-propygator-generated) data; post-fit
 RMS is sub-km-class; the fitted TLE's forward-prediction growth is the same
 order as the catalog TLE's (parity, not victory, is the claim).
+
+> **As-run note (2026-07-14):** both windows run (quiet + active — the locked
+> scope; a storm case was offered and declined at election). All three Verify
+> gates pass. The fit converged on real GNV1B data in 16–18 iterations at
+> ~630 m post-fit RMS (the §1.2 lossiness class, now measured against a real
+> orbit); on the fit day the fitted TLE *beat* the catalog in both windows
+> (0.83× / 0.79×). Forward prediction exposed a **B\*-regime finding**: with
+> B\* fitted, the quiet window ran away (+3 d ratio 17× — over a 1-day
+> solar-minimum arc the drag signature (~44 m/day, Chunk 2 Run 1) sits far
+> below the ~600 m SGP4 representation noise, so the fitted B\* 2.07e-4 is
+> pure fit residual extrapolating quadratically, with the mean motion skewed
+> to compensate it in-arc); the elected `--fit-bstar=off` variant collapses it
+> to 0.83–2.00× (beating the catalog at +1 d, mean motion restored to within
+> 8.3e-7 rev/day of the catalog's) while making the *active* window worse
+> (drag signature ~1 km/day → B\* genuinely observable there) — §1.2's own
+> `fit_bstar` guidance validated against reality. Parity holds with the
+> regime-appropriate setting: +1..+3 d fitted/catalog 3D ratios 0.83–2.00
+> (quiet, B\* off) / 1.08–2.10 (active, B\* on). Catalog TLEs: Space-Track
+> `gp_history`, nearest-epoch selection (−6.1 h / −4.2 h from fit start; both
+> predate the fit day). Evidence: `run_fit_vs_catalog.py` +
+> `results_fit_vs_catalog.txt` (four blocks) + the README "Fitter vs. catalog"
+> section. Chunk 4 handoff: the fitter-vs-catalog table + the B\* regime rule
+> (over a 1-day arc, fit B\* when drag is observable, hold it when quiet).
+
+> **Sweep extension (2026-07-14, maintainer-elected):** does a longer fitting
+> span close the forward gap — and should the §1.2 `fitting_span` default move
+> 2 d → 3 d? `--sweep`: 1/2/3-day fit arcs **end-anchored** at the day-4
+> start, forecast over the common days 4–6 window (density realization held
+> fixed across spans), configs B\* fitted and B\* held-at-catalog
+> (`initial_guess=catalog` + `fit_bstar=False`), both windows
+> (`results_fit_span_sweep.txt`; sweep table + readings in the README).
+> Results: a 1-day arc under-conditions B\* in every regime (12–18.5 km at
+> +3 d); **2 days is the fitted-B\* sweet spot in both windows** (4.5 /
+> 2.1 km); **3 days beats 2 nowhere in the default configuration** (in-arc
+> RMS grows with span — SGP4 representation error accumulating — and older
+> data imports stale density). **The conditional default change was declined:
+> the shipped 2-day default is empirically vindicated.** The regime rule
+> sharpened: weak drag → hold a calibrated B\* and fit elements on the
+> longest clean arc (quiet 3-d held: 1.41 km, edging the 3.25-d-stale
+> catalog's 1.46 km); strong drag → fit B\* on ~2 days (holding a long-arc B\*
+> over longer arcs degrades active forecasts 1.9 → 7.0 km — the wrong held
+> decay pushes compensation into the fitted mean motion, which extrapolates).
+> Plus the operational note: at solar max every well-configured fitted TLE
+> beat the 3-day-stale catalog at +3 d by 2–8× — freshness beats catalog
+> pedigree in high drag. Chunk 4 handoff: the sweep table + the sharpened
+> rule; **Chunk 6** (elected the same day) carries the `FitResult` covariance
+> follow-on.
+
+> **State-path extension (2026-07-14, maintainer-elected):** the §1.2 `State`
+> reference path — the fitter's own internal `propagate_numerical` reference,
+> the path a pre-flight user with no truth trajectory actually exercises —
+> measured against reality for the first time (`--state-path`;
+> `results_fit_state_path.txt`; README table + readings). Twin design: the
+> day-2-start truth state, the shipped 2-day `fitting_span` default, the
+> sweep's common days-4–6 forecast, B\* fitted; only the reference source
+> differs from the live-recomputed trajectory-path twin. Results: quiet —
+> **free** (+4–10% at +3 d; 7–28 m reference drift under ~600 m SGP4 noise);
+> active with the uncalibrated Cd 2.3 — **7.4× the twin** (15.3 vs 2.1 km at
+> +3 d), far beyond the displacement-sum estimate, because the fit inherits
+> the reference's wrong *secular decay* (fitted B\* 1.32e-4 vs the twin's
+> 2.05e-4) — a derivative error that compounds through the forecast; active
+> with the calibrated Cd 3.405 — parity, here better than the truth fit
+> itself (1.15 vs 2.07 km). The composition needed measuring, not arithmetic
+> — the study's thesis, again. Findings-doc rule: **the State path is free
+> iff the ballistic coefficient is calibrated**, and the fit's own
+> diagnostics cannot see an uncalibrated reference (in-arc RMS 635 m against
+> its own wrong reference — the self-consistency trap live); Chunk 6's
+> covariance does not catch it either (it flags conditioning, not reference
+> bias) — the guard is a calibrated Cd or a truth reference.
+
+> **A-priori-table extension (2026-07-15, maintainer-elected):** the
+> state-path check's "calibrated Cd" row needs truth to calibrate — circular
+> for the no-truth persona — so this extension runs the calibration source
+> that persona actually has: the shipped Cd tables (Chunk 2b's Run 4/5
+> configs, constructors imported from `run_gracefo.py`), three rows appended
+> to the same twin design (`results_fit_state_path.txt` regenerated — the
+> original rows recompute deterministically in the same run; README table +
+> readings). Design: the sphere table (`VariableCd.sphere_default` on A_ram)
+> through the **native State path** *and* the **external
+> propagate-then-fit-Trajectory route** — the pair's delta measures the
+> construction-time "identical result" equivalence on real data — then the
+> box table (`BoxFaceCd.default`, `InPlaneTracking(ecef)`) via the external
+> route only, because **§1.2's State path cannot express attitude** (no
+> parameter; internal reference pinned to default `LofAligned`) — a shipped
+> limitation this extension surfaced, material for the sail regime, whose
+> documented remedy is now validated: equivalence deltas ≤ 1.9 m / ≤ 0.5 m
+> (quiet/active) across every column, B\* to 2e-8, against a ~600 m SGP4
+> floor. Results: active — sphere/box 9,484 / 9,284 m at +3 d, ~4.5× the
+> twin, between calibrated (1,147) and nominal (15,285) exactly as their
+> ±20% product errors predict; the box row is the first *over*-decay point
+> and proves the compounding is sign-symmetric (fitted B\* 2.34e-4 above vs
+> sphere 1.57e-4 below the twin's 2.05e-4). Quiet — +25% / +60% over the
+> twin, second-order under the quiet fitted-B\* runaway. The transfer is
+> ~linear: ~0.4–0.5 km per % of ρ·Cd·A error at +3 d (active), ~20–25 m/%
+> (quiet). Findings-doc rule sharpened: **"calibrated" means a
+> single-digit-% ballistic coefficient — the a-priori tables' density
+> confound (±20% at solar max, ×1.5–2.2 in deep minimum) structurally cannot
+> meet it**; the tables buy physical plausibility, not State-path
+> calibration. Attitude-dependent spacecraft take the external route, at
+> zero cost.
 
 ---
 
@@ -766,6 +870,73 @@ by then).
 with Chunk 4's optional face-sum pin: if the pin lands *before* this fix, its
 generous-margin tolerance already absorbs the ≤ 1e-3 m² shift; if after, pin
 against the regenerated table.
+
+---
+
+## Chunk 6 — `FitResult` covariance exposure (order-independent feature work)
+
+> **Elected 2026-07-14 (maintainer's request), from Chunk 3's B\* finding.**
+> Like Chunk 5 this is not study work — but where Chunk 5 is a fix, this adds
+> **public surface**, so it runs on its **own branch off `main`** on the
+> normal feature path: a `features.md` §1.2 amendment drafted at chunk time
+> (this plan never silently amends contracts), a **minor** version bump (the
+> exact number depends on what has shipped by then), CHANGELOG + release the
+> maintainer's. No study chunk depends on it, and it needs nothing from the
+> study's data beyond the Chunk 4 fixtures.
+
+**Motivation (the Chunk 3 evidence):** the quiet-window 1-day fits converged
+at in-band RMS while their fitted B\* (1.8–2.1e-4 vs the catalog's 0.99e-5)
+was pure fit residual that ruined forward prediction 17× — and nothing on
+`FitResult` could show the user that B\* was unconstrained. The estimator
+computes the parameter covariance anyway (the same "diagnostics are free from
+the estimator" argument that pulled `FitResult` in-contract at the 1.2
+Checkpoint A); a formal sigma(B\*) ≫ the estimate reads "hold B\*" directly —
+the clean primitive a "weak-drag warning" heuristic would only approximate.
+
+**Create / edit:**
+- `src/propygator/tle/fitter.py` — capture the physical covariance from the
+  `BatchLSEstimator` at convergence (exact Orekit 13.1.x accessor probed at
+  chunk time, the Chunk-0 rhythm — reflection first, then the real call path)
+  and carry it on `FitResult`: the covariance matrix plus named per-parameter
+  sigmas in a documented parameter order (the 6 mean elements + B\* iff
+  `fit_bstar`), following the `residuals_m` array-backed value-type invariants
+  (defensive copy, read-only contents, value-based `__eq__`/`__hash__`,
+  validating `__post_init__`, constructible pre-JVM).
+- `docs/features.md` §1.2 — the amendment (additive fields only; document the
+  interpretation caveat: under the fixed 1 m / 1 mm/s measurement sigmas
+  against a *systematic* SGP4 representation error, formal sigmas are
+  **conditioning indicators** — relative, not absolute, uncertainty).
+- Tests (`tests/tle/test_fitter.py`; `orekit` fixture): shape / parameter
+  order / read-only pins; sigma(B\*) **dominant** on a short weak-drag fit vs
+  small on a drag-observable fit (relationships, not absolutes — the study's
+  tolerance policy); the `fit_bstar=False` path (no B\* row); equality/hash
+  with the new fields.
+- `notebooks/07_tle_fitting.ipynb` — a covariance read added to the
+  walkthrough, flagging the Chunk-3-style unconstrained B\*.
+- **Resolved at election (the Chunk 3 sweep):** the conditional
+  `fitting_span` default change (2 d → 3 d) is **declined** — the sweep showed
+  2 days is the fitted-B\* sweet spot in both windows and 3 days beats it
+  nowhere in the default configuration; the shipped default stands, and the
+  sweep table goes to the findings doc instead.
+- **Also resolved at election (2026-07-14):** a `bstar=` convenience kwarg on
+  `fit_tle` (direct pre-computed-B\* input) was considered and **declined** —
+  the contract-sanctioned carrier route
+  (`initial_guess=TLE.from_state_unfitted(..., bstar=...)` +
+  `fit_bstar=False`) works and is not burdensome; the §1.2 signatures stay
+  frozen.
+
+**Reuse:** the `FitResult` validation idioms; the Chunk-0 probe rhythm for the
+covariance accessor; the Chunk 3/4 pinned GNV1B subsamples as the
+weak-drag / strong-drag test pair.
+
+**You provide / run:** the branch (suggest `feature/fitresult-covariance`);
+CHANGELOG; the version bump + release per `docs/release-process.md`.
+
+**Verify:** full suite + pre-commit green; `import propygator` stays JVM-free
+(`FitResult` remains constructible + validating pre-init); the fitter's public
+signatures unchanged (additive fields only); sigma(B\*) on the quiet
+short-arc real-data fixture reads unconstrained while a drag-observable fit
+reads constrained.
 
 ---
 

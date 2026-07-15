@@ -1,6 +1,6 @@
 # GRACE-FO vs. GNV1B reduced-dynamic orbits (real-world validation, Chunks 2 + 2b + 2c)
 
-Evidence for `docs/build-plan-real-world-validation.md` Chunks 2 and 2b — the
+Evidence for `docs/build-plan-real-world-validation.md` Chunks 2, 2b, and 2c — the
 **drag-stack** diagnostic. After the LAGEOS-2 leg established the conservative-force
 floor (Chunks 0–1), this leg measures the full drag pipeline (NRLMSISE-00 + real CSSI
 space weather + the shared `DragSensitive` proxy) against a real drag-perturbed LEO
@@ -382,6 +382,258 @@ Readings:
   storm-time behavior). Recorded here and in the findings-doc handoff, not
   acted on.
 
+## Fitter vs. catalog (Chunk 3, 2026-07-14 runs)
+
+The question that motivated the study, answered with one table: *is a
+propygator-fitted TLE as good as an operational catalog TLE at predicting a real
+orbit?* Per window (`run_fit_vs_catalog.py`, evidence in
+`results_fit_vs_catalog.txt`): a `Trajectory.from_arrays` reference from **one
+day** of GNV1B truth at 60 s cadence (ITRF in — the §1.2 Trajectory path
+converts to TEME internally) → `fit_tle_detailed(..., norad_id=43476,
+name="GRACE-FO 1")`, then both the fitted TLE and the same-epoch Space-Track
+catalog TLE propagated over the fit day + 3 forward days (`propagate_tle` on the
+exact truth grid) and diffed against GNV1B per day. After the primary runs, a
+`--fit-bstar=off` variant was elected (recorded in the driver docstring) to
+localize the quiet-window forward divergence — four committed blocks total.
+A **fitting-span sweep** and a **State-path check** followed (both
+maintainer-elected the same day; subsections below, evidence in
+`results_fit_span_sweep.txt` / `results_fit_state_path.txt`).
+
+**Catalog TLE provenance:** Space-Track `gp_history` class, pulled by the
+maintainer 2026-07-14 (the build plan's data-access rule — `fetch_tle` is
+CelesTrak-current-epoch only); a ±1-day EPOCH-range query around each fit-day
+start, nearest epoch selected. Quiet candidates 19317.54987675,
+**19317.74687279 (selected, −6.1 h from fit t₀)**, 19318.79751821, 19318.86318356,
+19318.99451421; active candidates 23353.56387492, **23353.82590425 (selected,
+−4.2 h)**, 23354.54648230, 23354.93952327. Both winners precede the fit day, so
+neither has "seen" fit-day data; the full lines are embedded in the driver.
+
+| | quiet_2019 | active_2023 |
+|---|---|---|
+| fit: iterations / post-fit RMS (300 meas.) | 17 / **633.5 m** | 16 / **626.9 m** |
+| fit-day 3D RMS: fitted vs catalog | **634 vs 762 m** | **627 vs 798 m** |
+| +3 d 3D RMS, fitted (B\* fitted) | 17,986 m | **16,680 m** |
+| +3 d 3D RMS, fitted (B\* held 0) | **2,074 m** | 21,638 m |
+| +3 d 3D RMS, catalog | 1,039 m | 7,928 m |
+| forward ratio fitted/catalog, best config | 0.83–2.00 (B\* off) | 1.08–2.10 (B\* on) |
+| fitted B\* (on) vs catalog B\* | 2.07e-4 vs 0.99e-5 | 4.64e-5 vs 1.62e-4 |
+
+Readings:
+
+- **The fit converges on real (non-propygator) data** in all four runs (16–18
+  iterations) at **~630 m post-fit RMS** — the same class as §1.2's pinned ~495 m
+  2-day numerical-reference lossiness, now measured against a real orbit. The
+  residual is flat across the fit day (per-quarter RMS 411–730 m): SGP4
+  representation error, not a trend.
+- **On the fit day the fitted TLE beats the catalog in both windows** (0.83× /
+  0.79×) — unsurprising (it is fit to exactly that day) but worth recording:
+  post-fit, a propygator TLE is a *better* compression of the day's truth than
+  the operational element set.
+- **Forward prediction reaches catalog parity with the regime-appropriate
+  `fit_bstar`** — the headline. Active window, B\* fitted: ratios 1.08 → 2.10
+  over the 3 forward days (both TLEs degrade fast in solar-max drag; catalog
+  7.9 km at +3 d, fitted 16.7 km — same order). Quiet window, B\* fitted: the
+  fitted TLE **runs away** (18.0 km vs the catalog's flat 1.0 km at +3 d, ratio
+  17 — outside the same-order band). The `--fit-bstar=off` variant proves the
+  mechanism: holding B\* collapses the quiet forward error to 2.1 km (ratios
+  0.83–2.00, *beating* the catalog at +1 day) and restores the fitted mean
+  motion to within 8.3e-7 rev/day of the catalog's — over a 1-day
+  solar-minimum arc, drag contributes ~nothing observable, so the fitted
+  B\* (2.07e-4, 21× the catalog's) was pure fit residual that extrapolates
+  quadratically, and the estimator skewed n to compensate it inside the arc.
+  In the active window the same hold makes prediction *worse* (21.6 vs
+  16.7 km) — there B\* is genuinely observable over a day. This is
+  features.md §1.2's own `fit_bstar` guidance ("pass False where B\* is
+  unobservable — short spans, weak-drag regimes — the estimate would wander,
+  absorbing along-track error") validated against reality, with deep solar
+  minimum behaving as a weak-drag regime for a 1-day arc.
+- **B\* differs from the catalog by design in every configuration** (§1.2's
+  documented fit-residual behavior, shown against reality); the element-level
+  sanity otherwise holds — i / RAAN / e / n agree to 1.3e-3 deg / 3.4e-2 deg /
+  1.4e-5 / 8e-5 rev/day or better across all fits (argp/M are epoch-dependent
+  fast angles at a 4–6 h epoch offset). The fitted TLE's international
+  designator is the documented `00000` placeholder (no `initial_guess`
+  supplied; identity policy, cosmetic).
+- **Chunk 3 verify gates: all pass** — the fit converges on real data; post-fit
+  RMS is sub-km-class; forward-prediction growth is the same order as the
+  catalog's (parity, not victory), with the quiet/B\*-on divergence documented
+  as the regime caveat rather than a defect. Operational takeaway for the
+  findings doc: over a 1-day fit arc, fit B\* when drag is strong enough to be
+  observable, hold it when quiet — either way a propygator-fitted TLE predicts
+  a real orbit at catalog-TLE parity.
+
+### Fitting-span sweep (Chunk 3 extension, 2026-07-14)
+
+Maintainer-elected after the primary runs, to answer two questions: does a
+longer fitting span close the forward-prediction gap, and should the shipped
+§1.2 `fitting_span` default (2 days) move to 3? Design (`--sweep`):
+**end-anchored** — 1/2/3-day fit arcs all ending at the day-4 start, each
+forecast over the *common* days 4–6 window, so the forecast window and its
+density realization are identical across spans and the question is the
+operational one ("given truth up to T, how much history should the fit
+consume to predict T..T+3 d?"). The §1.2 epoch-at-reference-start rule places
+a longer span's TLE epoch farther from the window — a real consequence of the
+design under evaluation, deliberately included. Two configs per span: **B\*
+fitted**, and **B\* held at the catalog's long-arc value**
+(`initial_guess=catalog` + `fit_bstar=False` — the guess donates its B\* to
+the seed, the hold keeps it; to hold a *bare* pre-computed B\* with no TLE to
+donate it, mint a carrier via `TLE.from_state_unfitted(state, norad_id=...,
+bstar=...)` — only the B\* and identity survive from a guess, the seed
+refinement re-derives the elements). The catalog row is context, *not* a parity
+benchmark here (its epoch predates this forecast window by ~3.2 days; parity
+was the primary experiment's same-epoch claim).
+
++3 d 3D RMS (meters), per fit-arc span:
+
+| config | 1 d | 2 d | 3 d |
+|---|---|---|---|
+| quiet, B\* fitted | 18,546 | 4,493 | 4,853 |
+| quiet, B\* held cat | 2,745 | 2,042 | **1,409** |
+| quiet, catalog (3.25 d stale) | — | — | 1,459 |
+| active, B\* fitted | 12,117 | **2,072** | 3,342 |
+| active, B\* held cat | **1,949** | 4,510 | 7,001 |
+| active, catalog (3.17 d stale) | — | — | 16,805 |
+
+Readings:
+
+- **A 1-day arc under-conditions B\* in every regime** — 12–18.5 km runaways
+  with B\* fitted (quiet 1-d B\* 1.76e-4, active 6.4e-5 — same class as the
+  primary runs on a different fit day; the mechanism reproduces).
+- **Two days is the fitted-B\* sweet spot in both windows** (4.5 / 2.1 km) and
+  **3 days beats 2 nowhere in the default configuration** — in-arc RMS grows
+  with span (590 → 654 m quiet, 596 → 681 m active: SGP4 representation error
+  accumulates) and the older data imports stale density/dynamics. **The
+  conditional default change was declined: the shipped `fitting_span = 2 d`
+  default is empirically vindicated.**
+- **The B\* regime rule sharpens.** Weak drag: hold B\* at a calibrated value
+  and fit elements on the longest clean arc — the quiet 3-day held fit
+  (1.41 km) is the best quiet forecaster in the table, edging even the stale
+  catalog (1.46 km). Strong drag: fit B\* on ~2 days — holding the catalog's
+  long-arc B\* gets monotonically *worse* with span in the active window
+  (1.9 → 7.0 km): when the held B\* doesn't match the arc's actual decay, a
+  longer arc forces more of the compensation into the fitted mean motion,
+  which then extrapolates (visible in the n column, 15.27642822 →
+  15.27621407 drifting away from the 1-day value).
+- **Freshness beats catalog pedigree in high drag**: at solar max every
+  well-configured fitted TLE beats the 3-day-stale catalog at +3 d by 2–8×
+  (2.1 vs 16.8 km) — if you have recent truth, fit it rather than ride an old
+  element set. In the quiet window the stale catalog stays competitive
+  (1.46 km) because nothing decays.
+- Forecast days 4–6 carry no burn signature (smooth per-day growth in all 14
+  rows); the SDS monthly reports remain the formal maneuver check.
+
+### State-path check (Chunk 3 extension, 2026-07-14)
+
+Second maintainer-elected extension: the §1.2 **State reference path** — where
+the fitter propagates its own internal reference via `propagate_numerical`,
+the path a pre-flight user (no truth trajectory yet) actually exercises —
+measured against reality for the first time. The TLE-vs-reality error composes
+(SGP4 lossiness) + (reference-vs-reality drift); Chunks 2 and 3 measured the
+two pieces separately, and this run measures the **composition** directly
+rather than trusting the arithmetic — self-consistent composition arguments
+being exactly the study's risk class, and the arithmetic indeed under-predicted
+the uncalibrated case (below). Twin design (`--state-path`): the state is the
+day-2-start truth sample (ITRF → EME2000), `fitting_span` = the shipped 2-day
+default (fit window days 2–3, ending at the day-4 start), forecast = the
+sweep's common days 4–6 window, B\* fitted throughout; the 2-day
+Trajectory-path fit is recomputed live as the twin, so the rows differ **only
+in reference source**. Evidence: `results_fit_state_path.txt`.
+
+The **a-priori-table rows** (maintainer-elected 2026-07-15, same design) close
+the pre-flight loop: the fitted-Cd row below needs truth to calibrate —
+circular for the State path's no-truth persona — and the shipped Cd tables are
+the calibration source that persona actually has. Three more rows per window,
+all Chunk 2b Run 4/5 physics (constructors imported from `run_gracefo.py`, not
+duplicated): the **sphere table** (`VariableCd.sphere_default` on A_ram =
+1.027 m²) through the *native* State path — legal, a sphere is
+attitude-independent; the **same sphere config** through the
+**external-reference route** (propagate `propagate_numerical` yourself on the
+60 s truth grid, feed the `Trajectory` path — the documented State-path
+equivalent, decided identical at construction time), the pair's printed delta
+**measuring that equivalence on real data** instead of assuming it; and the
+**box table** (`BoxFaceCd.default` on the base-averaged box, flown
+`InPlaneTracking(velocity_reference="ecef")`) via the external route only —
+§1.2 has no attitude parameter (the internal reference is contract-pinned to
+the default `LofAligned`), so the box row rides the equivalence the sphere
+pair just verified. External references live on the exact truth grid, so each
+doubles as its own drift twin with no internal-grid caveat.
+
+| +3 d 3D RMS (m) | quiet_2019 | active_2023 |
+|---|---|---|
+| Trajectory path (truth reference) | 4,493 | 2,072 |
+| State path, Cd 2.3 nominal | 4,954 | 15,285 |
+| State path, the window's Run-3 fitted Cd | 4,681 | **1,147** |
+| State path, sphere table (native) | 5,632 | 9,484 |
+| external route, sphere table (the equivalence twin) | 5,630 | 9,484 |
+| external route, box table (IPT-ecef) | 7,172 | 9,284 |
+| native-vs-external deltas, sphere pair (all columns) | ≤ 1.9 m | ≤ 0.5 m |
+| reference drift over the fit window (nominal / fitted / sphere / box), RMS | 28 / 7 / 86 / 217 m | 1,435 / 128 / 922 / 730 m |
+
+Readings:
+
+- **Quiet: the State path is free** (+4–10% at +3 d) — the reference drift
+  (7–28 m) drowns under the ~600 m SGP4 representation noise, exactly as
+  composed from Chunk 2's drag-on rates.
+- **Active with an uncalibrated Cd: far worse than the displacement-sum
+  estimate** — 7.4× the twin (15.3 vs 2.1 km at +3 d), not the ~1.5× the
+  arithmetic suggested. Mechanism: the Cd-2.3 reference under-decays (~32%
+  drag under-model, drift growing quadratically to 3.25 km by fit-window
+  end), and the fit inherits the reference's wrong **secular trend**, not
+  just its displacement — visible in the fitted B\* (1.32e-4 vs the twin's
+  2.05e-4). A derivative error keeps compounding through the forecast. The
+  direct measurement earning its keep over the back-of-envelope.
+- **Active with the calibrated Cd: parity — here even better than the truth
+  fit** (1,147 vs 2,072 m; fitted B\* 1.94e-4 ≈ the twin's 2.05e-4). A
+  smooth, well-calibrated model reference is as good a fit substrate as
+  truth, plausibly because it carries no hour-scale real density
+  fluctuations for the fit to absorb into its secular terms. Single-window
+  evidence — read as "parity, sometimes better", not a systematic advantage.
+- **The operational rule for the pre-flight / sail use case: the State path
+  is free *iff* the ballistic coefficient is calibrated** — and the ~30%
+  Cd/density error case shows what uncalibrated costs (7×). Nothing in the
+  fit's own diagnostics can see it: the uncalibrated fit's in-arc RMS was a
+  beautiful 635 m *against its own wrong reference* — the self-consistency
+  trap, live. Chunk 6's covariance exposure will not catch this either (it
+  flags conditioning, not reference bias); the guard is a calibrated Cd or a
+  truth reference.
+
+Readings from the a-priori-table rows (2026-07-15):
+
+- **The construction-time equivalence is now measured, not assumed.** Native
+  State path vs the external propagate-then-fit route on the identical sphere
+  config: every column agrees to ≤ 1.9 m (quiet) / ≤ 0.5 m (active), B\* to
+  2e-8 — measurement-placement noise against a ~600 m SGP4 floor and
+  multi-km forecast errors. The two delivery paths are the same fit. That
+  validates the remedy for a real §1.2 limitation this extension surfaced:
+  the State path has no attitude parameter (its internal reference is pinned
+  to the default `LofAligned`), so an attitude-dependent spacecraft — the
+  box here, a solar sail in the maintainer's use case — *cannot* be
+  expressed natively; propagate externally and fit the `Trajectory`, losing
+  nothing.
+- **The shipped tables are not "calibrated" in the State-path sense.** They
+  are physically credible (Chunk 2b, DSMC-consistent) but carry the window's
+  density confound, and the fit pays for it: active, sphere/box land at
+  9,484 / 9,284 m at +3 d — ~4.5× the twin, between calibrated (1,147) and
+  nominal (15,285), exactly as their ±20% product errors (0.80× / 1.21×)
+  predict. Quiet, the tables cost +25% / +60% over the twin (5.6 / 7.2 vs
+  4.5 km) — every quiet configuration stays dominated by the quiet-window
+  fitted-B\* runaway (the sweep's finding), so the table penalty is a
+  second-order effect there.
+- **The compounding mechanism is symmetric in sign** — the box row is the
+  study's first *over*-decay point: its fitted B\* (2.34e-4) skews above the
+  twin's (2.05e-4) exactly as the sphere's (1.57e-4) skews below, mirroring
+  the drift directions, with near-equal magnitudes because |0.80−1| ≈
+  |1.21−1|. The forecast penalty tracks |ρ·Cd·A error|, not its sign.
+- **The transfer is ~linear, and it quantifies "calibrated":** active-window
+  cost above the calibrated row ≈ 0.4–0.5 km per % of product error (20% →
+  ~8.3 km, 32% → ~14.1 km above the 1,147 m base); quiet ≈ 20–25 m per %.
+  So at solar max the State path needs a single-digit-% ballistic
+  coefficient to stay near the truth-reference twin — a bar the a-priori
+  tables' density confound (±20% at solar max, ×1.5–2.2 in deep minimum)
+  structurally cannot meet. The tables buy physical plausibility, not
+  State-path calibration; the guard remains a fitted/calibrated Cd or a
+  truth reference.
+
 ## Files
 
 - `gnv1b.py` — minimal GNV1B parser (tarball-aware; GPS→TAI, ITRF, QC screen,
@@ -396,3 +648,14 @@ Readings:
   docstring; quoted in the Storm window section above).
 - `results.txt` — captured stdout (the committed evidence; all four blocks:
   quiet, active, storm peak arc, storm onset arc).
+- `run_fit_vs_catalog.py` — the Chunk 3 driver (fitted TLE vs. Space-Track
+  catalog TLE; the maintainer-pulled historical TLEs embedded with provenance;
+  modes: primary, `--fit-bstar=off`, `--sweep`, `--state-path`).
+- `results_fit_vs_catalog.txt` — captured stdout (four blocks: quiet and
+  active, each with B\* fitted and with `--fit-bstar=off`).
+- `results_fit_span_sweep.txt` — captured stdout of the `--sweep` runs (two
+  blocks: the end-anchored 1/2/3-day fitting-span sweep per window).
+- `results_fit_state_path.txt` — captured stdout of the `--state-path` runs
+  (two blocks: the §1.2 State-reference-path composition check per window;
+  regenerated 2026-07-15 with the a-priori-table rows + the native-vs-external
+  equivalence check — the original three rows recompute in the same run).
