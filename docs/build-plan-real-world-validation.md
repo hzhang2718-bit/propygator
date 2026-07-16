@@ -181,6 +181,16 @@ fixtures small enough to live as literals.
 - **Mergeable chunks:** 2, 2b, 2c, and 3 share the GNV1B data pipeline; adjacent
   ones can run in one session (with 2 + 2b done, 2c + 3 is the natural remaining
   pairing).
+- **2026-07-15 reorganization (pre-Chunk-4 cleanup, maintainer-requested):**
+  shared analysis math centralized in `experiments/real-world-validation/common.py`
+  (RIC/rms, formerly hosted by the Chunk 0 driver), the GRACE-FO leg constants /
+  factories / measured anchors in `gracefo/gracefo_common.py` (formerly split
+  across drivers), the diagnostic probes moved to `gracefo/probes/`, a top-level
+  study README added, and `run_all.py` added as the one-command
+  regenerate/verify orchestrator. All five results files were regenerated from
+  the reorganized drivers and verified to reproduce the committed numbers
+  (wall-clock timing lines aside). Chunk texts below keep their original file
+  references except where a path moved.
 
 ---
 
@@ -347,7 +357,7 @@ and the per-face `BoxFaceCd.default`. This is the direct evidence for Checkpoint
 geometry decision, and it answers the pre-flight-Cd question behind the maintainer's
 solar-sail use case: before flight data comes back, these tables are the only Cd
 estimate available, so it matters what they predict against a real orbit. A scratch
-probe (retained as `gracefo/probe_tables.py`; **superseded geometry** — its
+probe (retained as `gracefo/probes/probe_tables.py`; **superseded geometry** — its
 docstring and the ISSUE notes below say how) already queried the tables at
 GRACE-FO conditions; Runs 4 & 5 turn that table lookup into committed *orbit*
 residuals.
@@ -430,7 +440,7 @@ ASCII-only prints; `progress=False`):
 
 **Reuse:** the Run 1–3 machinery in `run_gracefo.py` (parse, config, propagate, RIC,
 growth); `VariableCd.sphere_default` / `BoxFaceCd.default` / `InPlaneTracking` (all
-shipped); `probe_tables.py` (retained beside the driver) as the diagnostic template
+shipped); `probes/probe_tables.py` (retained under `gracefo/probes/`) as the diagnostic template
 — mechanism only, its geometry is superseded (its docstring says how).
 
 **You provide:** nothing new (both windows' GNV1B already on disk).
@@ -605,7 +615,7 @@ download time per the data-access rule).
 > **daily-Ap-driven**, smearing the evening storm across May 10's quiet
 > morning — the onset fitted Cd 1.78 is that smearing artifact, and the
 > storm-surprise run was +614 m *before onset* (+2.24 km/day total). Mechanism
-> proven by the committed `probe_ap_driving.py` (1.92× density at constant
+> proven by the committed `probes/probe_ap_driving.py` (1.92× density at constant
 > real-time ap = the fitted-Cd ratio). Named follow-on, not built: the
 > ap-history mode (`withSwitch(9, -1)`). Evidence: two `results.txt` blocks +
 > the README "Storm window" section.

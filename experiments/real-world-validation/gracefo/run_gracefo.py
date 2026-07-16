@@ -35,7 +35,7 @@ Cd-table diagnostic block therefore restates every Cd on the common A_ram
 reference beside the Run 3 fitted Cd and the DSMC physical band (Mehta 2013;
 arXiv 2503.21651), with each printed number labeled as exactly one quantity
 (the build plan's flagged reference-area ISSUE fix; the retained scratch
-``probe_tables.py`` mixed references and is superseded).
+``probes/probe_tables.py`` mixed references and is superseded).
 
 **Chunk 2c (storm window):** the same battery over the 2024-05-11 Gannon-storm
 day (daily Ap 271, 3-hourly ap to 400 -- the strongest storm of the GRACE-FO
@@ -83,60 +83,43 @@ import numpy as np
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
-# Reuse the Chunk 0 RIC helper + rms + Earth-rate constant (build plan "Reuse").
-sys.path.insert(0, str(_HERE.parent / "lageos"))
-import run_lageos as rl  # noqa: E402
+sys.path.insert(0, str(_HERE.parent))
+# Shared study analysis kit (the Chunk 0 RIC helper + rms; build plan "Reuse")
+# and the GRACE-FO leg configuration (constants, geometry, factories).
+from common import ric_components, rms as _rms  # noqa: E402
 from gnv1b import find_window_files, parse_gnv1b  # noqa: E402
+from gracefo_common import (  # noqa: E402
+    A_RAM_M2,
+    A_SIDE_X_M2,
+    A_SIDE_Z_M2,
+    BOX_X_M,
+    BOX_Y_M,
+    BOX_Z_M,
+    DATA_ROOT,
+    DSMC_CD_BAND,
+    GRACEFO_AREA_M2,
+    GRACEFO_CD_NOMINAL,
+    GRACEFO_CR,
+    GRACEFO_MASS_KG,
+    GRACEFO_SAT_ID,
+    LENGTH_CORRECTION_M,
+    SUBSAMPLE_S,
+    box_spacecraft,
+    force_config,
+    sphere_spacecraft,
+)
 
 from propygator import (  # noqa: E402
     BoxFaceCd,
-    ForceModelConfig,
     Frame,
     InPlaneTracking,
     IntegratorConfig,
     SpacecraftConfig,
-    SpacecraftGeometry,
     State,
     VariableCd,
     propagate_numerical,
 )
 
-DATA_ROOT = _HERE.parent / "data" / "gracefo"
-
-# GRACE-FO 1 (GRACE C, NORAD 43476). Sphere-equivalent drag/SRP parameters
-# (citations in README.md): launch mass ~600 kg; the body is a ~3.1 x 1.9 x 0.8 m
-# trapezoidal prism flying narrow-end-forward, so the ram frontal area is ~1 m^2;
-# Cd 2.3 is the free-molecular nominal. The scalar Cd fit (Run 3) is the real
-# diagnostic -- it absorbs the Cd x A / m product, so the exact A only sets the
-# nominal starting point, not the answer.
-GRACEFO_MASS_KG = 600.0
-GRACEFO_AREA_M2 = 1.0
-GRACEFO_CD_NOMINAL = 2.3
-GRACEFO_CR = 1.3  # sphere reflection coefficient (1.0 absorbing .. 2.0 specular)
-GRACEFO_SAT_ID = "C"
-
-# --- Chunk 2b geometry: the base-averaged rectangle at real dimensions -------
-# GRACE-FO is a trapezoidal prism (JPL GRACE-FO Launch Press Kit, cross-checked
-# vs eoPortal FLEXBUS/Astrium): length 3.123 m (along-track), height 0.780 m
-# (radial), bottom/top widths 1.943 / 0.690 m. Averaging the two parallel widths
-# gives a rectangle that preserves the ram (frontal) area exactly and
-# under-counts the wetted side area by ~9.5% (~2% of Cd*A -- far below the
-# density confound these runs measure). Axis mapping matches InPlaneTracking's
-# convention (body +Y on the wind, +Z best-effort on the orbit normal):
-# x = height (radial), y = length (ram -- the long axis rides the wind),
-# z = base-averaged width (cross-track).
-BOX_X_M = 0.780  # radial (height)
-BOX_Y_M = 3.123  # along-track (ram; the long axis)
-BOX_Z_M = 1.3165  # cross-track (base-averaged width = (1.943 + 0.690) / 2)
-A_RAM_M2 = BOX_X_M * BOX_Z_M  # +/-Y ram/leeward faces: 1.027 m^2 (exact)
-A_SIDE_X_M2 = BOX_Y_M * BOX_Z_M  # +/-X nadir/zenith faces: 4.111 m^2 each
-A_SIDE_Z_M2 = BOX_X_M * BOX_Y_M  # +/-Z slant-side faces: 2.436 m^2 each
-DSMC_CD_BAND = (2.65, 4.5)  # physical free-molecular Cd on the frontal
-# reference for GRACE-class bodies (Mehta 2013; arXiv 2503.21651)
-LENGTH_CORRECTION_M = 0.33  # Verify-5 one-off sensitivity check only -- the
-# plan forbids length-correcting the baseline box (false precision)
-
-SUBSAMPLE_S = 60.0
 LOAD_DAYS = 3  # consecutive days loaded (screen span); the runs use a 1-day arc
 ARC_DAYS = 1.0  # the primary run/fit arc
 
@@ -160,51 +143,6 @@ CD_FIT_HI_DEFAULT = 5.0
 CD_FIT_HI_STORM = 8.0
 
 
-def _spacecraft(
-    cd: float | VariableCd, area_m2: float = GRACEFO_AREA_M2
-) -> SpacecraftConfig:
-    return SpacecraftConfig(
-        mass_kg=GRACEFO_MASS_KG,
-        geometry=SpacecraftGeometry.sphere(
-            area_m2=area_m2,
-            drag_coefficient=cd,
-            reflectivity_coefficient=GRACEFO_CR,
-        ),
-    )
-
-
-def _box_spacecraft(cd: BoxFaceCd, y_length_m: float = BOX_Y_M) -> SpacecraftConfig:
-    """The base-averaged GRACE-FO rectangle as a convex box (Chunk 2b, Run 5).
-
-    SRP optics stay at the ``box_and_panels`` defaults -- negligible at ~500 km;
-    drag is what these runs measure.
-    """
-    return SpacecraftConfig(
-        mass_kg=GRACEFO_MASS_KG,
-        geometry=SpacecraftGeometry.box_and_panels(
-            x_length_m=BOX_X_M,
-            y_length_m=y_length_m,
-            z_length_m=BOX_Z_M,
-            solar_array_area_m2=0.0,  # convex bus -- the BoxFaceCd contract
-            drag_coefficient=cd,
-        ),
-    )
-
-
-# The conservative force set (shared with Run 1 drag-off); Run 2/3 flip drag on.
-# Matches the LAGEOS Chunk 0 baseline: 70x70, sun+moon, SRP, solid+ocean tides,
-# relativity -- so the drag-off run reproduces the proven conservative floor.
-def _force_config(drag: bool) -> ForceModelConfig:
-    return ForceModelConfig(
-        drag=drag,
-        atmosphere_model="NRLMSISE-00",
-        srp=True,
-        solid_tides=True,
-        ocean_tides=True,
-        relativity=True,
-    )
-
-
 def _propagate_itrf(
     state0: State,
     span_s: float,
@@ -215,15 +153,15 @@ def _propagate_itrf(
 ) -> np.ndarray:
     """Propagate ``span_s`` and return the ITRF positions on the t0 + k*60 grid.
 
-    ``spacecraft`` overrides the sphere-equivalent ``_spacecraft(cd)`` (the Chunk
+    ``spacecraft`` overrides the sphere-equivalent ``sphere_spacecraft(cd)`` (the Chunk
     2b table runs); ``attitude=None`` keeps the propagator's default mode.
     """
     traj = propagate_numerical(
         state0,
         span_s,
         output_step=SUBSAMPLE_S,
-        force_models=_force_config(drag),
-        spacecraft=spacecraft if spacecraft is not None else _spacecraft(cd),
+        force_models=force_config(drag),
+        spacecraft=spacecraft if spacecraft is not None else sphere_spacecraft(cd),
         attitude=attitude,
         integrator=IntegratorConfig.high_precision(),
         progress=False,
@@ -233,7 +171,7 @@ def _propagate_itrf(
 
 def _along_track(diff: np.ndarray, eph, n: int) -> np.ndarray:
     """Signed along-track residual component over the first ``n`` samples."""
-    return rl.ric_components(
+    return ric_components(
         diff[:n], eph.positions_m[:n], eph.velocities_ms[:n], earth_fixed=True
     )[:, 1]
 
@@ -424,7 +362,7 @@ def _fit_cd(
         evals += 1
         pos = _propagate_itrf(state0, span_s, drag=True, cd=cd)
         along = _along_track(pos - eph.positions_m[: len(pos)], eph, n_arc)
-        rms = rl._rms(along)
+        rms = _rms(along)
         print(f"    Cd = {cd:6.3f}  ->  along RMS = {rms:10.3f} m", file=sys.stderr)
         return rms
 
@@ -659,7 +597,7 @@ def main() -> None:
         state0,
         arc_span_s,
         drag=True,
-        spacecraft=_spacecraft(sphere_table, area_m2=A_RAM_M2),
+        spacecraft=sphere_spacecraft(sphere_table, area_m2=A_RAM_M2),
     )
     t4 = _time.perf_counter() - t_wall
     t_wall = _time.perf_counter()
@@ -667,7 +605,7 @@ def main() -> None:
         state0,
         arc_span_s,
         drag=True,
-        spacecraft=_box_spacecraft(box_table),
+        spacecraft=box_spacecraft(box_table),
         attitude=ipt,
     )
     t5 = _time.perf_counter() - t_wall
@@ -684,14 +622,14 @@ def main() -> None:
 
     # --- residual table + growth profile -------------------------------------
     def ric_rms(diff: np.ndarray) -> tuple[float, float, float, float]:
-        ric = rl.ric_components(
+        ric = ric_components(
             diff, eph.positions_m[:n_arc], eph.velocities_ms[:n_arc], earth_fixed=True
         )
         return (
-            rl._rms(ric[:, 0]),
-            rl._rms(ric[:, 1]),
-            rl._rms(ric[:, 2]),
-            rl._rms(np.linalg.norm(diff, axis=1)),
+            _rms(ric[:, 0]),
+            _rms(ric[:, 1]),
+            _rms(ric[:, 2]),
+            _rms(np.linalg.norm(diff, axis=1)),
         )
 
     r1 = ric_rms(d1)
@@ -799,14 +737,14 @@ def main() -> None:
         state0,
         arc_span_s,
         drag=True,
-        spacecraft=_box_spacecraft(
+        spacecraft=box_spacecraft(
             BoxFaceCd.from_callable(_scaled_box_cd, name=f"box_face_default_x{s_fit:.4f}")
         ),
         attitude=ipt,
     )
     t5s = _time.perf_counter() - t_wall
     d5s = pos5s[:n_arc] - eph.positions_m[:n_arc]
-    along5s = rl._rms(_along_track(d5s, eph, n_arc))
+    along5s = _rms(_along_track(d5s, eph, n_arc))
     print(f"[verify 4]  box Cd*A scaled onto the fitted product (x{s_fit:.3f})")
     print(
         f"  scaled-box along RMS = {along5s:.2f} m vs Run 3 fitted {r3[1]:.2f} m "
@@ -825,12 +763,12 @@ def main() -> None:
         state0,
         arc_span_s,
         drag=True,
-        spacecraft=_box_spacecraft(box_table, y_length_m=BOX_Y_M + LENGTH_CORRECTION_M),
+        spacecraft=box_spacecraft(box_table, y_length_m=BOX_Y_M + LENGTH_CORRECTION_M),
         attitude=ipt,
     )
     t5l = _time.perf_counter() - t_wall
     d5l = pos5l[:n_arc] - eph.positions_m[:n_arc]
-    along5l = rl._rms(_along_track(d5l, eph, n_arc))
+    along5l = _rms(_along_track(d5l, eph, n_arc))
     print(
         f"[verify 5]  +{LENGTH_CORRECTION_M} m length-corrected box "
         f"(y = {BOX_Y_M + LENGTH_CORRECTION_M:.3f} m)"

@@ -1,8 +1,8 @@
 """Scratch probe (2026-07-12): what Cd do propygator's shipped tables return at
 GRACE-FO conditions?
 
-Retained beside the driver as the Chunk 2b diagnostic template (build plan
-"Reuse") -- mechanism only. **Superseded geometry:** this probe predates the
+Retained (under ``probes/`` since the 2026-07-15 reorganization) as the Chunk
+2b diagnostic template (build plan "Reuse") -- mechanism only. **Superseded geometry:** this probe predates the
 plan's refined base-averaged box. It uses LX,LY,LZ = 3.1 x 1.9 x 0.8 with x as
 the ram axis (A_ram = 1.52 m^2, side area 16.74 m^2); the refined Chunk 2b
 mapping is x = 0.780, y = 3.123 (ram -- matching InPlaneTracking's +Y-on-wind
@@ -40,7 +40,7 @@ import propygator
 propygator.init()
 
 _HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(_HERE))
+sys.path.insert(0, str(_HERE.parent))  # gracefo/ (moved to probes/ 2026-07-15)
 from gnv1b import find_window_files, parse_gnv1b  # noqa: E402
 
 from propygator import Frame  # noqa: E402
@@ -86,7 +86,7 @@ def main() -> None:
         print(f"  theta = {deg:3d} deg: Cd_face = {cd:6.3f}{tag}")
 
     for window in ("quiet_2019", "active_2023"):
-        files = find_window_files(_HERE.parent / "data" / "gracefo" / window)
+        files = find_window_files(_HERE.parents[1] / "data" / "gracefo" / window)
         eph = parse_gnv1b(files[:1], sat_id="C", subsample_s=600.0)  # 144 pts/day
         r = np.linalg.norm(eph.positions_m, axis=1)
         r_mean = float(np.mean(r))

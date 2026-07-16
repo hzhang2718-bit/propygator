@@ -75,24 +75,27 @@ spread is far below the GO tier).
    is exact at its nodes; the script falls back to `.at()` if the grids ever
    misalign.)
 6. Residuals decomposed radial / along-track / cross-track by a pure-NumPy
-   helper (`ric_components`, reused by the GRACE-FO leg). The triad is built
-   from the truth PV with the ECEF velocity corrected to inertial
-   (v + ω⊕×r) so the along-track axis isn't tilted by Earth rotation.
-   RMS + max per component at 1 / 3 / 7 days.
+   helper (`ric_components` in the study-level `../common.py`, shared with the
+   GRACE-FO leg). The triad is built from the truth PV with the ECEF velocity
+   corrected to inertial (v + ω⊕×r) so the along-track axis isn't tilted by
+   Earth rotation. RMS + max per component at 1 / 3 / 7 days.
 
 ## Files
 
 - `sp3.py` — minimal generic SP3-c parser (+ Lagrange velocity helper).
-- `run_lageos.py` — the Chunk 0 driver (steps above; `ric_components` lives
-  here).
+- `run_lageos.py` — the Chunk 0 driver (steps above; LAGEOS-2 constants live
+  here, the shared RIC/rms helpers in `../common.py`).
 - `run_ablations.py` — the Chunk 1 ablation matrix (appends to `results.txt`:
   `conda run -n propygator python run_ablations.py >> results.txt`).
 - `results.txt` — captured stdout (the committed evidence; Chunk 0 run + the
-  Chunk 1 append).
+  Chunk 1 append). Regenerate both blocks with
+  `python ../run_all.py --only lageos`.
 
 ## Result summary (2026-07-12 run)
 
-Full tables in `results.txt`; Checkpoint A reads the day-1 row.
+Full tables in `results.txt` (regenerated 2026-07-15 from the reorganized
+drivers — every number reproduced identically); Checkpoint A reads the day-1
+row.
 
 - **Parser:** epoch serialization round trip bit-exact for all 5041 epochs;
   grid exactly uniform (max deviation 0.0 s); position text round-trips

@@ -42,7 +42,9 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_lageos as rl  # noqa: E402  (Chunk 0 constants + RIC/rms helpers)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import run_lageos as rl  # noqa: E402  (Chunk 0 LAGEOS-2 constants + DATA_DIR)
+from common import OMEGA_EARTH, ric_components, rms as _rms  # noqa: E402
 from sp3 import parse_sp3  # noqa: E402
 
 from propygator import (  # noqa: E402
@@ -107,7 +109,7 @@ def compute_expectations(eph) -> dict[str, dict[str, float]]:
 
     idx = np.arange(0, len(eph.epochs), 30)  # hourly samples along the week
     pos = eph.positions_m[idx]
-    v_in = eph.velocities_ms[idx] + np.cross(rl._OMEGA_EARTH, pos)
+    v_in = eph.velocities_ms[idx] + np.cross(OMEGA_EARTH, pos)
     r = np.linalg.norm(pos, axis=1)
     r_mean = float(np.mean(r))
 
@@ -254,7 +256,7 @@ def main() -> None:
 
     def along_at_7d(diff: np.ndarray) -> float:
         """Signed along-track component of ``diff`` at the final truth epoch."""
-        return float(rl.ric_components(diff, eph.positions_m, eph.velocities_ms)[-1, 1])
+        return float(ric_components(diff, eph.positions_m, eph.velocities_ms)[-1, 1])
 
     t_wall = _time.perf_counter()
     pos_base = run_case({})
@@ -263,7 +265,7 @@ def main() -> None:
 
     d_base = pos_base - eph.positions_m
     base_norm = np.linalg.norm(d_base, axis=1)
-    base_d1, base_d7 = rl._rms(base_norm[m_day1]), rl._rms(base_norm)
+    base_d1, base_d7 = _rms(base_norm[m_day1]), _rms(base_norm)
 
     # Table A -- the wiring proof: |case - baseline| is the toggle's dynamical
     # effect, sign-free and independent of the unmodeled-force floor. A boolean
@@ -280,7 +282,7 @@ def main() -> None:
     stats = []
     for label, key, pos_c in cases:
         eff = np.linalg.norm(pos_c - pos_base, axis=1)
-        eff_d1, eff_d7 = rl._rms(eff[m_day1]), rl._rms(eff)
+        eff_d1, eff_d7 = _rms(eff[m_day1]), _rms(eff)
         bound = expect[key]["bound"]
         if bound < 0.5:  # predicted-null row
             ok = eff_d1 < 0.5
@@ -309,7 +311,7 @@ def main() -> None:
     for label, pos_c in stats:
         d_c = pos_c - eph.positions_m
         c_norm = np.linalg.norm(d_c, axis=1)
-        d1, d7 = rl._rms(c_norm[m_day1]), rl._rms(c_norm)
+        d1, d7 = _rms(c_norm[m_day1]), _rms(c_norm)
         if d7 < base_d7 - 0.5:
             improves.append(label)
         print(

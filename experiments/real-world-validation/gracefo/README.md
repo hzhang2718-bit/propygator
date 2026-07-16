@@ -129,8 +129,8 @@ length-corrected (that would swap a traceable dimension for a fictitious one); t
 3. **Space-weather context** — per-loaded-day F10.7 / Ap / Kp plus the max
    3-hourly ap over the run arc, read from the *same* `CssiSpaceWeatherData`
    NRLMSISE-00 consumes (for the storm window this is the live proof the storm
-   reaches the model; the committed quiet/active blocks predate this
-   enrichment and show a single midpoint line).
+   reaches the model; the quiet/active arc-max ap of 7 / 27 confirms those
+   windows geomagnetically mild).
 4. **Maneuver screen** — a drag-on arc over the loaded span; the along-track residual
    is fit with a smooth degree-5 polynomial and the largest departure reported (a
    thruster burn leaves a slope kink). Both windows read CLEAN. (Deliberate
@@ -150,7 +150,7 @@ length-corrected (that would swap a traceable dimension for a fictitious one); t
    soft limit at 5 warns but allows it, and a fit railing at 8 is reported as a
    density-bias bound, not a converged fit).
 8. Residuals decomposed radial / along-track / cross-track by the Chunk 0
-   `ric_components` helper (imported from `run_lageos`, not duplicated), with the
+   `ric_components` helper (the study-level `../common.py`, not duplicated), with the
    ECEF truth velocity corrected to inertial (v + ω⊕×r) so the along-track axis
    isn't tilted by Earth rotation. `high_precision` integrator throughout; the 60 s
    output grid coincides exactly with the truth grid (exact-grid diff).
@@ -181,8 +181,10 @@ length-corrected (that would swap a traceable dimension for a fictitious one); t
 
 ## Result summary (2026-07-12 run)
 
-Full tables in `results.txt`; Checkpoint B reads the along-track RMS row and the
-fitted Cd. Both windows: t0 sanity ~4e-9 m (frame/time conversion clean to float
+Full tables in `results.txt` (regenerated 2026-07-15 from the reorganized
+drivers — every number reproduced identically; the quiet/active blocks gained
+the per-day space-weather context in the rerun); Checkpoint B reads the
+along-track RMS row and the fitted Cd. Both windows: t0 sanity ~4e-9 m (frame/time conversion clean to float
 noise), maneuver screen CLEAN, 0 QC-dropped records, seamless day concatenation.
 
 | | quiet_2019 | active_2023 |
@@ -357,7 +359,7 @@ Readings:
   once s ≈ 1 — nothing dimension-related survives it.)
 - **The onset arc's fitted Cd 1.73 is a flagged artifact, not physics** —
   excluded from the three-window fitted-Cd story above. Mechanism, verified by
-  the committed `probe_ap_driving.py`: **Orekit's `NRLMSISE00` at default
+  the committed `probes/probe_ap_driving.py`: **Orekit's `NRLMSISE00` at default
   switches (the construction propygator uses) is driven by the *daily* Ap.**
   May 10's daily Ap = 105 is an average dominated by the evening storm, so the
   model runs storm-hot across the actually-quiet first ~15 h: at the same ECEF
@@ -543,7 +545,7 @@ The **a-priori-table rows** (maintainer-elected 2026-07-15, same design) close
 the pre-flight loop: the fitted-Cd row below needs truth to calibrate —
 circular for the State path's no-truth persona — and the shipped Cd tables are
 the calibration source that persona actually has. Three more rows per window,
-all Chunk 2b Run 4/5 physics (constructors imported from `run_gracefo.py`, not
+all Chunk 2b Run 4/5 physics (constructors imported from `gracefo_common.py`, not
 duplicated): the **sphere table** (`VariableCd.sphere_default` on A_ram =
 1.027 m²) through the *native* State path — legal, a sphere is
 attitude-independent; the **same sphere config** through the
@@ -638,21 +640,29 @@ Readings from the a-priori-table rows (2026-07-15):
 
 - `gnv1b.py` — minimal GNV1B parser (tarball-aware; GPS→TAI, ITRF, QC screen,
   subsample, multi-day concatenation).
-- `run_gracefo.py` — the Chunk 2 + 2b driver (steps above; reuses the Chunk 0
-  `ric_components` / `_rms`).
-- `probe_tables.py` — the retained 2026-07-12 scratch probe of the shipped Cd
-  tables, the Chunk 2b diagnostic template (**superseded geometry** — its
-  docstring says how; Run 5's driver code is the evidence path, not this).
-- `probe_ap_driving.py` — the Chunk 2c diagnostic probe proving the daily-Ap
-  driving of the NRLMSISE-00 instance propygator builds (recorded output in its
-  docstring; quoted in the Storm window section above).
+- `gracefo_common.py` — the leg configuration: GRACE-FO physical constants,
+  the Chunk 2b box geometry, the spacecraft/force-config factories every
+  driver shares, and the **measured anchors** (the Run-3 fitted Cds consumed
+  by later experiments, recorded once with provenance). The shared RIC/rms
+  helpers live one level up in `../common.py`.
+- `run_gracefo.py` — the Chunk 2 + 2b + 2c driver (steps above).
+- `probes/probe_tables.py` — the retained 2026-07-12 scratch probe of the
+  shipped Cd tables, the Chunk 2b diagnostic template (**superseded geometry**
+  — its docstring says how; Run 5's driver code is the evidence path, not
+  this).
+- `probes/probe_ap_driving.py` — the Chunk 2c diagnostic probe proving the
+  daily-Ap driving of the NRLMSISE-00 instance propygator builds (recorded
+  output in its docstring; quoted in the Storm window section above).
 - `results.txt` — captured stdout (the committed evidence; all four blocks:
-  quiet, active, storm peak arc, storm onset arc).
+  quiet, active, storm peak arc, storm onset arc). Regenerate with
+  `python ../run_all.py --only drag`.
 - `run_fit_vs_catalog.py` — the Chunk 3 driver (fitted TLE vs. Space-Track
   catalog TLE; the maintainer-pulled historical TLEs embedded with provenance;
   modes: primary, `--fit-bstar=off`, `--sweep`, `--state-path`).
 - `results_fit_vs_catalog.txt` — captured stdout (four blocks: quiet and
-  active, each with B\* fitted and with `--fit-bstar=off`).
+  active, each with B\* fitted and with `--fit-bstar=off`). Regenerate with
+  `python ../run_all.py --only fit` (sweep/state-path files:
+  `--only sweep,state-path`).
 - `results_fit_span_sweep.txt` — captured stdout of the `--sweep` runs (two
   blocks: the end-anchored 1/2/3-day fitting-span sweep per window).
 - `results_fit_state_path.txt` — captured stdout of the `--state-path` runs

@@ -27,7 +27,7 @@ LAGEOS-2 vs ILRS precise orbit -- Chunk 0 conservative-force diagnostic
   spacecraft: sphere A = 0.2827 m2, Cr = 1.13, mass = 405.38 kg
   force model: EIGEN-6S 70x70, Sun+Moon third body, cannonball SRP, solid tides, ocean tides, relativity; drag OFF
   integrator: IntegratorConfig.high_precision()
-  wall time: 11.1 s; samples: 5041 (truth: 5041)
+  wall time: 31.4 s; samples: 5041 (truth: 5041)
   metadata force_models: ['gravity:EIGEN-6S:70x70', 'third_body:sun', 'third_body:moon', 'srp', 'tides:solid', 'tides:ocean', 'relativity']
   metadata spacecraft: sphere:A=0.2827433388230814;m=405.38,Cd=2.2,Cr=1.13
   epoch alignment vs truth grid: max |dt| = 0.000e+00 s (exact-grid diff path)
@@ -63,7 +63,7 @@ Chunk 1 -- LAGEOS-2 ablation matrix: the per-toggle wiring proof
   planets                    7.099e-12   2.634e-12             0.026
   bound = a*t^2/2, a secular upper limit -- orbit-periodic forces
   average 1-2 orders below it; a bound << 1 m predicts a null row.
-[ablation matrix A -- wiring proof]  8 x 7-day propagations, 85 s wall
+[ablation matrix A -- wiring proof]  8 x 7-day propagations, 239 s wall
   effect = |case - baseline| trajectory difference, 3D RMS (m)
   case                        eff d1 rms  eff d7 rms     bound1d  flag
   srp off                          0.826       5.869      13.241  OK

@@ -2,23 +2,27 @@
 
 Evidence for ``docs/build-plan-real-world-validation.md`` Chunk 3, the question
 that motivated the study: *is a propygator-fitted TLE as good as an operational
-catalog TLE at predicting a real orbit?* Per window (quiet_2019 / active_2023):
+catalog TLE at predicting a real orbit?* Per window (quiet_2019 / active_2023),
+one driver with four modes, each writing its own committed results file. The
+full method, election history, and result readings live in README.md ("Fitter
+vs. catalog" and its subsections); the build-plan Chunk 3 as-run notes record
+what was elected when.
 
-1. A ``Trajectory.from_arrays`` reference from **one day** of GNV1B truth at
-   60 s cadence (ITRF in -- the features.md 1.2 Trajectory path converts to
-   TEME internally), fed to ``fit_tle_detailed(..., norad_id=43476,
-   name="GRACE-FO 1")``.
-2. The ``FitResult`` diagnostics (iterations, rms_m, residual profile) -- the
-   post-fit agreement over the fit day.
-3. **Prediction test:** the fitted TLE propagated over the fit day + 3 forward
-   days (``propagate_tle``), diffed against GNV1B truth per day.
-4. **Catalog benchmark:** the maintainer-provided same-epoch Space-Track TLE
-   run over the *same* grid, diffed the same way -- the side-by-side per-day
-   RMS table. Parity, not victory, is the claim.
-5. Element-level sanity: fitted vs. catalog mean elements close where the
-   ~5 h epoch offset allows a direct read (i, RAAN, e, n); B* expected to
-   differ (a fit residual, not a physical value -- the 1.2 documented
-   behavior, here shown against reality).
+- **primary** (no flag): fit one day of GNV1B truth via the 1.2 Trajectory
+  path, then fitted TLE vs the same-epoch Space-Track catalog TLE over the fit
+  day + 3 forward days, plus element-level sanity. Parity, not victory, is the
+  claim. ``--fit-bstar=off`` re-runs it with B* held at the seed's 0.0 (the
+  weak-drag regime diagnostic).
+- **--sweep**: the fitting-span sweep -- 1/2/3-day fit arcs end-anchored at the
+  day-4 start, forecast over the common days 4-6 window; B* fitted vs held at
+  the catalog's long-arc value. Loads 6 truth days.
+- **--state-path**: the 1.2 State-reference-path composition check (the fitter
+  propagates its own internal reference) against the live-recomputed
+  trajectory-path twin, at the nominal / Run-3-fitted Cd, plus the
+  a-priori-table rows (sphere table through the native State path AND the
+  external propagate-then-fit route -- the measured equivalence -- and the box
+  table via the external route, whose IPT-ecef attitude the State path cannot
+  express). Loads 6 truth days.
 
 The catalog TLEs are pasted below from the Space-Track **gp_history** class
 (the maintainer's pull, per the build plan's data-access rule -- ``fetch_tle``
@@ -31,71 +35,17 @@ propygator conda env (starts the JVM, needs orekit-data); cwd-independent:
     cd experiments/real-world-validation/gracefo
     conda run -n propygator python run_fit_vs_catalog.py quiet_2019  >  results_fit_vs_catalog.txt
     conda run -n propygator python run_fit_vs_catalog.py active_2023 >> results_fit_vs_catalog.txt
+    conda run -n propygator python run_fit_vs_catalog.py quiet_2019 --fit-bstar=off  >> results_fit_vs_catalog.txt
+    conda run -n propygator python run_fit_vs_catalog.py active_2023 --fit-bstar=off >> results_fit_vs_catalog.txt
+    conda run -n propygator python run_fit_vs_catalog.py quiet_2019 --sweep  >  results_fit_span_sweep.txt
+    conda run -n propygator python run_fit_vs_catalog.py active_2023 --sweep >> results_fit_span_sweep.txt
+    conda run -n propygator python run_fit_vs_catalog.py quiet_2019 --state-path  >  results_fit_state_path.txt
+    conda run -n propygator python run_fit_vs_catalog.py active_2023 --state-path >> results_fit_state_path.txt
 
+(or ``python ../run_all.py --only fit`` to regenerate all three files).
 Stdout is ASCII-only (captured under cp1252); the fit's ``iter N | rms``
 progress goes to stderr. ``--parse-only`` stops before the JVM-touching steps
 (truth parse + catalog-TLE validation only).
-
-``--fit-bstar=off`` re-runs the battery with ``fit_bstar=False`` (B* held at
-the seed's 0.0) -- the supplementary diagnostic elected at run time after the
-primary quiet_2019 run showed the fitted B* (2.07e-4 vs catalog 0.98e-6-class)
-driving a quadratic forward-prediction runaway: features.md 1.2's own guidance
-says to hold B* "where B* is unobservable (short spans, drag-free regimes...
-the estimate would wander, absorbing along-track error)", and a 1-day
-solar-minimum arc is plausibly that regime. This variant tests the shipped
-guidance against reality.
-
-``--sweep`` runs the **fitting-span sweep** (maintainer-elected 2026-07-14
-extension): 1 / 2 / 3-day fit arcs, all **end-anchored** at the day-4 start,
-each forecast over the common days 4-6 window -- the operational question
-("given truth up to T, how much history should the fit consume to predict
-T..T+3d?") with the forecast density realization held fixed across spans. Two
-configs per span: B* fitted, and B* held at the catalog's long-arc value
-(``initial_guess=catalog`` + ``fit_bstar=False`` -- the guess donates its B*
-to the seed, the hold keeps it). Loads 6 truth days. Evidence captured to
-``results_fit_span_sweep.txt``:
-
-    conda run -n propygator python run_fit_vs_catalog.py quiet_2019 --sweep  >  results_fit_span_sweep.txt
-    conda run -n propygator python run_fit_vs_catalog.py active_2023 --sweep >> results_fit_span_sweep.txt
-
-``--state-path`` runs the **State-path check** (maintainer-elected 2026-07-14,
-the second extension): the features.md 1.2 ``State`` reference path -- the one
-a pre-flight user (no truth trajectory yet) actually exercises -- fit against
-reality for the first time. The reference the fitter consumes is its own
-internal ``propagate_numerical`` run, so the TLE-vs-reality error composes
-(SGP4 lossiness) + (numerical-reference-vs-reality drift); Chunks 2 and 3
-measured both pieces separately, and this mode measures the composition
-directly rather than trusting the arithmetic (self-consistent composition
-arguments being exactly this study's risk class). Design: the state is the
-day-2-start truth sample (ITRF -> EME2000), ``fitting_span`` = the shipped
-2-day default (so the fit window ends at the day-4 start) and the forecast is
-the sweep's common days 4-6 window -- the sweep's 2-day trajectory-path row is
-the exact twin, differing only in reference source (recomputed live in the
-block). Two State-path configs: Cd = 2.3 nominal and the window's Run-3 fitted
-Cd (results.txt), each with its reference-vs-truth drift printed -- the
-composition evidence.
-
-The **a-priori-table rows** (maintainer-elected 2026-07-15 extension) complete
-the pre-flight story: the fitted-Cd row needs truth to calibrate (circular for
-the State path's no-truth persona), and the shipped tables are the calibration
-source that persona actually has. Three more rows per window, all Chunk 2b
-Run 4/5 physics imported from ``run_gracefo`` (not duplicated): the sphere
-table (``VariableCd.sphere_default`` on A_ram) through the **native State
-path**; the same sphere config through the **external-reference route**
-(propagate ``propagate_numerical`` yourself, fit the ``Trajectory`` -- the
-documented State-path equivalent), whose printed row-4-vs-row-5 delta measures
-the construction-time "identical result" equivalence on real data instead of
-assuming it; and the box table (``BoxFaceCd.default`` on the base-averaged
-box, flown ``InPlaneTracking(velocity_reference="ecef")``) via the external
-route only -- the 1.2 State path cannot express attitude (no such parameter;
-its internal reference is contract-pinned to the default ``LofAligned``), so
-the box row rides the equivalence the sphere pair just verified. External
-references are propagated on the 60 s truth grid, so each doubles as its own
-drift twin (no internal-grid caveat). Loads 6 truth days; captured to
-``results_fit_state_path.txt``:
-
-    conda run -n propygator python run_fit_vs_catalog.py quiet_2019 --state-path  >  results_fit_state_path.txt
-    conda run -n propygator python run_fit_vs_catalog.py active_2023 --state-path >> results_fit_state_path.txt
 """
 
 from __future__ import annotations
@@ -107,14 +57,27 @@ import numpy as np
 
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE))
-# Reuse the Chunk 0 RIC helper + rms (build plan "Reuse"; the run_gracefo idiom),
-# and run_gracefo's Run 2/3 force set + Run 4/5 table spacecraft for the
-# state-path mode (imported, not duplicated, so the Chunk 2/2b drift rates and
+sys.path.insert(0, str(_HERE.parent))
+# Shared study analysis kit (the Chunk 0 RIC helper + rms; build plan "Reuse")
+# and the GRACE-FO leg configuration -- the same constants/factories the Chunk
+# 2/2b reference-vs-reality rates were measured with, plus the RUN3_FITTED_CD
+# measured anchors (imported, not duplicated, so the Chunk 2/2b drift rates and
 # table findings apply verbatim).
-sys.path.insert(0, str(_HERE.parent / "lageos"))
-import run_gracefo as rg  # noqa: E402
-import run_lageos as rl  # noqa: E402
+from common import ric_components, rms as _rms  # noqa: E402
 from gnv1b import find_window_files, parse_gnv1b  # noqa: E402
+from gracefo_common import (  # noqa: E402
+    A_RAM_M2,
+    DATA_ROOT,
+    GRACEFO_CD_NOMINAL,
+    GRACEFO_SAT_ID,
+    NORAD_ID,
+    RUN3_FITTED_CD,
+    SAT_NAME,
+    SUBSAMPLE_S,
+    box_spacecraft,
+    force_config,
+    sphere_spacecraft,
+)
 
 from propygator import (  # noqa: E402
     TLE,
@@ -130,13 +93,6 @@ from propygator import (  # noqa: E402
     propagate_tle,
 )
 
-DATA_ROOT = _HERE.parent / "data" / "gracefo"
-
-NORAD_ID = 43476
-SAT_NAME = "GRACE-FO 1"
-GRACEFO_SAT_ID = "C"
-
-SUBSAMPLE_S = 60.0
 FIT_SPAN_S = 86400.0  # the 1-day fit arc (build plan Chunk 3)
 FORWARD_DAYS = 3  # prediction days past the fit span
 LOAD_DAYS = 4  # fit day + FORWARD_DAYS of truth
@@ -146,11 +102,7 @@ SWEEP_SPANS_D = (1, 2, 3)  # end-anchored fit-arc lengths
 SWEEP_LOAD_DAYS = 6  # max span (3 d) + the common 3-day forecast window
 
 # --state-path mode (the 2026-07-14 State-path extension + the 2026-07-15
-# a-priori-table rows). Spacecraft + force set come from run_gracefo.py
-# (rg._force_config / rg._spacecraft / rg._box_spacecraft -- the configs the
-# Chunk 2/2b reference-vs-reality rates were measured with); the fitted Cd per
-# window is Run 3's (results.txt).
-RUN3_FITTED_CD = {"quiet_2019": 2.030, "active_2023": 3.405}
+# a-priori-table rows)
 STATE_FIT_SPAN_S = 2 * 86400.0  # the shipped features.md 1.2 default
 
 # Historical catalog TLEs for NORAD 43476, Space-Track gp_history class,
@@ -232,7 +184,7 @@ def _run_sweep(eph, catalog: TLE) -> None:
         pos = traj.to_frame(Frame.ITRF).positions
         d = np.linalg.norm(pos[: len(truth_fc)] - truth_fc, axis=1)
         return [
-            rl._rms(d[j * n_per_day : (j + 1) * n_per_day]) for j in range(n_fc_days)
+            _rms(d[j * n_per_day : (j + 1) * n_per_day]) for j in range(n_fc_days)
         ]
 
     print("[sweep]  end-anchored fit arcs; common forecast window = days 4-6")
@@ -331,8 +283,8 @@ def _run_state_path(eph, window: str) -> None:
         traj = propagate_tle(tle, span_fc, output_step=SUBSAMPLE_S, start=t_end)
         pos = traj.to_frame(Frame.ITRF).positions
         d_fc = np.linalg.norm(pos[: len(truth_fc)] - truth_fc, axis=1)
-        return rl._rms(d_fit), [
-            rl._rms(d_fc[j * n_per_day : (j + 1) * n_per_day])
+        return _rms(d_fit), [
+            _rms(d_fc[j * n_per_day : (j + 1) * n_per_day])
             for j in range(n_fc_days)
         ]
 
@@ -376,7 +328,7 @@ def _run_state_path(eph, window: str) -> None:
             state0,
             STATE_FIT_SPAN_S,
             output_step=SUBSAMPLE_S,
-            force_models=rg._force_config(drag=True),
+            force_models=force_config(drag=True),
             spacecraft=spacecraft,
             attitude=attitude,
             integrator=IntegratorConfig.high_precision(),
@@ -384,13 +336,13 @@ def _run_state_path(eph, window: str) -> None:
         )
         pos_ref = traj.to_frame(Frame.ITRF).positions
         d_ref = np.linalg.norm(pos_ref[: len(truth_fit)] - truth_fit, axis=1)
-        return traj, rl._rms(d_ref), float(d_ref[-1])
+        return traj, _rms(d_ref), float(d_ref[-1])
 
     for cd, tag in (
-        (rg.GRACEFO_CD_NOMINAL, "nominal"),
+        (GRACEFO_CD_NOMINAL, "nominal"),
         (RUN3_FITTED_CD[window], "Run-3 fit"),
     ):
-        _, drift_rms, drift_end = _external_reference(rg._spacecraft(cd), None)
+        _, drift_rms, drift_end = _external_reference(sphere_spacecraft(cd), None)
         print(
             f"  reference drift vs truth over the fit window (Cd {cd:.3f}): "
             f"RMS {drift_rms:.1f} m, end {drift_end:.1f} m"
@@ -398,8 +350,8 @@ def _run_state_path(eph, window: str) -> None:
         fit = fit_tle_detailed(
             state0,
             fitting_span=STATE_FIT_SPAN_S,
-            force_models=rg._force_config(drag=True),
-            spacecraft=rg._spacecraft(cd),
+            force_models=force_config(drag=True),
+            spacecraft=sphere_spacecraft(cd),
             norad_id=NORAD_ID,
             name=SAT_NAME,
         )
@@ -416,12 +368,12 @@ def _run_state_path(eph, window: str) -> None:
     # pair's delta measures the "State path == propagate-then-fit" equivalence
     # on real data. The box row needs IPT-ecef, which the 1.2 State path
     # cannot express, so it rides the just-verified equivalence.
-    sphere_cfg = rg._spacecraft(VariableCd.sphere_default(), area_m2=rg.A_RAM_M2)
+    sphere_cfg = sphere_spacecraft(VariableCd.sphere_default(), area_m2=A_RAM_M2)
 
     fit = fit_tle_detailed(
         state0,
         fitting_span=STATE_FIT_SPAN_S,
-        force_models=rg._force_config(drag=True),
+        force_models=force_config(drag=True),
         spacecraft=sphere_cfg,
         norad_id=NORAD_ID,
         name=SAT_NAME,
@@ -441,7 +393,7 @@ def _run_state_path(eph, window: str) -> None:
     rows.append(("External ref, sphere table", fit.rms_m, fit_win, per_day, fit.tle))
 
     traj_ref, drift_rms, drift_end = _external_reference(
-        rg._box_spacecraft(BoxFaceCd.default()),
+        box_spacecraft(BoxFaceCd.default()),
         InPlaneTracking(velocity_reference="ecef"),
     )
     print(
@@ -641,10 +593,10 @@ def main() -> None:
     d_fit = _tle_diff_itrf(fit.tle, eph, span_s)
     d_cat = _tle_diff_itrf(catalog, eph, span_s)
     nn = len(d_fit)
-    ric_fit = rl.ric_components(
+    ric_fit = ric_components(
         d_fit, eph.positions_m[:nn], eph.velocities_ms[:nn], earth_fixed=True
     )
-    ric_cat = rl.ric_components(
+    ric_cat = ric_components(
         d_cat, eph.positions_m[:nn], eph.velocities_ms[:nn], earth_fixed=True
     )
 
@@ -655,10 +607,10 @@ def main() -> None:
     ratios = []
     for d in range(LOAD_DAYS):
         sl = slice(d * n_per_day, min((d + 1) * n_per_day, nn))
-        rms3_f = rl._rms(np.linalg.norm(d_fit[sl], axis=1))
-        rms3_c = rl._rms(np.linalg.norm(d_cat[sl], axis=1))
-        along_f = rl._rms(ric_fit[sl, 1])
-        along_c = rl._rms(ric_cat[sl, 1])
+        rms3_f = _rms(np.linalg.norm(d_fit[sl], axis=1))
+        rms3_c = _rms(np.linalg.norm(d_cat[sl], axis=1))
+        along_f = _rms(ric_fit[sl, 1])
+        along_c = _rms(ric_cat[sl, 1])
         ratio = rms3_f / rms3_c if rms3_c > 0 else float("nan")
         label = "1 (fit day)" if d == 0 else f"{d + 1} (+{d})"
         print(
