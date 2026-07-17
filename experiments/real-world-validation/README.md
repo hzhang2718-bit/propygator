@@ -22,11 +22,14 @@ last:
    predicting real GNV1B truth, plus three maintainer-elected extensions
    (fitting-span sweep, State-path composition check, a-priori-table rows).
 
-**Status (2026-07-15):** Chunks 0–3 complete — Checkpoint A resolved **GO**
+**Status (2026-07-16):** Chunks 0–4 complete — Checkpoint A resolved **GO**
 (day-1 residual 3.6 m RMS, tier 1 with ~3× margin), Checkpoint B resolved
-(relationship pins; `box_and_panels` geometry upgrade **deferred**). Chunk 4
-(wrap-up: pinned tests, findings doc, README note) is next; Chunks 5 and 6 are
-order-independent follow-ons on their own branches off `main`.
+(relationship pins; `box_and_panels` geometry upgrade **deferred**), and the
+Chunk 4 wrap-up shipped the pinned tests
+(`tests/propagation/test_real_world_*.py`, `tests/tle/test_fitter_real_world.py`),
+the findings doc (`docs/real-world-validation-findings.md`), and the README
+Validation note. Chunks 5 and 6 are order-independent follow-ons on their own
+branches off `main`; the build plan stays active.
 
 ## Layout
 
@@ -84,7 +87,8 @@ progress to stderr.
 ## Findings at a glance
 
 Full tables and readings live in the leg READMEs (the committed `results.txt`
-files are the raw evidence); the Chunk 4 findings doc will consolidate them.
+files are the raw evidence); `docs/real-world-validation-findings.md`
+consolidates them.
 
 | Leg | Headline | Where |
 |---|---|---|

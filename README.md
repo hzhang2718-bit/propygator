@@ -191,22 +191,47 @@ reference is recovered essentially exactly. Non-convergence raises
 
 ## Features
 
-v1 feature set (✅ = implemented):
+The v1 feature set (all implemented):
 
-- ✅ **Numerical propagation** — high-fidelity orbit propagation from an initial
+- **Numerical propagation** — high-fidelity orbit propagation from an initial
   state vector with configurable force models, plus the plot + CSV output surface.
-- ✅ **TLE propagation** — SGP4/SDP4 propagation of TLEs (`fetch_tle` /
+- **TLE propagation** — SGP4/SDP4 propagation of TLEs (`fetch_tle` /
   `propagate_tle`), reusing the same plot + CSV output surface.
-- ✅ **Real-time tracking** — current position (`current_state` /
+- **Real-time tracking** — current position (`current_state` /
   `current_ground_position`), an observer sky view (`look_angles` /
   `plot_sky_track`), and a live, self-updating dashboard (`live_track`).
-- ✅ **Ground passes + brightness** — visible passes from a ground station with
+- **Ground passes + brightness** — visible passes from a ground station with
   estimated visual magnitude (`find_passes`), plus table / CSV / iCalendar / sky-chart
   / timeline output (`passes_to_dataframe`, `export_passes_csv`, `export_passes_ics`,
   `plot_sky_chart`, `plot_pass_timeline`).
-- ✅ **TLE fitting** — least-squares fit of a TLE against a reference trajectory
+- **TLE fitting** — least-squares fit of a TLE against a reference trajectory
   (`fit_tle`, plus `fit_tle_detailed` for the fit diagnostics), with the
   lossiness quantified and non-convergence raised honestly.
+
+## Validation
+
+Beyond the test suite, each surface is anchored to an independent external
+reference — including **measured orbits** (cm-level ILRS laser ranging and
+GRACE-FO GPS reduced-dynamic truth), the one oracle that can't share a wiring
+misconception with the code's own tests:
+
+- **SGP4/SDP4** — Vallado's AIAA 2006-6753 reference vectors (test-pinned).
+- **Pass prediction** — Skyfield cross-check, agreement < 2 s / < 1° over a
+  10-pass ISS table (test-pinned).
+- **Numerical propagator** — LAGEOS-2 vs. ILRS precise orbits: **3.6 m RMS
+  after one day** on conservative forces, with every force toggle's ablation
+  signature verified against its computed order.
+- **Drag stack** — GRACE-FO vs. GNV1B orbits across solar-quiet, solar-max,
+  and Gannon-storm conditions: a single fitted Cd collapses the along-track
+  residual to **1.9–6.4 m/day** (calm conditions); the remainder is
+  thermospheric-density uncertainty, quantified.
+- **TLE fitter** — fits measured GRACE-FO truth at ~630 m RMS and predicts at
+  **operational-catalog parity** (0.8–2.1× the Space-Track TLE over +3 days).
+
+Details, provenance, and honest caveats:
+[`docs/real-world-validation-findings.md`](docs/real-world-validation-findings.md);
+the committed evidence lives under
+[`experiments/real-world-validation/`](experiments/real-world-validation/).
 
 ## Notebooks
 
@@ -233,6 +258,13 @@ Rendered HTML versions will be posted on the projects page in the future.
 The full design reference — data model, module structure, conventions, and the
 key architectural decisions — lives in
 [`docs/architecture.md`](docs/architecture.md).
+
+## Development
+
+Releases are cut from short-lived branches, squash-merged to `main` and
+annotated-tagged (see [`docs/release-process.md`](docs/release-process.md)).
+From **v0.7.2** onward this runs through GitHub Pull Requests with CI; earlier
+releases were squash-merged locally.
 
 ## Acknowledgments
 
