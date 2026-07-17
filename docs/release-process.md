@@ -105,8 +105,8 @@ consistent. The message mirrors `v0.2.0`'s style, e.g. `v0.3.0 - TLE propagator
 ```bash
 git log --oneline --decorate -3            # main HEAD is the new squash commit, tagged
 git diff --stat <branch> main              # empty == squash captured everything
-git rev-parse main vX.Y.Z^{commit}         # both SHAs identical -> tag points at HEAD
-git tag -l vX.Y.Z -n99                      # annotated message reads right
+git rev-parse main "vX.Y.Z^{commit}"       # both SHAs identical -> tag points at HEAD
+git tag -l vX.Y.Z -n99                     # annotated message reads right
 ```
 
 `git diff --stat <branch> main` returning nothing is the key check that the squash
@@ -138,9 +138,14 @@ on the repo's front page.
 ```bash
 git fetch --prune --tags origin
 git rev-parse main origin/main             # identical
-git ls-remote --tags origin vX.Y.Z         # tag present; the refs/tags/vX.Y.Z^{} line peels to main HEAD
+git ls-remote --tags origin | grep vX.Y.Z  # both refs; the refs/tags/vX.Y.Z^{} line peels to main HEAD
 git ls-remote --heads origin <branch>      # empty == remote branch gone
 ```
+
+On PowerShell, substitute `| Select-String vX.Y.Z` for the `grep`. Passing the
+tag as a pattern instead (`git ls-remote --tags origin vX.Y.Z`) prints only the
+tag-object line — the `^{}` peel doesn't match the literal pattern, so pipe-filter
+to see it.
 
 When `main` and `origin/main` match, the remote `vX.Y.Z^{}` peeled ref equals
 `main`'s HEAD commit, and the remote branch is gone, the release is live.
