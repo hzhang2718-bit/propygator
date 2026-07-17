@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.7.2] - 2026-07-16
+
+### Added
+
+- Experiments on propygator's real-life fidelity with real satellite data from
+  ILRS, NASA GRACE-FO, and Space-Track. Relevant files are under
+  experiments/real-world-validation.
+- Study on the LAGEOS-2 satellite targeting numerical propagator's ability to
+  propagate drag-free arcs. Conclusion: propygator has high fidelity with drag-free
+  orbits.
+- Study on the LAGEOS-2 satellite targeting different forces' wiring in the numerical
+  propagator. Conclusion: forces reach Orekit, and their effects are in expected
+  ranges.
+- Study on the GRACE-FO satellite targeting numerical propagator and the shipped
+  drag tables' ability to propagate drag-significant arcs. Conclusion: fidelity is
+  limited but respectable, and 1-day propagations have sub-kilometer precision with
+  possible exceptions during geomagnetic storms.
+- Study on the GRACE-FO satellite targeting the quality of the TLE fitter.
+  Conclusion: TLE fitter consistently converges on measured truth, and it performs
+  roughly as well as the catalogue TLE. A fitting span of 2 days seems optimal. Propygator
+  TLE is also accurate to 22 km under the worst-case scenario after 3 days.
+  Strategic setting of the B* term during times of quiet solar activity can
+  create a large improvement. Fitting from a single state generates results comparable
+  to fitting from a known trajectory during quiet solar activity or with a fitted Cd.
+  Fitting from a single state has a greater loss of accuracy during high solar activity
+  with uncalibrated Cd.
+- This study exposed a couple of minor issues that will be the target of future work.
+  These include fixing the slightly negative numbers in the BoxFaceCd table and
+  exposing covariance in TLE FitResult to help detect B* fitting issues.
+- Added new tests to pin down the numerical propagator's accuracy with LAGEOS and
+  GRACE-FO.
+- Added new tests to pin down TLE fitting fidelity on a real subsample.
+- Documentation of the real-world validation experiment under
+  docs/real-world-validation-findings.md.
+
 ## [0.7.1] - 2026-07-11
 
 ### Fixed

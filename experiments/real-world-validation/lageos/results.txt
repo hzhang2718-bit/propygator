@@ -1,0 +1,92 @@
+LAGEOS-2 vs ILRS precise orbit -- Chunk 0 conservative-force diagnostic
+==========================================================================
+[data]
+  file: esa.orb.lageos2.230422.v70.sp3.gz
+  SP3 version: c, V-records: True
+  satellite: L52
+  time system: UTC
+  coordinate system: SLR08 (ITRF-realization class)
+  epochs: 5041 (header claims 5041), interval 120.0 s
+  span: 2023-04-16T00:00:00 -> 2023-04-23T00:00:00 UTC (7.000 days)
+[parser checks]
+  epoch[0]: file fields 2023-04-16 00:00:00.00000000 UTC -> Epoch 2023-04-16T00:00:00 (UTC)
+  epoch[2520]: file fields 2023-04-19 12:00:00.00000000 UTC -> Epoch 2023-04-19T12:00:00 (UTC)
+  epoch[5040]: file fields 2023-04-23 00:00:00.00000000 UTC -> Epoch 2023-04-23T00:00:00 (UTC)
+  from_iso(to_iso()) == epoch for all 5041 epochs: True
+  grid uniformity: max |dt - 120.0 s| = 0.000e+00 s over 5040 intervals
+  position text round trip: first X re-formats to '   4648.005426' km (file: '   4648.005426')
+[velocity routes]  V-records vs 7-point Lagrange differentiation
+  all 5041 epochs:  rms 3.545e-05 m/s, max 1.438e-04 m/s
+  interior (excl. 3 edge samples/end): rms 3.543e-05 m/s, max 1.438e-04 m/s
+  at t0 (initial state uses the V-record): |dv| = 4.248e-05 m/s
+[t0 sanity]
+  ITRF -> EME2000 -> ITRF round trip at t0: |dr| = 9.313e-10 m, |dv| = 3.777e-12 m/s
+[propagation]
+  initial EME2000 state: r = [108982.68484871276, -11876956.516758155, -2102511.8419665894] m
+                         v = [3572.858340513853, -692.881043938518, 4481.109184339802] m/s
+  spacecraft: sphere A = 0.2827 m2, Cr = 1.13, mass = 405.38 kg
+  force model: EIGEN-6S 70x70, Sun+Moon third body, cannonball SRP, solid tides, ocean tides, relativity; drag OFF
+  integrator: IntegratorConfig.high_precision()
+  wall time: 31.4 s; samples: 5041 (truth: 5041)
+  metadata force_models: ['gravity:EIGEN-6S:70x70', 'third_body:sun', 'third_body:moon', 'srp', 'tides:solid', 'tides:ocean', 'relativity']
+  metadata spacecraft: sphere:A=0.2827433388230814;m=405.38,Cd=2.2,Cr=1.13
+  epoch alignment vs truth grid: max |dt| = 0.000e+00 s (exact-grid diff path)
+  first propagated sample (t0) vs truth: |dr| = 9.313e-10 m, |dv| = 3.777e-12 m/s   << 1 m required before anything else is interpretable
+[early growth]  |dr| propagated - truth
+  t0 + 2 min :        0.004 m
+  t0 + 10 min:        0.019 m
+  t0 + 1 h   :        0.145 m
+  t0 + 6 h   :        1.686 m
+  t0 + 24 h  :        6.194 m
+[residuals]  propagated - truth, ITRF positions, RIC (meters)
+  horizon       n  radial rms       max   along rms       max   cross rms       max      3D rms       max
+  1 d       721       0.110     0.197       3.622     6.193       0.051     0.109       3.624     6.194
+  3 d      2161       0.134     0.320      10.614    18.234       0.100     0.212      10.615    18.235
+  7 d      5041       0.277     0.740      23.647    40.548       0.155     0.334      23.649    40.549
+[checkpoint A]
+  day-1 3D residual: rms 3.624 m, max 6.194 m; |dr| at t0+24h = 6.194 m
+  tiers: <=20 m/day GO | ~20-500 m/day INVESTIGATE inputs (Cr/mass/area, second AC's SP3) | >500 m/day INVESTIGATE wiring
+
+==========================================================================
+Chunk 1 -- LAGEOS-2 ablation matrix: the per-toggle wiring proof
+==========================================================================
+[data] esa.orb.lageos2.230422.v70.sp3.gz: 5041 epochs, 7.000 days (the Chunk 0 arc)
+[expected orders]  computed along the truth orbit (nothing quoted)
+  central gravity at r = 12162 km: 2.695e+00 m/s2
+  force                       a (m/s2)         a/g   1-day bound (m)
+  srp                        3.548e-09   1.316e-09            13.241
+  relativity                 2.950e-09   1.095e-09            11.012
+  tides                      5.742e-08   2.131e-08           214.331
+  sun+moon                   3.213e-06   1.192e-06         11993.379
+  gravity>20                 8.717e-12   3.235e-12             0.033
+  gravity>8                  3.904e-08   1.449e-08           145.708
+  planets                    7.099e-12   2.634e-12             0.026
+  bound = a*t^2/2, a secular upper limit -- orbit-periodic forces
+  average 1-2 orders below it; a bound << 1 m predicts a null row.
+[ablation matrix A -- wiring proof]  8 x 7-day propagations, 239 s wall
+  effect = |case - baseline| trajectory difference, 3D RMS (m)
+  case                        eff d1 rms  eff d7 rms     bound1d  flag
+  srp off                          0.826       5.869      13.241  OK
+  relativity off                   0.643       4.502      11.012  OK
+  tides off (solid+ocean)          2.936      14.064     214.331  OK
+  sun+moon third body off        149.564     780.787   11993.379  OK
+  gravity 20x20                    0.000       0.001       0.033  null OK
+  gravity 8x8                      4.350      25.631     145.708  OK
+  planets third body ON            0.000       0.001       0.026  null OK
+[ablation matrix B -- agreement vs truth]  3D RMS (m); along@7d signed
+  case                        day1 rms     delta  day7 rms     delta  along@7d
+  baseline (Chunk 0)             3.624        --    23.649        --     -40.5
+  srp off                        4.141    +0.516    27.286    +3.637     -35.4
+  relativity off                 2.981    -0.643    19.149    -4.500     -32.6
+  tides off (solid+ocean)        1.166    -2.458    13.516   -10.133     -27.9
+  sun+moon third body off      152.673  +149.049   797.071  +773.422    -390.8
+  gravity 20x20                  3.624    -0.000    23.648    -0.001     -40.5
+  gravity 8x8                    7.938    +4.314    49.237   +25.588     -83.6
+  planets third body ON          3.624    -0.000    23.649    +0.000     -40.5
+[checks]
+  wiring (table A): every effect inside its predicted-order window, nulls null: PASS
+  vs-truth improvements (table B): relativity off, tides off (solid+ocean)
+  reading: those contributions partially oppose the unmodeled
+  along-track floor (ERP + thermal thrust) over this week -- see the
+  along@7d signs. The wiring proof is table A; the sign-level
+  attribution is a findings-doc note, not resolvable from one week.

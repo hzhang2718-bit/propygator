@@ -1,0 +1,50 @@
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] quiet_2019 (fitting-span sweep)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (6): gracefo_1B_2019-11-14_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-15_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-16_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-17_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-18_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-19_RL04.ascii.noLRI.tgz
+  1 Hz records read: 518400 (QC-dropped 0); subsampled to 60 s -> 8640 epochs
+  span: 2019-11-14T00:00:19 -> 2019-11-19T23:59:19 TAI (5.999 days loaded)
+  fit arcs: 1/2/3 d, all ending at the day-4 start; common forecast window: days 4-6
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   19317.74687279 +.00000271 +00000-0 +98502-5 0  9994
+  2 43476 088.9970 166.9377 0018420 022.3999 337.8049 15.23932987082211
+  epoch 2019-11-13T17:55:29.809056 UTC (+6.07 h from truth t0 -- negative = after)
+[sweep]  end-anchored fit arcs; common forecast window = days 4-6
+  all fit arcs end at 2019-11-17T00:00:19 TAI (the day-4 start); forecast = the next 3 days
+  'B* held cat' = initial_guess=catalog + fit_bstar=False (elements fitted, B* pinned to the catalog's long-arc value)
+  config         span  in-arc rms   +1 d 3D   +2 d 3D   +3 d 3D          B*     n (rev/d)
+  B* fitted       1 d       590.2    2529.5    8559.1   18545.5   1.759e-04   15.23931676
+  B* fitted       2 d       623.2     931.2    2225.5    4492.5   3.017e-05   15.23933606
+  B* fitted       3 d       653.8    1005.2    2407.1    4853.1   3.326e-05   15.23931808
+  B* held cat     1 d       604.2     774.8    1489.0    2745.2   9.850e-06   15.23935707
+  B* held cat     2 d       626.3     689.3    1099.7    2042.0   9.850e-06   15.23934592
+  B* held cat     3 d       674.3     725.3     866.6    1409.4   9.850e-06   15.23933512
+  catalog (*)       -           -    1039.3    1166.2    1459.4   9.850e-06   15.23932987
+  (*) context, not a parity benchmark: the catalog epoch sits 3.25 d before this forecast window (in-arc rms = RMS over the fit measurements at convergence, meters)
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] active_2023 (fitting-span sweep)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (6): gracefo_1B_2023-12-20_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-21_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-22_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-23_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-24_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-25_RL04.ascii.noLRI.tgz
+  1 Hz records read: 518400 (QC-dropped 0); subsampled to 60 s -> 8640 epochs
+  span: 2023-12-20T00:00:19 -> 2023-12-25T23:59:19 TAI (5.999 days loaded)
+  fit arcs: 1/2/3 d, all ending at the day-4 start; common forecast window: days 4-6
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   23353.82590425  .00004407  00000-0  16167-3 0  9994
+  2 43476  88.9824 323.8854 0015957  51.6909 308.5772 15.27615336310325
+  epoch 2023-12-19T19:49:18.1272 UTC (+4.17 h from truth t0 -- negative = after)
+[sweep]  end-anchored fit arcs; common forecast window = days 4-6
+  all fit arcs end at 2023-12-23T00:00:19 TAI (the day-4 start); forecast = the next 3 days
+  'B* held cat' = initial_guess=catalog + fit_bstar=False (elements fitted, B* pinned to the catalog's long-arc value)
+  config         span  in-arc rms   +1 d 3D   +2 d 3D   +3 d 3D          B*     n (rev/d)
+  B* fitted       1 d       596.1    1492.1    5267.8   12116.8   6.443e-05   15.27645457
+  B* fitted       2 d       636.3     687.4    1164.9    2072.0   2.051e-04   15.27629581
+  B* fitted       3 d       680.7     811.7    1711.7    3341.9   2.171e-04   15.27616902
+  B* held cat     1 d       601.9     639.7     908.2    1949.4   1.617e-04   15.27642822
+  B* held cat     2 d       654.3    1148.1    2427.1    4509.8   1.617e-04   15.27631934
+  B* held cat     3 d       807.6    2079.5    4152.9    7001.4   1.617e-04   15.27621407
+  catalog (*)       -           -    7927.7   12002.9   16804.6   1.617e-04   15.27615336
+  (*) context, not a parity benchmark: the catalog epoch sits 3.17 d before this forecast window (in-arc rms = RMS over the fit measurements at convergence, meters)

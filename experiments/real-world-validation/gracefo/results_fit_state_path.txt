@@ -1,0 +1,64 @@
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] quiet_2019 (state-path check)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (6): gracefo_1B_2019-11-14_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-15_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-16_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-17_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-18_RL04.ascii.noLRI.tgz, gracefo_1B_2019-11-19_RL04.ascii.noLRI.tgz
+  1 Hz records read: 518400 (QC-dropped 0); subsampled to 60 s -> 8640 epochs
+  span: 2019-11-14T00:00:19 -> 2019-11-19T23:59:19 TAI (5.999 days loaded)
+  fit window: days 2-3 (2 d, ending at the day-4 start); common forecast window: days 4-6
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   19317.74687279 +.00000271 +00000-0 +98502-5 0  9994
+  2 43476 088.9970 166.9377 0018420 022.3999 337.8049 15.23932987082211
+  epoch 2019-11-13T17:55:29.809056 UTC (+6.07 h from truth t0 -- negative = after)
+[state path]  1.2 State reference path vs reality (composition check)
+  state = the day-2-start truth sample, 2019-11-15T00:00:19 TAI (ITRF -> EME2000); fitting_span = 2 d (the shipped default; fit window ends at the day-4 start)
+  forecast = the common days 4-6 window (the sweep's); B* fitted throughout; force set = run_gracefo Run 2/3 (table rows: the Chunk 2b Run 4/5 spacecraft)
+  reference drift vs truth over the fit window (Cd 2.300): RMS 27.9 m, end 69.4 m
+  reference drift vs truth over the fit window (Cd 2.030): RMS 6.9 m, end 18.6 m
+  reference drift vs truth over the fit window (sphere table): RMS 85.5 m, end 201.0 m (rows 4+5 -- same dynamics)
+  reference drift vs truth over the fit window (box table, IPT-ecef): RMS 217.1 m, end 500.6 m
+  config                             in-arc rms fit-win 3D   +1 d 3D   +2 d 3D   +3 d 3D          B*
+  Trajectory path (truth ref)             623.2      622.8     931.2    2225.5    4492.5   3.017e-05
+  State path, Cd 2.300 (nominal)          623.7      623.9    1031.6    2487.1    4954.4   3.273e-05
+  State path, Cd 2.030 (Run-3 fit)        623.7      622.9     961.1    2323.1    4681.2   3.145e-05
+  State path, sphere table                623.7      629.9    1203.2    2885.4    5631.6   3.603e-05
+  External ref, sphere table              623.4      629.9    1203.0    2884.6    5629.7   3.601e-05
+  External ref, box table (IPT)           623.4      662.0    1630.3    3802.6    7171.8   4.345e-05
+  [equivalence]  native State path vs external route, sphere table (rows 4 vs 5) -- absolute deltas:
+    in-arc rms 0.4 m | fit-win 3D 0.0 m | +1/+2/+3 d 3D 0.1 / 0.8 / 1.9 m | B* 1.80e-08
+    (same dynamics through both delivery paths -- differences are measurement placement only, expected << the ~600 m SGP4 floor; the construction-time equivalence measured on real data, licensing the box row, whose attitude the State path cannot express)
+  (in-arc rms = vs the fit's OWN reference -- truth for row 1, the internal numerical propagation for the State rows, the external 60 s reference for the 'External ref' rows; fit-win 3D = the TLE vs truth over the 2-day fit window; forecast days vs truth)
+  reading: State-path cost vs the trajectory twin = the reference drift expressed through the fit -- expected ~nil where drift << the ~600 m SGP4 noise, material where the reference Cd is uncalibrated. The table rows are the no-truth pre-flight case: the shipped a-priori tables as the calibration source, the box flown at Chunk 2b's Run-5 wind-aligned attitude via the external route.
+GRACE-FO 1: fitted TLE vs Space-Track catalog TLE -- Chunk 3
+==========================================================================
+[window] active_2023 (state-path check)
+[data]
+  satellite: C = GRACE-FO 1 (GRACE C) (NORAD 43476)
+  source files (6): gracefo_1B_2023-12-20_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-21_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-22_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-23_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-24_RL04.ascii.noLRI.tgz, gracefo_1B_2023-12-25_RL04.ascii.noLRI.tgz
+  1 Hz records read: 518400 (QC-dropped 0); subsampled to 60 s -> 8640 epochs
+  span: 2023-12-20T00:00:19 -> 2023-12-25T23:59:19 TAI (5.999 days loaded)
+  fit window: days 2-3 (2 d, ending at the day-4 start); common forecast window: days 4-6
+[catalog TLE]  Space-Track gp_history, nearest epoch to the fit start
+  1 43476U 18047A   23353.82590425  .00004407  00000-0  16167-3 0  9994
+  2 43476  88.9824 323.8854 0015957  51.6909 308.5772 15.27615336310325
+  epoch 2023-12-19T19:49:18.1272 UTC (+4.17 h from truth t0 -- negative = after)
+[state path]  1.2 State reference path vs reality (composition check)
+  state = the day-2-start truth sample, 2023-12-21T00:00:19 TAI (ITRF -> EME2000); fitting_span = 2 d (the shipped default; fit window ends at the day-4 start)
+  forecast = the common days 4-6 window (the sweep's); B* fitted throughout; force set = run_gracefo Run 2/3 (table rows: the Chunk 2b Run 4/5 spacecraft)
+  reference drift vs truth over the fit window (Cd 2.300): RMS 1435.4 m, end 3252.3 m
+  reference drift vs truth over the fit window (Cd 3.405): RMS 127.7 m, end 342.8 m
+  reference drift vs truth over the fit window (sphere table): RMS 922.0 m, end 2109.6 m (rows 4+5 -- same dynamics)
+  reference drift vs truth over the fit window (box table, IPT-ecef): RMS 730.1 m, end 1560.7 m
+  config                             in-arc rms fit-win 3D   +1 d 3D   +2 d 3D   +3 d 3D          B*
+  Trajectory path (truth ref)             636.3      636.5     687.4    1164.9    2072.0   2.051e-04
+  State path, Cd 2.300 (nominal)          635.1     1572.0    5182.5    9516.8   15284.6   1.323e-04
+  State path, Cd 3.405 (Run-3 fit)        635.7      650.7     793.4     924.1    1147.2   1.936e-04
+  State path, sphere table                635.2     1121.6    3353.4    5982.1    9484.4   1.565e-04
+  External ref, sphere table              634.8     1121.6    3353.4    5982.1    9484.4   1.565e-04
+  External ref, box table (IPT)           635.6      963.4    2734.7    5523.0    9284.2   2.338e-04
+  [equivalence]  native State path vs external route, sphere table (rows 4 vs 5) -- absolute deltas:
+    in-arc rms 0.5 m | fit-win 3D 0.0 m | +1/+2/+3 d 3D 0.0 / 0.0 / 0.0 m | B* 0.00e+00
+    (same dynamics through both delivery paths -- differences are measurement placement only, expected << the ~600 m SGP4 floor; the construction-time equivalence measured on real data, licensing the box row, whose attitude the State path cannot express)
+  (in-arc rms = vs the fit's OWN reference -- truth for row 1, the internal numerical propagation for the State rows, the external 60 s reference for the 'External ref' rows; fit-win 3D = the TLE vs truth over the 2-day fit window; forecast days vs truth)
+  reading: State-path cost vs the trajectory twin = the reference drift expressed through the fit -- expected ~nil where drift << the ~600 m SGP4 noise, material where the reference Cd is uncalibrated. The table rows are the no-truth pre-flight case: the shipped a-priori tables as the calibration source, the box flown at Chunk 2b's Run-5 wind-aligned attitude via the external route.

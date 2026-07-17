@@ -2,8 +2,10 @@
 
 A keep-it-around record of how a finished feature branch becomes a tagged release
 on `main`. It generalizes the steps used for `v0.3.0` (Feature 1.3, the TLE
-propagator). Distribution is **GitHub-only** — there is no PyPI publish step; a
-release is simply a squash-merge to `main` plus an annotated tag (project_meta §3).
+propagator), updated for the GitHub Pull Request flow adopted at `v0.7.2`.
+Distribution is **GitHub-only** — there is no PyPI publish step; a release is a
+squash-merge to `main` (through a PR from `v0.7.2` on) plus an annotated tag
+(project_meta §3).
 
 Conventions assumed here:
 
@@ -61,21 +63,36 @@ git status        # expect a clean tree
 This commit is folded into the squash in step 3, so its message is throwaway — it
 will not appear in `main`'s history.
 
-## 3. Squash-merge into `main`
+## 3. Open a pull request and squash-merge it on GitHub
+
+Push the branch, then merge it through a PR (the flow adopted at `v0.7.2`; before
+that, this step was a local `git merge --squash`).
+
+```bash
+git push -u origin <branch>
+```
+
+1. On GitHub, open a PR with **base `main`** and **compare `<branch>`** (use the
+   "Compare & pull request" banner after the push, or **Pull requests → New**).
+   Title it like the release commit — `Feature N.M: <short title>`, matching the
+   existing `main` history; the finalized `CHANGELOG` section is a ready-made body.
+2. Let CI finish green, then self-review the **Files changed** diff.
+3. Merge with **"Squash and merge"** (not a merge commit — this keeps the
+   one-commit-per-release history). Edit the squash message to the release title;
+   optionally tick **Delete branch**.
+
+GitHub creates the single feature-titled squash commit on `main`. It is a
+**brand-new commit with a new SHA** — not any commit in your local repo — so the
+next step pulls it before anything else touches it.
+
+## 4. Pull `main`, then tag it (annotated, matching the existing tags)
+
+Fetch GitHub's squash commit **first** — tagging before the pull would point the
+tag at the wrong commit (the classic first-timer mistake):
 
 ```bash
 git switch main
-git merge --squash <branch>
-git commit -m "Feature N.M: <short title>"
-```
-
-`--squash` stages the whole branch diff without committing or recording a merge
-parent; your `git commit` creates the single feature-titled release commit
-(matching the existing `main` history).
-
-## 4. Tag it (annotated, matching the existing tags)
-
-```bash
+git pull origin main
 git tag -a vX.Y.Z -m "vX.Y.Z - <one-line summary>"
 ```
 
@@ -83,10 +100,10 @@ All existing tags are **annotated** (`git cat-file -t vX.Y.Z` → `tag`); keep t
 consistent. The message mirrors `v0.2.0`'s style, e.g. `v0.3.0 - TLE propagator
 (SGP4/SDP4) and CelesTrak TLE fetch`.
 
-## 5. Verify locally before pushing
+## 5. Verify before pushing the tag
 
 ```bash
-git log --oneline --decorate -3            # main HEAD is the new feature commit, tagged
+git log --oneline --decorate -3            # main HEAD is the new squash commit, tagged
 git diff --stat <branch> main              # empty == squash captured everything
 git rev-parse main vX.Y.Z^{commit}         # both SHAs identical -> tag points at HEAD
 git tag -l vX.Y.Z -n99                      # annotated message reads right
@@ -95,12 +112,15 @@ git tag -l vX.Y.Z -n99                      # annotated message reads right
 `git diff --stat <branch> main` returning nothing is the key check that the squash
 captured the entire branch (no file was missed).
 
-## 6. Push and clean up (the outward-facing step)
+## 6. Push the tag and clean up (the outward-facing step)
+
+`main` is already on GitHub (the PR merge pushed it, step 4 pulled it), so only
+the tag remains to push:
 
 ```bash
-git push origin main --follow-tags         # pushes main + reachable annotated tags in one shot
-git branch -D <branch>                      # see note: -D, not -d
-git push origin --delete <branch>           # optional: drop the remote branch too
+git push origin vX.Y.Z                      # GitHub does not create the tag; you do
+git branch -D <branch>                       # local branch: -D, not -d (see note)
+git push origin --delete <branch>            # only if the PR merge did not auto-delete it
 ```
 
 > [!NOTE]
@@ -109,12 +129,9 @@ git push origin --delete <branch>           # optional: drop the remote branch t
 > "merged" and `-d` refuses. The empty `git diff --stat <branch> main` in step 5 is
 > your proof the content is safe to force-delete.
 
-If you prefer two explicit pushes over `--follow-tags`:
-
-```bash
-git push origin main
-git push origin vX.Y.Z
-```
+Optionally, publish a **GitHub Release** from the tag (Releases → Draft a new
+release → choose `vX.Y.Z`, paste the `CHANGELOG` section) so the release surfaces
+on the repo's front page.
 
 ## 7. Verify the remote
 
@@ -136,8 +153,8 @@ When `main` and `origin/main` match, the remote `vX.Y.Z^{}` peeled ref equals
 - [ ] `CHANGELOG.md` `[Unreleased]` renamed to `[X.Y.Z] - YYYY-MM-DD`, new empty `[Unreleased]` opened
 - [ ] `pyproject.toml` version bumped **and** editable reinstall done (`importlib.metadata` reports `X.Y.Z`)
 - [ ] release prep committed, tree clean
-- [ ] `git merge --squash` + single `Feature N.M: …` commit on `main`
-- [ ] annotated `vX.Y.Z` tag pointing at `main` HEAD
+- [ ] branch pushed; PR opened (base `main`), CI green, **Squash and merge** with the `Feature N.M: …` title
+- [ ] `git pull origin main`, then annotated `vX.Y.Z` tag pointing at `main` HEAD
 - [ ] local verification (empty branch↔main diff, tag peels to HEAD)
-- [ ] pushed `main` + tag; feature branch deleted (`-D`) locally and on `origin`
+- [ ] pushed the tag; feature branch deleted (`-D` locally, and on `origin` if not auto-deleted)
 - [ ] remote verified (`origin/main` matches, remote tag peels to HEAD)
