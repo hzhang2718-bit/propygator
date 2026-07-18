@@ -30,7 +30,10 @@ which is *not* shipped and is fetched separately via
   log-spaced), `incidence_axis` (rad, uniform over `[0, π]`), and a `metadata_json`
   provenance string. The runtime sums `CdA = Σ_i Cd_i(θ_i)·A_i` over the six faces of a
   convex box. It shares the sphere table's gas-surface assumptions (SESAM α anchor,
-  300 K wall, diffuse re-emission) — cross-table coherence. Regenerate with
+  300 K wall, diffuse re-emission) — cross-table coherence. The grid is floored at
+  0.0 at generation (v0.7.3): the leeward closed form's analytic residue dips
+  noise-level negative for light species — see the generator docstring's "Leeward
+  floor". Regenerate with
   `python scripts/generate_box_face_cd_table.py` (same generation-only deps as the
   sphere table; see that script's docstring). End users load the committed array and
   compute nothing.

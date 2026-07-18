@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-07-17
+
+### Added
+
+- Construction-time validations to ensure that the shipped and user-input Cd tables do
+  not have negative entries.
+- New tests to ensure that the shipped Cd tables have no negative entries.
+- Notes about Cd table changes to the real-world validation experiment and its
+  associated documentation.
+
+### Changed
+
+- `from_table` now rejects custom Cd tables with negative entries (which earlier versions
+  accepted).
+
+### Fixed
+
+- Slightly negative entries in the `BoxFaceCd` table are floored at 0 at table
+  generation. The shipped `BoxFaceCd` table is regenerated. Previously, wrapping the
+  shipped table in a callable raised `ValueError` mid-propagation due to the table's
+  negative entries and run-time checks.
+
 ## [0.7.2] - 2026-07-16
 
 ### Added

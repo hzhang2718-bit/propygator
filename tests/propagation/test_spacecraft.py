@@ -332,6 +332,11 @@ def test_variable_cd_in_range_does_not_warn():
             "radius_axis": np.array([1.0]),
             "density_axis": np.array([1.0, 2.0]),
         },  # axis too short
+        {
+            "grid": np.array([[1.0, 1.0], [1.0, -1e-6]]),
+            "radius_axis": np.array([1.0, 2.0]),
+            "density_axis": np.array([1.0, 2.0]),
+        },  # negative entry (Cd >= 0, validated since v0.7.3)
     ],
 )
 def test_variable_cd_from_table_validation(kwargs):
@@ -518,6 +523,13 @@ def test_box_face_in_range_does_not_warn():
             "density_axis": np.array([1.0, 2.0]),
             "incidence_axis": np.array([0.0, np.pi + 0.1]),  # above pi
         },
+        {
+            # negative entry (Cd >= 0, validated since v0.7.3)
+            "grid": np.array([[[1.0, 1.0], [1.0, 1.0]], [[1.0, 1.0], [1.0, -1e-6]]]),
+            "radius_axis": np.array([1.0, 2.0]),
+            "density_axis": np.array([1.0, 2.0]),
+            "incidence_axis": np.array([0.0, np.pi]),
+        },
     ],
 )
 def test_box_face_from_table_validation(kwargs):
@@ -542,6 +554,37 @@ def test_box_face_default_loads_committed_asset():
     assert 2.0 < head_on < 5.0
     assert 0.0 < edge_on < 0.5
     assert head_on > edge_on
+    # Chunk 5 (v0.7.3): the grid is floored at 0.0 at generation, so the leeward
+    # half — noise-level negative through v0.7.2 — serves values >= 0.
+    assert bf._grid.min() >= 0.0
+    assert bf(6_828_000.0, 1e-12, np.pi) >= 0.0
+
+
+def test_shipped_grids_are_nonnegative():
+    """Both committed tables satisfy the from_table >= 0 rule they now load through.
+
+    The box grid is floored at generation (its leeward half was noise-negative
+    through v0.7.2 — Chunk 5); the sphere grid never approaches zero (min ~2.1),
+    so its half of the rule is trivially true, no regeneration needed.
+    """
+    box = BoxFaceCd.default()
+    sphere = VariableCd.sphere_default()
+    assert box._grid is not None and box._grid.min() >= 0.0
+    assert sphere._grid is not None and sphere._grid.min() >= 0.0
+
+
+def test_box_face_default_callable_wrap_serves_leeward():
+    """An identity from_callable wrap of the shipped table returns >= 0 at θ = π.
+
+    The Chunk 5 asymmetry: through v0.7.2 the table path tolerated the shipped
+    grid's negative leeward noise, but from_callable's runtime check rejects
+    Cd < 0 — so wrapping the shipped table (e.g. scaling it) raised ValueError
+    mid-propagation. With the floored grid the wrap must serve the whole θ axis.
+    """
+    table = BoxFaceCd.default()
+    wrapped = BoxFaceCd.from_callable(table, name="identity_wrap")
+    for radius_m in (6_600_000.0, 6_828_000.0, 7_500_000.0):
+        assert wrapped(radius_m, 1e-12, np.pi) >= 0.0
 
 
 # --- metadata serializer ---------------------------------------------------
