@@ -295,15 +295,17 @@ the margin costs nothing). The pins prove "the wiring didn't regress", not
   ballistic coefficient (§1.2's documented behavior, now shown on reality).
 - **One-week/one-day arcs per window:** the numbers characterize these arcs;
   the *relationships* are what's pinned.
-- `box_face_default` carries noise-level negative leeward entries (θ=π slice
-  ≤ 0, min −5.8e-4) — harmless in the table path (≤ 0.01 % of the face-sum)
-  but `from_callable` rejects Cd < 0, an asymmetry between factory paths →
-  **Chunk 5** (floor the generator at zero + validate `from_table` inputs).
+- `box_face_default` carried noise-level negative leeward entries through
+  v0.7.2 (θ=π slice ≤ 0, min −5.8e-4) — harmless in the table path (≤ 0.01 %
+  of the face-sum) but `from_callable` rejects Cd < 0, an asymmetry between
+  factory paths → **Chunk 5** (floor the generator at zero + validate
+  `from_table` inputs; shipped in v0.7.3).
 
 ## 8. Named follow-ons (recorded, not built)
 
 - **Chunk 5 — `box_face_default` leeward floor** (order-independent
-  maintenance, own branch off `main`; evidence in the build plan).
+  maintenance, own branch off `main`; evidence in the build plan). **Shipped
+  in v0.7.3.**
 - **Chunk 6 — `FitResult` covariance exposure** (order-independent feature,
   own branch, §1.2 amendment at chunk time): sigma(B\*) ≫ estimate reads
   "hold B\*" directly — the clean primitive behind the Chunk 3 B\* regime

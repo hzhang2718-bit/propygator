@@ -294,7 +294,10 @@ class VariableCd:
 
         ``grid`` has shape ``(len(radius_axis), len(density_axis))``; both axes are
         SI (radius in meters, density in kg/m^3), strictly increasing and finite.
-        ``name`` overrides the content hash in metadata (the shipped table uses
+        ``grid`` entries must be finite and **>= 0** (validated since v0.7.3): Cd
+        is a drag coefficient, and :meth:`from_callable` already rejects a negative
+        value at runtime — the two factories accept the same values. ``name``
+        overrides the content hash in metadata (the shipped table uses
         ``"sphere_default"``); leave it ``None`` for a user table.
         """
         radius = _validate_axis("radius_axis", radius_axis)
@@ -307,6 +310,11 @@ class VariableCd:
             )
         if not np.all(np.isfinite(grid_arr)):
             raise ValueError("grid must be finite (no NaN/inf)")
+        if np.any(grid_arr < 0.0):
+            raise ValueError(
+                f"grid contains negative entries (min {float(grid_arr.min())!r}); "
+                "the drag coefficient must be >= 0"
+            )
         grid_arr = _as_readonly(grid_arr)
         return cls(
             grid=grid_arr,
@@ -553,9 +561,13 @@ class BoxFaceCd:
         ``grid`` has shape ``(len(radius_axis), len(density_axis),
         len(incidence_axis))``; all axes are SI (radius in meters, density in kg/m^3,
         ``incidence`` the face-flow angle θ in radians), strictly increasing and finite.
-        ``incidence_axis`` must lie within ``[0, π]``. ``name`` overrides the content
-        hash in metadata (the shipped table uses ``"box_face_default"``); leave it
-        ``None`` for a user table.
+        ``incidence_axis`` must lie within ``[0, π]``. ``grid`` entries must be finite
+        and **>= 0** (validated since v0.7.3): Cd is a drag coefficient, and
+        :meth:`from_callable` already rejects a negative value at runtime — the two
+        factories accept the same values (the shipped table is floored at 0.0 over
+        its leeward half at generation). ``name`` overrides the content hash in
+        metadata (the shipped table uses ``"box_face_default"``); leave it ``None``
+        for a user table.
         """
         radius = _validate_axis("radius_axis", radius_axis)
         density = _validate_axis("density_axis", density_axis)
@@ -576,6 +588,11 @@ class BoxFaceCd:
             )
         if not np.all(np.isfinite(grid_arr)):
             raise ValueError("grid must be finite (no NaN/inf)")
+        if np.any(grid_arr < 0.0):
+            raise ValueError(
+                f"grid contains negative entries (min {float(grid_arr.min())!r}); "
+                "the drag coefficient must be >= 0"
+            )
         grid_arr = _as_readonly(grid_arr)
         return cls(
             grid=grid_arr,

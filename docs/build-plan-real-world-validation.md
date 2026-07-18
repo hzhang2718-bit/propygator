@@ -760,7 +760,7 @@ order as the catalog TLE's (parity, not victory, is the claim).
 
 ---
 
-## Chunk 4 — Wrap-up: pinned tests, findings doc, README
+## Chunk 4 — Wrap-up: pinned tests, findings doc, README - Done
 
 **Goal:** persist what the study proved — regression tests that would catch a
 future wiring regression, the findings doc, the README claim.
@@ -826,13 +826,22 @@ retires to `docs/history/`.
 
 ---
 
-## Chunk 5 — `box_face_default` negative-leeward grid fix (order-independent maintenance)
+## Chunk 5 — `box_face_default` negative-leeward grid fix (order-independent maintenance) - Done
 
 > **Normal-fix-path item, folded in as its own chunk (maintainer's 2026-07-12
 > request) so it can be addressed in isolation.** It touches `scripts/` +
-> `data/` + `src/` + `tests/` on its **own branch off `main`** (not the study
-> branch), at any time — no study chunk depends on it, and it needs nothing from
-> the study's data. Discovered by Chunk 2b's Verify-4 probe.
+> `data/` + `src/` + `tests/` (plus, per the 2026-07-16 amendments, cosmetic
+> `experiments/` + `docs/` touch-ups) on its **own branch off `main`** (not the
+> study branch), at any time — no study chunk depends on it, and it needs
+> nothing from the study's data. Discovered by Chunk 2b's Verify-4 probe.
+
+> **Amended 2026-07-16 (pre-build blast-radius analysis, on branch
+> `fix/box-face-cd-leeward-floor`):** the Create/edit, Scope-decisions, and
+> Verify items below fold in that analysis — the floor-placement constraint,
+> the npz metadata handling, the old-vs-new grid diff (the venv-drift guard),
+> the committed-evidence decision (frozen — maintainer chose option (b)), and
+> the `run_gracefo.py::_scaled_box_cd` cleanup. Evidence figures re-verified
+> against the shipped npz the same day.
 
 **Evidence (measured 2026-07-12; recorded so no session re-derives it):** the
 shipped `data/box_face_cd_default.npz` grid (shape 26 × 25 × 65) carries
@@ -841,6 +850,24 @@ noise-level **negative** entries over the leeward half — 11,325 of 42,250 valu
 −3.4e-11). Physically Cd_leeward → 0⁺; the negatives are numerical noise
 (hypothesis to confirm at chunk time: erfc/exp cancellation in the generator's
 leeward Sentman closed form, committed with no physical floor).
+**Re-verified 2026-07-16 with three additions:** the negatives are confined to
+incidence nodes 46–64 (θ ≥ 129.4°); the npz `metadata_json.cd_range` min is
+**−0.00175** — the pre-regrid *cloud* range, more negative than the grid min,
+so flooring only the grid leaves a stale negative range claim in the metadata;
+the sphere table's grid min is 2.106 (zero negatives), so its half of the fix
+is validation-only, no regeneration.
+**Hypothesis resolved at fix time (2026-07-17), with a mechanism refinement:**
+the negatives are the closed form's *analytic* residue, not floating-point
+noise — a cancellation-free `erfc(−a)` re-evaluation of the same formula
+reproduces them to ~1e-17. The erfc/exp terms nearly cancel *analytically*,
+and for low speed-ratio (light, hot) species the DRIA re-emission recoil
+projected on the drag axis exceeds the tiny incident drag: H reaches −1.6e-3
+near θ ≈ 150–180°, He −3.2e-11 at θ = π (the measured slice value), and the
+grid argmin sits at 1350 km / lowest densities / θ = 143.4° — the
+He/H-dominated corner. Still physically spurious (the model has no
+self-shadowing; a convex body's leeward faces are shielded, Cd_leeward → 0⁺),
+so the floor stands unchanged; the mechanism is recorded in the generator's
+module docstring ("Leeward floor").
 
 **Symptom that bit:** table lookups tolerate the negatives (no per-lookup
 validation on the `from_table` path), but `BoxFaceCd.from_callable` **rejects**
@@ -854,32 +881,90 @@ that `from_callable` would refuse to serve.
 **Create / edit:**
 - `scripts/generate_box_face_cd_table.py` — floor the assembled grid at 0.0 (the
   physical bound) before writing; document the floor in the script docstring.
+  **Floor placement is constrained (2026-07-16):** it goes in `generate()` at
+  grid assembly — after the nearest-neighbour edge fill, *before* the anchor
+  prints so the logged θ=180 anchor reflects shipped values — and **never**
+  inside `_face_cd_species` / `_face_cd_total`: the cross-validator drives
+  those closed forms against the *unfloored* experiment kernel
+  (`cd_box.cd_panel_species`) and asserts machine-precision agreement (1e-9
+  gate), which an in-form floor breaks at ~5.8e-4. Corollary: **the experiment
+  kernel needs no matching floor** — the experiment side is untouched by
+  design.
+- Same script, metadata: rescope `cd_range` (post-floor grid range, or keep the
+  cloud range under a cloud-named key — its current min −0.00175 is the
+  *cloud*, not the grid) and add explicit floor provenance (e.g.
+  `leeward_floor: {applied, n_floored, min_before_floor}`).
 - Regenerate `data/box_face_cd_default.npz` and rerun the generator's
   cross-validation gate (the change is ≤ 5.8e-4 absolute — far inside the Tier B
-  "≪ 1% on CdA" acceptance).
+  "≪ 1% on CdA" acceptance). Because the floor never touches the closed form,
+  `CROSS_VALIDATION_MAX_REL_PCT` (0.1193) is **expected to reproduce
+  unchanged** — the rerun is confirmation, not refresh; update the constant
+  (and the results file) only if the print actually moves.
+- **Old-vs-new npz array diff (new verify artifact, 2026-07-16):** assert only
+  previously-negative grid entries changed (all to exactly 0.0) and every
+  other entry + all three axes are bit-identical. This doubles as the
+  venv-drift guard: if *non-leeward* entries moved, the throwaway venv's
+  pymsis/scipy have drifted since the 2026-06 snapshot and the whole grid
+  silently shifted — **stop and decide** (re-pin the venv per
+  `docs/experiments_venv.md` vs. accept a full regeneration); never ship the
+  diff blind.
 - `src/propygator/propagation/spacecraft.py` — validate grid ≥ 0 in
   `BoxFaceCd.from_table` (and `VariableCd.from_table`, same rule, cheap) so the
   asymmetry closes at construction; leave `from_callable`'s strict runtime check
-  as is.
+  as is. (This tightens a previously-accepted input beyond the archived
+  general-upgrades-1.md Tier B validation table — the archived doc stays
+  untouched; the factory docstrings carry the new rule and this plan is the
+  sanctioned instruction.)
 - Tests (`tests/propagation/test_spacecraft.py`, pure-Python, no JVM): the
   shipped grid min ≥ 0 (both tables — the sphere's is trivially true, its Cd
   never approaches 0); `from_table` rejects a grid containing a negative entry;
   an identity `from_callable` wrap of the default table returns ≥ 0 at θ = π.
+  While there, extend `test_box_face_default_loads_committed_asset` with a
+  leeward-≥-0 assert.
+- `experiments/real-world-validation/gracefo/run_gracefo.py` (2026-07-16) —
+  remove the now-dead `_scaled_box_cd` `max(0.0, …)` clamp and replace its
+  bug-explanation comment with a one-line breadcrumb ("grid floored at
+  generation since v0.7.3"). Clamping non-negative values is an identity, so
+  the committed evidence stays reproducible — **no re-run**.
+- Docs (2026-07-16): `docs/real-world-validation-findings.md` §7 caveat + §8
+  follow-on gain a "shipped in v0.7.3" pointer; `data/README.md`'s box-table
+  entry gains a one-line floor note; `experiments/real-world-validation/README.md`
+  gains the evidence-freeze note (see Scope decisions).
+
+**Scope decisions (resolved 2026-07-16, maintainer's; do not relitigate):**
+- **Committed study evidence stays frozen at its v0.7.2 numbers** (option (b)
+  of the blast-radius analysis). `gracefo/results.txt` prints
+  `leeward -0.000` in 4 places (the sign of −3.4e-11); after regeneration a
+  `run_all.py --verify` diffs on exactly those strings — the numeric effect on
+  Run 5 is ~1e-11 m² of Cd·A, below printed precision. Do **not** regenerate
+  the `drag` / `state-path` groups; instead the study README notes that a
+  post-Chunk-5 `--verify` differs by exactly `leeward -0.000` → `0.000` and
+  why that is expected (the evidence is the historical record of what was
+  measured against the table that shipped then).
+- **No other experiment re-runs.** Surveyed 2026-07-16: the Tier B benefit
+  studies (`cd_box_benefit_study*.py`), `experiments/ecef-attitude-benefit/`
+  (its committed results print no leeward Cd values), and
+  `gracefo/probes/probe_tables.py` (superseded probe, outside `run_all`) are
+  archived evidence with the effect below printed precision; notebook 02 has
+  no leeward narrative and strips outputs. Note-only, no action.
 
 **Reuse:** the existing generator + its cross-validation harness. The committed
 default-table tests assert *ranges*, not exact values (verified 2026-07-12), and
 run metadata is name-based (`Cd=table:box_face_default`), not content-based — so
 nothing pinned moves.
 
-**You provide / run:** the branch (suggest `fix/box-face-cd-leeward-floor`); the
-generator rerun; CHANGELOG + the patch release per `docs/release-process.md`
-(the version number depends on whether the study's optional tag has been taken
-by then).
+**You provide / run:** the branch (`fix/box-face-cd-leeward-floor`, created
+2026-07-16); the generator + cross-validator reruns (throwaway venv, not
+conda); CHANGELOG + the patch release per `docs/release-process.md` — the
+release is **`v0.7.3`** (the study's optional `v0.7.2` tag was taken).
 
-**Verify:** regenerated npz min ≥ 0; full suite + pre-commit green. Interaction
-with Chunk 4's optional face-sum pin: if the pin lands *before* this fix, its
-generous-margin tolerance already absorbs the ≤ 1e-3 m² shift; if after, pin
-against the regenerated table.
+**Verify:** regenerated npz min ≥ 0 **and** the old-vs-new array diff is
+leeward-only (the venv-drift gate above); the cross-validation rerun
+reproduces `CROSS_VALIDATION_MAX_REL_PCT` (or constant + npz metadata are
+refreshed together); full suite + pre-commit green. Interaction with Chunk 4's
+face-sum pin (landed *before* this fix): its generous-margin band already
+absorbs the shift (~1e-7 m² on the 4.18 m² face-sum; its docstring says so) —
+nothing pinned moves.
 
 ---
 

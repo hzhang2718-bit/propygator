@@ -770,11 +770,8 @@ def main() -> None:
     s_fit = diag["cda_fit"] / diag["cda_box_w"]
 
     def _scaled_box_cd(radius_m: float, density_kgm3: float, theta_rad: float) -> float:
-        # The shipped box_face_default grid carries noise-level *negative* leeward
-        # entries (~ -2e-6 near theta=pi) that the table lookup path tolerates but
-        # the from_callable validation rejects (Cd must be >= 0) -- clamp at zero;
-        # the effect is ~1e-6 m^2 of Cd*A, far below everything measured here.
-        return max(0.0, s_fit * box_table(radius_m, density_kgm3, theta_rad))
+        # Grid floored at generation since v0.7.3 -- no clamp needed.
+        return s_fit * box_table(radius_m, density_kgm3, theta_rad)
 
     t_wall = _time.perf_counter()
     pos5s = _propagate_itrf(

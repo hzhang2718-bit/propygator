@@ -29,6 +29,25 @@ experiment), the scattered cloud is regridded -- one ``(radius, density)`` regri
 incidence node, since the incidence is sampled exactly at every node -- onto a clean
 ``(radius, density, incidence)`` mesh and saved.
 
+**Leeward floor (v0.7.3).** The assembled grid is floored at 0.0 -- the physical
+bound -- before the anchor prints and the write. Over the leeward half the closed
+form's erfc/exp terms nearly cancel and the *analytic* residue dips slightly negative
+for low speed-ratio (light, hot) species: the DRIA re-emission recoil projected on
+the drag axis exceeds the tiny incident drag (H reaches ~-1.6e-3 near theta ~
+150-180 deg, and the theta = pi value is strictly negative for every species), so the
+mass-flux-weighted grid went negative where He/H dominate -- the high-altitude /
+low-density corner (pre-floor grid min -5.8e-4; 27% of entries, all at theta >=
+129 deg). Confirmed by direct evaluation 2026-07-17: an erfc-reformulated,
+cancellation-free evaluation reproduces the same negatives to ~1e-17, so they are
+model artifact, not float noise -- physically spurious, since a convex body's leeward
+faces are shielded (the closed form has no self-shadowing) and Cd_leeward -> 0+.
+The floor lives in :func:`generate` at grid assembly and **never** inside
+:func:`_face_cd_species` / :func:`_face_cd_total`: the cross-validator
+(``experiments/drag-coefficient-verification/cross_validate_box_face.py``) drives
+those closed forms against the *unfloored* experiment kernel and asserts
+machine-precision agreement, which an in-form floor would break. Floor provenance
+(count, pre-floor minimum) is recorded in ``metadata_json["leeward_floor"]``.
+
 **Independence / cross-validation.** Like the sphere generator, the per-face *physics*
 here is reconstructed from the standard literature, **not** copied from the experiment
 ``cd_box.py`` kernel. The Tier-A pieces are imported from ``generate_sphere_cd_table``
@@ -310,6 +329,23 @@ def generate(
         n_outside,
     )
 
+    # Floor the assembled grid at 0.0, the physical bound (module docstring "Leeward
+    # floor"): the leeward closed form is analytically slightly negative for low
+    # speed-ratio species (a self-shadowing-free model artifact), so the weighted grid
+    # dips below zero where He/H dominate. Floored HERE -- after the regrid + edge
+    # fill, before the anchor prints so the logged theta=180 anchor reflects shipped
+    # values -- and never inside _face_cd_species/_face_cd_total (the cross-validator
+    # needs those unfloored).
+    min_before_floor = float(grid.min())
+    negative = grid < 0.0
+    n_floored = int(np.count_nonzero(negative))
+    grid[negative] = 0.0
+    logger.info(
+        "Floored %d negative leeward grid entries at 0.0 (min before floor %.3e)",
+        n_floored,
+        min_before_floor,
+    )
+
     # Sanity anchors at a representative mid-grid cell (build-plan Chunk-2 verify: the
     # per-face Cd should floor near ~0.07 at edge-on and taper to ~0 by ~110 deg).
     ri, di = radius_axis.size // 2, density_axis.size // 2
@@ -410,7 +446,19 @@ def generate(
         },
         "seed": seed,
         "n_samples": int(cd_cloud.size),
-        "cd_range": [float(cd_cloud.min()), float(cd_cloud.max())],
+        # cd_range is the SHIPPED (post-floor) grid's range -- the claim a consumer
+        # can check against the array. The pre-regrid, unfloored sample cloud keeps
+        # its extremes under cd_cloud_range (provenance; through v0.7.2 this was
+        # what cd_range held, and it is negative on the leeward half). The sphere
+        # generator's cd_range stays cloud-scoped -- its cloud is strictly positive,
+        # so nothing stale to rescope there.
+        "cd_range": [float(grid.min()), float(grid.max())],
+        "cd_cloud_range": [float(cd_cloud.min()), float(cd_cloud.max())],
+        "leeward_floor": {
+            "applied": True,
+            "n_floored": n_floored,
+            "min_before_floor": min_before_floor,
+        },
         "generated_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     return grid.astype(np.float64), metadata

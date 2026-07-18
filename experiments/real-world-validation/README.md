@@ -108,6 +108,13 @@ consolidates them.
   evidence is each leg's README + results files.
 - Evidence numbers are deterministic (same code, truth files, orekit-data);
   only wall-clock timings vary between runs — `run_all.py --verify` masks them.
+- **Evidence is frozen at its v0.7.2 numbers** — the historical record of what
+  was measured against the table that shipped then. The Chunk 5 leeward floor
+  (v0.7.3) regenerated `box_face_cd_default.npz`, so a post-v0.7.3 `--verify`
+  of the `drag` / `state-path` groups differs from the committed
+  `gracefo/results.txt` in exactly four `leeward -0.000` → `0.000` prints (the
+  sign of a −3.4e-11 the floor zeroed; the numeric effect on Run 5 is
+  ~1e-11 m² of Cd·A, below printed precision). Expected — do not regenerate.
 - Shared code: `common.py` (cross-leg analysis math), `gracefo/gracefo_common.py`
   (leg config + measured anchors). Drivers stay the per-chunk entry points.
 - Reference-only: not shipped, not in CI, outside `testpaths`, excluded from
