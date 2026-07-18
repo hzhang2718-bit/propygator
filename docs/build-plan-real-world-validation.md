@@ -154,7 +154,7 @@ fixtures small enough to live as literals.
 
 ## How to use this plan
 
-- **9 chunks (0–6, with 2b and 2c inserted after 2)**, each sized for one
+- **10 chunks (0–7, with 2b and 2c inserted after 2)**, each sized for one
   Claude Code session:
   - **Chunk 0 is the diagnostic gate** (LAGEOS end-to-end → Checkpoint A).
   - **Chunks 1–3 (2b and 2c included) are the evidence body**; **Chunk 4 is wrap-up**
@@ -167,6 +167,11 @@ fixtures small enough to live as literals.
     exposure elected from Chunk 3's B\* finding) — like Chunk 5 its own branch
     off `main`, but on the normal *feature* path (it adds public surface);
     no study chunk depends on it.
+  - **Chunk 7 is order-independent feature work** (the `FitResult` residual
+    diagnostics elected 2026-07-17 from the Chunk 6 scoping discussion) —
+    same shape as Chunk 6: own branch off `main`, the normal feature path,
+    no study chunk depends on it; may share Chunk 6's branch/release
+    (maintainer's call).
 - Each chunk lists **Goal / Create-Edit / Reuse / You provide / You run / Verify**.
 - **Checkpoint A (after Chunk 0) is GO / INVESTIGATE** — never a silent shrug: a
   bad diff reroutes the plan into localized bug-hunting (the t₀ diff, then the
@@ -996,18 +1001,40 @@ the clean primitive a "weak-drag warning" heuristic would only approximate.
   sigmas in a documented parameter order (the 6 mean elements + B\* iff
   `fit_bstar`), following the `residuals_m` array-backed value-type invariants
   (defensive copy, read-only contents, value-based `__eq__`/`__hash__`,
-  validating `__post_init__`, constructible pre-JVM).
+  validating `__post_init__`, constructible pre-JVM). Alongside it, capture
+  the **a-posteriori variance factor** σ₀² = cost² / (m − n) — the weighted
+  residual sum of squares over the degrees of freedom, available from the
+  observer's `ls_evaluation` (`getCost()`; exact accessor confirmed by the
+  same chunk-time probe) — and carry σ₀ as a scalar `FitResult` field: the
+  covariance and sigmas ship **raw**, and σ₀ is the documented bridge to
+  residual-scaled sigmas (× σ₀), applied by the user knowingly, never
+  silently. The **correlation matrix** (elected 2026-07-17) is exposed as a
+  **derived, JVM-free property** computed on demand from the stored
+  covariance — not a second stored array (no redundant state; equality/hash
+  stay covariance-based, and it works unchanged for any parameter set, 6 or
+  7 with B\*) — in the same documented parameter order; the docstring names
+  corr(B\*, n) → ±1 as the direct collinearity read behind the Chunk-3
+  pathology.
 - `docs/features.md` §1.2 — the amendment (additive fields only; document the
   interpretation caveat: under the fixed 1 m / 1 mm/s measurement sigmas
   against a *systematic* SGP4 representation error, formal sigmas are
-  **conditioning indicators** — relative, not absolute, uncertainty).
-- Tests (`tests/tle/test_fitter.py`; `orekit` fixture): shape / parameter
-  order / read-only pins; sigma(B\*) **dominant** on a short weak-drag fit vs
-  small on a drag-observable fit (relationships, not absolutes — the study's
-  tolerance policy); the `fit_bstar=False` path (no B\* row); equality/hash
-  with the new fields.
-- `notebooks/07_tle_fitting.ipynb` — a covariance read added to the
-  walkthrough, flagging the Chunk-3-style unconstrained B\*.
+  **conditioning indicators** — relative, not absolute, uncertainty; the σ₀
+  field documents the standard rescaling, with the honest second caveat that
+  even scaled sigmas understate uncertainty here — the residuals are a
+  smooth, autocorrelated once-per-rev signal, so the effective
+  independent-measurement count sits far below N).
+- Tests (`tests/tle/test_fitter.py` + `tests/tle/test_fitter_real_world.py`;
+  `orekit` fixture): shape / parameter order / read-only pins; sigma(B\*)
+  **dominant** on a short weak-drag fit vs small on a drag-observable fit,
+  and |corr(B\*, n)| **higher** on the weak-drag fit (relationships, not
+  absolutes — the study's tolerance policy); σ₀ relationship pins — O(1) on
+  the SGP4 self-fit (residuals at the assumed sigma) vs ≫ 1 on the real-data
+  fixture (~630 m residuals under a 1 m sigma); the `fit_bstar=False` path
+  (no B\* row) — exercised via the held-catalog-B\* carrier configuration on
+  the real-data fixture, doubling as a carrier-route pin; equality/hash with
+  the new fields.
+- `notebooks/07_tle_fitting.ipynb` — a covariance + correlation read added
+  to the walkthrough, flagging the Chunk-3-style unconstrained B\*.
 - **Resolved at election (the Chunk 3 sweep):** the conditional
   `fitting_span` default change (2 d → 3 d) is **declined** — the sweep showed
   2 days is the fitted-B\* sweet spot in both windows and 3 days beats it
@@ -1032,6 +1059,62 @@ CHANGELOG; the version bump + release per `docs/release-process.md`.
 signatures unchanged (additive fields only); sigma(B\*) on the quiet
 short-arc real-data fixture reads unconstrained while a drag-observable fit
 reads constrained.
+
+---
+
+## Chunk 7 — `FitResult` residual diagnostics (order-independent feature work)
+
+> **Elected 2026-07-17 (maintainer's request), from the Chunk 6 scoping
+> discussion.** Like Chunk 6 this adds **public surface**: its own branch off
+> `main` on the normal feature path, a `features.md` §1.2 amendment drafted at
+> chunk time (additive fields only), a minor version bump, CHANGELOG + release
+> the maintainer's. Order-independent of Chunk 6 — but it amends the same
+> §1.2 surface and the same `FitResult`, so running both chunks on one branch
+> with a single combined amendment and one release is the economical
+> packaging (maintainer's call).
+
+**Motivation:** `residuals_m` keeps only norms, which destroys the most
+diagnostic information in the residual set — *structure*. A once-per-rev
+sinusoid reads "SGP4 short-period representation error, irreducible"; a
+secular along-track ramp reads "drag/B\* mismatch" — exactly the analysis
+the study's Leg 3 did by hand. The signed position **and** velocity
+components are already computed and discarded in the observer loop
+(`_build_fit_observer`), and the observed PV provides the radial /
+along-track / cross-track axes: the data is free, only the carrying surface
+is new.
+
+**Create / edit:**
+- `src/propygator/tle/fitter.py` — the observer captures the signed residual
+  components at the accepted final evaluation; `FitResult` gains velocity
+  residual norms (`(N,)`) and signed position residuals decomposed
+  radial / along-track / cross-track (`(N, 3)`, axes built from the observed
+  PV; exact field names — and whether raw TEME components also ship — settled
+  at chunk time, the lean being RIC-only), following the `residuals_m`
+  array-backed value-type invariants (defensive copy, read-only contents,
+  value-based `__eq__`/`__hash__`, validating `__post_init__`, constructible
+  pre-JVM).
+- `docs/features.md` §1.2 — the amendment (additive fields only; document the
+  axis convention and the read: periodic structure = representation error,
+  secular structure = dynamics mismatch).
+- Tests (`tests/tle/test_fitter.py` + `tests/tle/test_fitter_real_world.py`):
+  shape / alignment with `measurement_epochs` / read-only / equality-hash
+  pins; a structure pin on the pinned measured day (along-track dominates the
+  decomposition — relationships, not absolutes); `import propygator` stays
+  JVM-free.
+- `notebooks/07_tle_fitting.ipynb` — a residual-structure read (the RIC
+  components over the arc; flag secular vs periodic by eye).
+
+**Reuse:** the `FitResult` validation idioms; the existing observer loop; the
+Chunk 3/4 pinned GNV1B subsamples.
+
+**You provide / run:** the branch (suggest
+`feature/fitresult-residual-diagnostics`, or fold onto Chunk 6's branch);
+CHANGELOG; the version bump + release per `docs/release-process.md`.
+
+**Verify:** full suite + pre-commit green; the fitter's public signatures
+unchanged (additive fields only); the along-track-dominant structure pin
+holds on the real-world fixture; `FitResult` remains constructible +
+validating pre-init.
 
 ---
 

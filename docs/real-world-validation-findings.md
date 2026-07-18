@@ -310,6 +310,17 @@ the margin costs nothing). The pins prove "the wiring didn't regress", not
   own branch, §1.2 amendment at chunk time): sigma(B\*) ≫ estimate reads
   "hold B\*" directly — the clean primitive behind the Chunk 3 B\* regime
   rule. It flags conditioning, **not** State-path reference bias (§5).
+  Scope extended 2026-07-17: + the a-posteriori variance factor σ₀ (the
+  documented bridge from raw to residual-scaled sigmas) and a derived,
+  JVM-free correlation-matrix property (corr(B\*, n) → ±1 is the direct
+  collinearity read).
+- **Chunk 7 — `FitResult` residual diagnostics** (order-independent feature,
+  own branch — or shared with Chunk 6 — §1.2 amendment at chunk time;
+  elected 2026-07-17): velocity residual norms + signed
+  radial/along-track/cross-track position residuals from the components the
+  observer already computes and discards; periodic structure reads "SGP4
+  representation error, irreducible", secular along-track reads
+  "dynamics/B\* mismatch" — the §5 hand analysis, productized.
 - **NRLMSISE-00 ap-history mode** (`withSwitch(9, -1)`): would drive the model
   at 3-hour resolution and fix the daily-Ap smearing (§4); wiring it changes
   all storm-time behavior, so it needs its own validation study — the
