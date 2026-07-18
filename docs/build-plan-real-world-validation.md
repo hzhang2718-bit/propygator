@@ -973,7 +973,7 @@ nothing pinned moves.
 
 ---
 
-## Chunk 6 — `FitResult` covariance exposure (order-independent feature work)
+## Chunk 6 — `FitResult` covariance exposure (order-independent feature work) - Done - correlation matrix dropped
 
 > **Elected 2026-07-14 (maintainer's request), from Chunk 3's B\* finding.**
 > Like Chunk 5 this is not study work — but where Chunk 5 is a fix, this adds

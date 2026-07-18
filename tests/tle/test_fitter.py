@@ -90,6 +90,33 @@ def _iss_tle() -> TLE:
     return TLE.from_strings(ISS_LINE1, ISS_LINE2, name="ISS (ZARYA)")
 
 
+PARAM_NAMES_7 = ("Px", "Py", "Pz", "Vx", "Vy", "Vz", "BSTAR")
+
+
+def _valid_covariance(n: int = 7) -> np.ndarray:
+    """A symmetric positive-definite (n, n) float64 matrix."""
+    d = np.arange(1.0, n + 1.0)
+    return np.diag(d) + 0.01 * np.outer(d, d)
+
+
+def _asymmetric_covariance() -> np.ndarray:
+    cov = _valid_covariance()
+    cov[0, 1] *= 3.0
+    return cov
+
+
+def _negative_diag_covariance() -> np.ndarray:
+    cov = _valid_covariance()
+    cov[2, 2] = -1.0
+    return cov
+
+
+def _nonfinite_covariance() -> np.ndarray:
+    cov = _valid_covariance()
+    cov[3, 3] = np.inf
+    return cov
+
+
 def _valid_fit_result(**overrides: object) -> FitResult:
     kwargs: dict = {
         "tle": _iss_tle(),
@@ -98,6 +125,9 @@ def _valid_fit_result(**overrides: object) -> FitResult:
         "rms_m": 0.5,
         "residuals_m": np.array([0.4, 0.5, 0.6]),
         "measurement_epochs": (_epoch(0.0), _epoch(60.0), _epoch(120.0)),
+        "covariance": _valid_covariance(),
+        "parameter_names": PARAM_NAMES_7,
+        "sigma0": 2.0,
     }
     kwargs.update(overrides)
     return FitResult(**kwargs)
@@ -242,6 +272,11 @@ def test_fit_result_valid_construction() -> None:
     assert result.residuals_m.shape == (3,)
     assert isinstance(result.measurement_epochs, tuple)
     assert len(result.measurement_epochs) == 3
+    # 2026-07-18 amendment fields.
+    assert result.covariance is not None
+    assert result.covariance.shape == (7, 7)
+    assert result.parameter_names == PARAM_NAMES_7
+    assert result.sigma0 == 2.0
 
 
 def test_fit_result_residuals_defensively_copied_and_read_only() -> None:
@@ -260,6 +295,45 @@ def test_fit_result_epochs_list_coerced_to_tuple() -> None:
     assert isinstance(result.measurement_epochs, tuple)
 
 
+def test_fit_result_parameter_names_list_coerced_to_tuple() -> None:
+    result = _valid_fit_result(parameter_names=list(PARAM_NAMES_7))
+    assert isinstance(result.parameter_names, tuple)
+
+
+def test_fit_result_covariance_defensively_copied_and_read_only() -> None:
+    source = _valid_covariance()
+    result = _valid_fit_result(covariance=source)
+    source[0, 0] = 999.0  # caller mutation must not reach the value type
+    assert result.covariance is not None
+    assert result.covariance[0, 0] != 999.0
+    with pytest.raises(ValueError):
+        result.covariance[0, 0] = 1.0  # read-only contents
+
+
+def test_fit_result_covariance_none_allowed() -> None:
+    # The singular-extraction corner (warned at fit time): the fit stands,
+    # covariance and its derived sigmas are honestly absent.
+    result = _valid_fit_result(covariance=None)
+    assert result.covariance is None
+    assert result.sigmas is None
+    assert result.sigma0 == 2.0  # sigma0 never depends on the inversion
+
+
+def test_fit_result_sigmas_is_derived_and_fresh() -> None:
+    result = _valid_fit_result()
+    sigmas = result.sigmas
+    assert sigmas is not None
+    assert result.covariance is not None
+    np.testing.assert_allclose(sigmas, np.sqrt(np.diag(result.covariance)))
+    assert sigmas.shape == (len(result.parameter_names),)
+    # Derived on demand: each call returns a fresh, writable array whose
+    # mutation cannot corrupt the stored covariance.
+    sigmas[0] = 999.0
+    fresh = result.sigmas
+    assert fresh is not None
+    assert fresh[0] != 999.0
+
+
 def test_fit_result_value_equality_and_hash() -> None:
     a = _valid_fit_result()
     b = _valid_fit_result()
@@ -269,6 +343,15 @@ def test_fit_result_value_equality_and_hash() -> None:
     assert a != c
     d = _valid_fit_result(residuals_m=np.array([0.4, 0.5, 0.7]))
     assert a != d
+    # 2026-07-18 amendment fields participate in equality/hash.
+    e = _valid_fit_result(sigma0=3.0)
+    assert a != e
+    f = _valid_fit_result(covariance=2.0 * _valid_covariance())
+    assert a != f
+    g = _valid_fit_result(covariance=None)
+    assert a != g
+    assert g == _valid_fit_result(covariance=None)
+    assert hash(g) == hash(_valid_fit_result(covariance=None))
 
 
 @pytest.mark.parametrize(
@@ -290,6 +373,21 @@ def test_fit_result_value_equality_and_hash() -> None:
         ({"residuals_m": np.array([0.4, np.nan, 0.6])}, ValueError),
         ({"measurement_epochs": (_epoch(0.0), _epoch(60.0))}, ValueError),
         ({"measurement_epochs": (_epoch(0.0), _epoch(60.0), "x")}, TypeError),
+        # 2026-07-18 amendment fields.
+        ({"covariance": [[1.0]]}, TypeError),
+        ({"covariance": np.eye(3)}, ValueError),  # shape vs parameter_names
+        ({"covariance": np.ones((7, 6))}, ValueError),  # non-square
+        ({"covariance": np.eye(7, dtype=np.float32)}, ValueError),
+        ({"covariance": _asymmetric_covariance()}, ValueError),
+        ({"covariance": _negative_diag_covariance()}, ValueError),
+        ({"covariance": _nonfinite_covariance()}, ValueError),
+        ({"parameter_names": ()}, ValueError),
+        ({"parameter_names": PARAM_NAMES_7[:6] + (7,)}, TypeError),
+        ({"parameter_names": ("a", "b")}, ValueError),  # length vs covariance
+        ({"sigma0": float("nan")}, ValueError),
+        ({"sigma0": -1.0}, ValueError),
+        ({"sigma0": "2.0"}, TypeError),
+        ({"sigma0": True}, TypeError),
     ],
 )
 def test_fit_result_validation_rows(overrides: dict, exc: type[Exception]) -> None:
@@ -559,6 +657,24 @@ def test_fit_result_invariants(iss_ref_2d: Trajectory, self_fit: FitResult) -> N
     )
     assert self_fit.iterations >= 1
     assert self_fit.evaluations >= self_fit.iterations
+    # 2026-07-18 amendment: the raw physical covariance in the estimator's
+    # documented Cartesian-basis order (Step-0 probe), read-only, with
+    # positive formal sigmas.
+    assert self_fit.parameter_names == PARAM_NAMES_7
+    assert self_fit.covariance is not None
+    assert self_fit.covariance.shape == (7, 7)
+    assert not self_fit.covariance.flags.writeable
+    sigmas = self_fit.sigmas
+    assert sigmas is not None
+    assert np.all(sigmas > 0.0)
+
+
+def test_self_fit_sigma0_far_below_one(self_fit: FitResult) -> None:
+    # sigma0 relationship pin (probe-corrected from the plan's "O(1)"): the
+    # self-fit converges to ~1e-6 m residuals, far BELOW the assumed 1 m /
+    # 1 mm/s measurement sigmas, so the a-posteriori variance factor sits
+    # orders of magnitude under 1 (measured ~2e-7; generous margin).
+    assert 0.0 < self_fit.sigma0 < 1.0e-2
 
 
 def test_field_policy_without_guess(iss_ref_2d: Trajectory) -> None:
@@ -607,8 +723,13 @@ def test_field_policy_kwargs_win_over_guess(iss_ref_2d: Trajectory) -> None:
 def test_fit_bstar_false_holds_seed_bstar(iss_ref_2d: Trajectory) -> None:
     # Without a guess the seed's B* is 0.0; with a guess it is the guess's.
     # Held bit-exact either way (Chunk-0 probe behavior, now pinned).
-    held_zero = fit_tle(iss_ref_2d, fitting_span=21600.0, fit_bstar=False)
-    assert float(held_zero.to_orekit().getBStar()) == 0.0
+    held_zero = fit_tle_detailed(iss_ref_2d, fitting_span=21600.0, fit_bstar=False)
+    assert float(held_zero.tle.to_orekit().getBStar()) == 0.0
+    # 2026-07-18 amendment: an unestimated B* has no covariance row — the
+    # parameter set is the six Cartesian orbital parameters only.
+    assert held_zero.parameter_names == PARAM_NAMES_7[:6]
+    assert held_zero.covariance is not None
+    assert held_zero.covariance.shape == (6, 6)
     held_guess = fit_tle(
         iss_ref_2d,
         fitting_span=21600.0,
@@ -768,6 +889,17 @@ def test_numerical_fit_documented_rms(numerical_fit: FitResult) -> None:
     assert numerical_fit.rms_m < 1000.0
     assert float(numerical_fit.residuals_m.max()) < 1500.0
     assert numerical_fit.iterations < 100  # converged well inside the budget
+
+
+def test_numerical_fit_sigma0_far_above_one(numerical_fit: FitResult) -> None:
+    # sigma0 relationship pin, the other side: against a full-force numerical
+    # reference the residuals are the ~495 m SGP4 representation error — far
+    # ABOVE the assumed 1 m sigma — so sigma0 lands in the hundreds (the raw
+    # sigmas are optimistic by that factor; the documented x-sigma0 bridge).
+    assert numerical_fit.sigma0 > 10.0
+    assert numerical_fit.covariance is not None
+    assert numerical_fit.covariance.shape == (7, 7)
+    assert numerical_fit.parameter_names == PARAM_NAMES_7
 
 
 def test_numerical_fit_bstar_is_a_fit_residual(numerical_fit: FitResult) -> None:
