@@ -1,6 +1,6 @@
 # GRACE-FO vs. GNV1B reduced-dynamic orbits (real-world validation, Chunks 2 + 2b + 2c)
 
-Evidence for `docs/build-plan-real-world-validation.md` Chunks 2, 2b, and 2c — the
+Evidence for `docs/history/build-plan-real-world-validation.md` Chunks 2, 2b, and 2c — the
 **drag-stack** diagnostic. After the LAGEOS-2 leg established the conservative-force
 floor (Chunks 0–1), this leg measures the full drag pipeline (NRLMSISE-00 + real CSSI
 space weather + the shared `DragSensitive` proxy) against a real drag-perturbed LEO

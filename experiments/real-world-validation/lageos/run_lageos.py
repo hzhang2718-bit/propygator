@@ -1,6 +1,6 @@
 """LAGEOS-2 vs. ILRS precise orbit — the Chunk 0 conservative-force diagnostic.
 
-Evidence for ``docs/build-plan-real-world-validation.md`` Chunk 0 (Checkpoint A
+Evidence for ``docs/history/build-plan-real-world-validation.md`` Chunk 0 (Checkpoint A
 is called on these numbers): parse the ILRS SP3 truth week, propagate the t0
 truth state 7 days with the conservative force set, and decompose the residuals
 in RIC at 1 / 3 / 7 days — after a t0 sanity diff that isolates frame/time

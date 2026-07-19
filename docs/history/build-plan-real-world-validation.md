@@ -1062,7 +1062,7 @@ reads constrained.
 
 ---
 
-## Chunk 7 — `FitResult` residual diagnostics (order-independent feature work)
+## Chunk 7 — `FitResult` residual diagnostics (order-independent feature work) - Done
 
 > **Elected 2026-07-17 (maintainer's request), from the Chunk 6 scoping
 > discussion.** Like Chunk 6 this adds **public surface**: its own branch off

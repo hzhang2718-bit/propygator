@@ -1,6 +1,6 @@
 """GRACE-FO vs. GNV1B reduced-dynamic orbit -- the Chunk 2 + 2b drag diagnostics.
 
-Evidence for ``docs/build-plan-real-world-validation.md`` Chunks 2, 2b and 2c:
+Evidence for ``docs/history/build-plan-real-world-validation.md`` Chunks 2, 2b and 2c:
 the full drag pipeline (NRLMSISE-00 + real CSSI space weather + the shared
 ``DragSensitive`` proxy) measured against a real drag-perturbed LEO orbit, with
 the residual decomposed into "pipeline" vs. "density model" by construction. Run

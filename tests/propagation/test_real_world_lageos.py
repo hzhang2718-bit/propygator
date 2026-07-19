@@ -1,6 +1,6 @@
 """Real-world pinned regression: LAGEOS-2 vs. an ILRS precise orbit.
 
-The study Chunk 4 pin (docs/build-plan-real-world-validation.md; evidence in
+The study Chunk 4 pin (docs/history/build-plan-real-world-validation.md; evidence in
 ``experiments/real-world-validation/lageos/``): propagate the pinned ILRS
 truth state one day with the conservative force set and require the residual
 to stay below the Checkpoint-A number times a generous margin. This guards the

@@ -128,6 +128,10 @@ def _valid_fit_result(**overrides: object) -> FitResult:
         "covariance": _valid_covariance(),
         "parameter_names": PARAM_NAMES_7,
         "sigma0": 2.0,
+        "velocity_residuals_ms": np.array([1e-3, 2e-3, 3e-3]),
+        "residuals_ric_m": np.array(
+            [[0.1, -0.3, 0.2], [0.0, 0.5, -0.1], [-0.2, 0.4, 0.3]]
+        ),
     }
     kwargs.update(overrides)
     return FitResult(**kwargs)
@@ -277,6 +281,9 @@ def test_fit_result_valid_construction() -> None:
     assert result.covariance.shape == (7, 7)
     assert result.parameter_names == PARAM_NAMES_7
     assert result.sigma0 == 2.0
+    # 2026-07-19 residual-diagnostics fields.
+    assert result.velocity_residuals_ms.shape == (3,)
+    assert result.residuals_ric_m.shape == (3, 3)
 
 
 def test_fit_result_residuals_defensively_copied_and_read_only() -> None:
@@ -310,6 +317,21 @@ def test_fit_result_covariance_defensively_copied_and_read_only() -> None:
         result.covariance[0, 0] = 1.0  # read-only contents
 
 
+def test_fit_result_covariance_tolerates_rounding_asymmetry() -> None:
+    # Symmetry is judged against the Cauchy-Schwarz natural scale
+    # sigma_i * sigma_j, not entrywise relative difference: the raw Orekit
+    # matrix carries rounding-noise asymmetry in near-zero off-diagonals
+    # (measured ~1e-10 of natural scale on the notebook-07 SGP4 refit, which
+    # an entrywise-relative rtol=1e-8 check wrongly rejected — the 2026-07-19
+    # fix). Here the pair differs by 2x *relatively* but is ~1e-11 of its
+    # natural scale — must be accepted.
+    cov = _valid_covariance()
+    cov[0, 1] = 1.0e-11
+    cov[1, 0] = 2.0e-11
+    result = _valid_fit_result(covariance=cov)
+    assert result.covariance is not None
+
+
 def test_fit_result_covariance_none_allowed() -> None:
     # The singular-extraction corner (warned at fit time): the fit stands,
     # covariance and its derived sigmas are honestly absent.
@@ -317,6 +339,31 @@ def test_fit_result_covariance_none_allowed() -> None:
     assert result.covariance is None
     assert result.sigmas is None
     assert result.sigma0 == 2.0  # sigma0 never depends on the inversion
+
+
+def test_fit_result_residual_diagnostics_defensively_copied_and_read_only() -> None:
+    # 2026-07-19 amendment fields: the same array-backed value-type treatment
+    # as residuals_m / covariance.
+    vel_source = np.array([1e-3, 2e-3, 3e-3])
+    ric_source = np.array([[0.1, -0.3, 0.2], [0.0, 0.5, -0.1], [-0.2, 0.4, 0.3]])
+    result = _valid_fit_result(
+        velocity_residuals_ms=vel_source, residuals_ric_m=ric_source
+    )
+    vel_source[0] = 999.0  # caller mutation must not reach the value type
+    ric_source[0, 0] = 999.0
+    assert result.velocity_residuals_ms[0] == 1e-3
+    assert result.residuals_ric_m[0, 0] == 0.1
+    with pytest.raises(ValueError):
+        result.velocity_residuals_ms[0] = 1.0  # read-only contents
+    with pytest.raises(ValueError):
+        result.residuals_ric_m[0, 0] = 1.0  # read-only contents
+
+
+def test_fit_result_ric_residuals_are_signed() -> None:
+    # Signed components are the whole point: negative entries are valid.
+    ric = np.array([[-5.0, -10.0, -2.0], [-1.0, 3.0, 0.0], [0.0, 0.0, 0.0]])
+    result = _valid_fit_result(residuals_ric_m=ric)
+    assert result.residuals_ric_m[0, 1] == -10.0
 
 
 def test_fit_result_sigmas_is_derived_and_fresh() -> None:
@@ -352,6 +399,13 @@ def test_fit_result_value_equality_and_hash() -> None:
     assert a != g
     assert g == _valid_fit_result(covariance=None)
     assert hash(g) == hash(_valid_fit_result(covariance=None))
+    # 2026-07-19 residual-diagnostics fields participate in equality/hash.
+    h = _valid_fit_result(velocity_residuals_ms=np.array([1e-3, 2e-3, 4e-3]))
+    assert a != h
+    i = _valid_fit_result(
+        residuals_ric_m=np.array([[0.1, -0.3, 0.2], [0.0, 0.5, -0.1], [-0.2, 0.4, 9.9]])
+    )
+    assert a != i
 
 
 @pytest.mark.parametrize(
@@ -388,6 +442,22 @@ def test_fit_result_value_equality_and_hash() -> None:
         ({"sigma0": -1.0}, ValueError),
         ({"sigma0": "2.0"}, TypeError),
         ({"sigma0": True}, TypeError),
+        # 2026-07-19 residual-diagnostics fields.
+        ({"velocity_residuals_ms": [1e-3, 2e-3, 3e-3]}, TypeError),
+        ({"velocity_residuals_ms": np.array([[1e-3, 2e-3, 3e-3]])}, ValueError),
+        (
+            {"velocity_residuals_ms": np.array([1e-3, 2e-3], dtype=np.float32)},
+            ValueError,
+        ),
+        ({"velocity_residuals_ms": np.array([1e-3, -2e-3, 3e-3])}, ValueError),
+        ({"velocity_residuals_ms": np.array([1e-3, np.nan, 3e-3])}, ValueError),
+        ({"velocity_residuals_ms": np.array([1e-3, 2e-3])}, ValueError),  # length
+        ({"residuals_ric_m": [[0.1, 0.2, 0.3]]}, TypeError),
+        ({"residuals_ric_m": np.array([0.1, 0.2, 0.3])}, ValueError),  # 1-D
+        ({"residuals_ric_m": np.ones((3, 2))}, ValueError),  # not (N, 3)
+        ({"residuals_ric_m": np.ones((3, 3), dtype=np.float32)}, ValueError),
+        ({"residuals_ric_m": np.full((3, 3), np.inf)}, ValueError),
+        ({"residuals_ric_m": np.ones((2, 3))}, ValueError),  # length vs residuals
     ],
 )
 def test_fit_result_validation_rows(overrides: dict, exc: type[Exception]) -> None:
@@ -667,6 +737,22 @@ def test_fit_result_invariants(iss_ref_2d: Trajectory, self_fit: FitResult) -> N
     sigmas = self_fit.sigmas
     assert sigmas is not None
     assert np.all(sigmas > 0.0)
+    # 2026-07-19 amendment: the residual diagnostics align with the
+    # measurement grid, read-only.
+    assert self_fit.velocity_residuals_ms.shape == (300,)
+    assert self_fit.residuals_ric_m.shape == (300, 3)
+    assert not self_fit.velocity_residuals_ms.flags.writeable
+    assert not self_fit.residuals_ric_m.flags.writeable
+    assert np.all(np.isfinite(self_fit.velocity_residuals_ms))
+    assert np.all(self_fit.velocity_residuals_ms >= 0.0)
+    # The RIC decomposition is an orthonormal projection of the same vectors
+    # residuals_m takes its norms from: row norms must reproduce residuals_m.
+    np.testing.assert_allclose(
+        np.linalg.norm(self_fit.residuals_ric_m, axis=1),
+        self_fit.residuals_m,
+        rtol=1e-9,
+        atol=1e-12,
+    )
 
 
 def test_self_fit_sigma0_far_below_one(self_fit: FitResult) -> None:

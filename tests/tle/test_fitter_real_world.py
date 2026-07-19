@@ -1,6 +1,6 @@
 """Real-world pinned regression: the TLE fitter on measured GNV1B truth.
 
-The study Chunk 4 pin (docs/build-plan-real-world-validation.md; evidence in
+The study Chunk 4 pin (docs/history/build-plan-real-world-validation.md; evidence in
 ``experiments/real-world-validation/gracefo/results_fit_vs_catalog.txt``): the
 batch-least-squares fit must converge on a real, non-propygator-generated
 trajectory — the pinned GRACE-FO GNV1B day — with post-fit RMS in the SGP4
@@ -13,6 +13,13 @@ amendment) pin the B*-observability reads on the same fixture, weak arc
 relationships, not the build plan's a-priori guesses (the plan's
 "sigma(B*) ≫ estimate" read was falsified: the fitted B* inflates in step
 with its sigma on weak arcs, so only comparative reads discriminate).
+
+The Chunk 7 additions (2026-07-19, the residual-diagnostics amendment) pin
+the RIC structure on the full measured day: along-track dominates the signed
+decomposition (measured RIC RMS 116.5 / 594.4 / 162.1 m). The short arc is
+deliberately *not* structure-pinned — measured there, the dominance inverts
+(cross-track leads at 52 m vs 13 m along), a fit-absorption artifact of the
+~1-rev arc, not a stable relationship.
 
 Fixture: the shared solar-active GNV1B day (145 PV samples at 600 s,
 ``tests/propagation/real_world_gnv1b.py``). The committed Chunk 3 evidence fit
@@ -177,6 +184,35 @@ def test_scaled_sigma_bstar_vs_catalog_reads_observability(
     )
     assert weak_scaled > 3.0 * CATALOG_BSTAR  # measured ~17x: unconstrained
     assert strong_scaled < 1.5 * CATALOG_BSTAR  # measured ~0.15x: usable
+
+
+def test_ric_structure_along_track_dominates(full_day_fit: FitResult) -> None:
+    # Chunk 7: the residual-structure pin on the pinned measured day. SGP4's
+    # representation error on a real drag-perturbed LEO day is dominated by
+    # along-track structure (measured RIC RMS 116.5 / 594.4 / 162.1 m —
+    # along/radial 5.1x, along/cross 3.7x); pin the dominance relationship at
+    # a generous 1.5x, not the absolutes (study tolerance policy).
+    ric = full_day_fit.residuals_ric_m
+    assert ric.shape == (len(full_day_fit.residuals_m), 3)
+    rms = np.sqrt(np.mean(ric**2, axis=0))
+    assert rms[1] > 1.5 * rms[0]  # along-track dominates radial
+    assert rms[1] > 1.5 * rms[2]  # along-track dominates cross-track
+    # Orthonormal-projection consistency on real data: row norms reproduce
+    # residuals_m (measured at machine precision; loose tolerance).
+    np.testing.assert_allclose(
+        np.linalg.norm(ric, axis=1), full_day_fit.residuals_m, rtol=1e-9
+    )
+
+
+def test_velocity_residuals_populate_on_real_data(full_day_fit: FitResult) -> None:
+    # Chunk 7: the velocity residual norms on the measured day (measured
+    # 0.12-1.26 m/s — the ~627 m position RMS maps to sub-m/s velocity
+    # error). Non-degenerate and bounded, generous margin.
+    vel = full_day_fit.velocity_residuals_ms
+    assert vel.shape == (len(full_day_fit.residuals_m),)
+    assert np.all(np.isfinite(vel))
+    assert np.all(vel > 0.0)
+    assert float(vel.max()) < 15.0  # measured max 1.26 m/s, ~12x margin
 
 
 def test_held_catalog_bstar_carrier_configuration(

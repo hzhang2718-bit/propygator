@@ -2,9 +2,10 @@
 
 > **Status: findings record (non-binding).** The evidence body lives in
 > `experiments/real-world-validation/` (committed results files + per-leg
-> READMEs, regenerable via `run_all.py`); the study's working blueprint is
-> `docs/build-plan-real-world-validation.md` (kept active — Chunks 5–6 and
-> follow-ons remain open). This doc consolidates what the study measured and
+> READMEs, regenerable via `run_all.py`); the study's working blueprint was
+> `docs/history/build-plan-real-world-validation.md` (archived 2026-07-19 —
+> the study and all its follow-on chunks shipped, `v0.7.2`–`v0.8.0`). This
+> doc consolidates what the study measured and
 > what it means, in the style of `docs/history/prospective-forces-and-progress-findings.md`;
 > archive it to `docs/history/` when superseded. Nothing here amends a shipped
 > contract — where the study touched shipped behavior, the outcome was either
