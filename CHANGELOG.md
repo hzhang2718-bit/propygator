@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-07-19
+## [0.8.0] - 2026-07-26
 
 ### Added
 
@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New tests covering `FitResult` additions, including GRACE-FO data pinned tests.
   Covariance symmetry check was loosened during testing to prevent rejections of
   valid TLE fits.
+- Experiment exploring a decision matrix for getting the most out of the TLE fitter.
+  The results are confirmative and documented in docs/ and the TLE fitting notebook.
+- Experiment exploring the "fading memory" (age-weighted) TLE fitting process. The idea
+  is deemed worth further exploration. However, it is not implemented as of now because
+  early results are inconclusive against a pre-registered bar and whether it is truly
+  superior to the newly drafted decision matrix.
 
 ## [0.7.3] - 2026-07-17
 

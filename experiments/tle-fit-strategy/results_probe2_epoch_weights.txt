@@ -1,0 +1,28 @@
+Probe 2: epoch-at-end + age weights -- quiet_2019
+==============================================================================
+  anchor = day-7 start 2019-11-20T00:00:19 TAI; forecast days 7-10
+
+[forecast] (same anchor/window as probe 1 -- rows comparable across probes)
+  config                       span  in-arc     +1 d     +2 d     +3 d     +4 d         B* epoch stale  sigB*scl
+  held-cat 3d endEpoch           3d   673.9    895.8   1003.9   1201.2   1417.7  9.850e-06     -0.00 d         -
+  held-cat 6d endEpoch           6d   772.9   1434.3   1599.8   1616.1   1761.2  9.850e-06     -0.00 d         -
+  fitted 6d endEpoch             6d   746.7   1083.0   1275.4   1783.2   2436.4  2.806e-06     -0.00 d  5.89e-07
+  fitted 6d endEp w tau1.5       6d   906.1    730.9   1144.2   2085.5   3130.8  7.224e-07     -0.00 d  1.48e-06
+  held-cat 6d endEp w tau2       6d  1050.0    853.8    917.2   1005.0   1149.3  9.850e-06     -0.00 d         -
+  catalog (stale)                 -       -   1927.1   2106.0   2153.0   2286.7
+
+  wall time 68 s
+Probe 2: epoch-at-end + age weights -- active_2023
+==============================================================================
+  anchor = day-7 start 2023-12-26T00:00:19 TAI; forecast days 7-10
+
+[forecast] (same anchor/window as probe 1 -- rows comparable across probes)
+  config                       span  in-arc     +1 d     +2 d     +3 d     +4 d         B* epoch stale  sigB*scl
+  fitted 2d endEpoch             2d   666.3    905.0   1546.8   1948.4   1691.4  1.880e-04     -0.00 d  4.33e-06
+  held-cat 1d endEpoch           1d   636.4    833.0   1920.1   3383.1   4558.1  1.617e-04     -0.00 d         -
+  selfcal 2d->1d endEpoch        1d   640.4    711.3    906.2   1009.0   1304.1  1.880e-04     -0.00 d         -
+  fitted 3d endEp w tau0.75      3d   793.0    863.7   1662.8   2288.0   2181.1  1.843e-04     -0.00 d  5.08e-06
+  fitted 3d endEp w tau1.0       3d   749.1    782.0   1202.9   1309.1   1212.5  1.938e-04     -0.00 d  3.57e-06
+  catalog (stale)                 -       -  22759.4  29815.6  36963.4  43739.7
+
+  wall time 59 s
