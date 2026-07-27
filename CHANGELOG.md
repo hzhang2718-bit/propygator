@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-26
+
+### Added
+
+- TLE `FitResult` exposes the new fields of a 7 x 7 symmetric Cartesian `covariance`
+  matrix, covering `Px`, `Py`, `Pz`, `Vx`, `Vy`, `Vz`, and `BSTAR`
+  (when `fit_bstar=True`). In addition, `FitResult` also exposes `parameter_names`,
+  `sigma0`, and derived raw `sigmas`. These values, especially for `BSTAR`, shed more
+  light on the success of the fit and whether a refit with `BSTAR` held is potentially
+  beneficial.
+- TLE `FitResult` gains residual diagnostics. These include the norm of velocity
+  residuals (`velocity_residuals_ms`) and signed position residuals on radial,
+  along-track, and cross-track axes (`residuals_ric_m`). These values help expose
+  systematic fit errors that indicate a refit may be necessary.
+- New tests covering `FitResult` additions, including GRACE-FO data pinned tests.
+  Covariance symmetry check was loosened during testing to prevent rejections of
+  valid TLE fits.
+- Experiment exploring a decision matrix for getting the most out of the TLE fitter.
+  The results are confirmative and documented in docs/ and the TLE fitting notebook.
+- Experiment exploring the "fading memory" (age-weighted) TLE fitting process. The idea
+  is deemed worth further exploration. However, it is not implemented as of now because
+  early results are inconclusive against a pre-registered bar and whether it is truly
+  superior to the newly drafted decision matrix.
+
 ## [0.7.3] - 2026-07-17
 
 ### Added

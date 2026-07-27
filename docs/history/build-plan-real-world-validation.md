@@ -973,7 +973,7 @@ nothing pinned moves.
 
 ---
 
-## Chunk 6 — `FitResult` covariance exposure (order-independent feature work)
+## Chunk 6 — `FitResult` covariance exposure (order-independent feature work) - Done - correlation matrix dropped
 
 > **Elected 2026-07-14 (maintainer's request), from Chunk 3's B\* finding.**
 > Like Chunk 5 this is not study work — but where Chunk 5 is a fix, this adds
@@ -1062,7 +1062,7 @@ reads constrained.
 
 ---
 
-## Chunk 7 — `FitResult` residual diagnostics (order-independent feature work)
+## Chunk 7 — `FitResult` residual diagnostics (order-independent feature work) - Done
 
 > **Elected 2026-07-17 (maintainer's request), from the Chunk 6 scoping
 > discussion.** Like Chunk 6 this adds **public surface**: its own branch off

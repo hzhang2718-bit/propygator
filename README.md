@@ -189,6 +189,18 @@ reference is recovered essentially exactly. Non-convergence raises
 `TLEFitError` (no partial result). A walkthrough lives in
 [`notebooks/07_tle_fitting.ipynb`](notebooks/07_tle_fitting.ipynb).
 
+**Fit diagnostics, and what to do with them.** `fit_tle_detailed` also returns
+the estimator's `covariance` / `sigmas` / `sigma0` (Cartesian TEME at the fitted
+epoch, plus `BSTAR`) and the signed residual structure `residuals_ric_m`
+(radial / along-track / cross-track) alongside `velocity_residuals_ms`. These
+matter because **in-arc RMS is an anti-signal for forward prediction** — a free
+B\* on a short arc happily absorbs along-track error into a garbage drag
+coefficient, and B\* handling alone is the difference between ~1 km and 50+ km
+of drift at +3 days. [`docs/tle-fitting-playbook.md`](docs/tle-fitting-playbook.md)
+turns two numbers off those diagnostics into a gate that picks the fitting
+strategy, measured against GRACE-FO truth across quiet / active / storm drag
+regimes.
+
 ## Features
 
 The v1 feature set (all implemented):

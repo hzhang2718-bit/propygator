@@ -1,6 +1,6 @@
 """LAGEOS-2 ablation matrix — the Chunk 1 per-toggle wiring proof.
 
-Evidence for ``docs/build-plan-real-world-validation.md`` Chunk 1: rerun the
+Evidence for ``docs/history/build-plan-real-world-validation.md`` Chunk 1: rerun the
 Chunk 0 arc with one ``ForceModelConfig`` change at a time and require every
 ablation to move the truth residual by roughly its physically predicted order
 (and ``planets_third_body`` to move ~nothing). This is direct evidence that
@@ -63,7 +63,8 @@ _SOLAR_CONSTANT = 1361.0  # W/m^2 at 1 AU
 _AU = 1.495978707e11  # m
 _K2_LOVE = 0.30  # nominal degree-2 Love number (solid-tide scale estimate)
 
-# The Chunk 0 baseline (docs/build-plan-real-world-validation.md Chunk 0 step 2).
+# The Chunk 0 baseline
+# (docs/history/build-plan-real-world-validation.md Chunk 0 step 2).
 _BASELINE = {
     "drag": False,
     "solid_tides": True,

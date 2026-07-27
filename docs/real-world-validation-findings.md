@@ -2,9 +2,10 @@
 
 > **Status: findings record (non-binding).** The evidence body lives in
 > `experiments/real-world-validation/` (committed results files + per-leg
-> READMEs, regenerable via `run_all.py`); the study's working blueprint is
-> `docs/build-plan-real-world-validation.md` (kept active — Chunks 5–6 and
-> follow-ons remain open). This doc consolidates what the study measured and
+> READMEs, regenerable via `run_all.py`); the study's working blueprint was
+> `docs/history/build-plan-real-world-validation.md` (archived 2026-07-19 —
+> the study and all its follow-on chunks shipped, `v0.7.2`–`v0.8.0`). This
+> doc consolidates what the study measured and
 > what it means, in the style of `docs/history/prospective-forces-and-progress-findings.md`;
 > archive it to `docs/history/` when superseded. Nothing here amends a shipped
 > contract — where the study touched shipped behavior, the outcome was either
@@ -314,6 +315,23 @@ the margin costs nothing). The pins prove "the wiring didn't regress", not
   documented bridge from raw to residual-scaled sigmas) and a derived,
   JVM-free correlation-matrix property (corr(B\*, n) → ±1 is the direct
   collinearity read).
+  **Built 2026-07-18 (branch `feature/fitresult-covariance`, shipped in
+  v0.8.0), with two probe-forced corrections to the election as recorded
+  above.** (1) The basis is **Cartesian, not mean elements** — Orekit
+  13.1.x's `TLEPropagatorBuilder` estimates `Px..Vz` at epoch + `BSTAR` and
+  offers no orbit-type option. (2) The correlation-matrix property was
+  **dropped**: the corr(B\*, n) read it was elected for is falsified —
+  recovered from the Cartesian covariance by delta-method projection, it
+  measures ≈ −0.97 on the weak ~1-rev arc *and* the drag-observable full
+  day alike (B\*/n collinearity is structural to the TLE fit — both act
+  along-track), and whole-matrix conditioning reads invert (the healthy
+  long arc scores *worse*). Likewise "sigma(B\*) ≫ estimate" as literally
+  recorded above fails — the fitted B\* inflates in step with its sigma on
+  weak arcs — so the shipped read is **comparative**: raw sigma(B\*)
+  across configurations (~1200× collapse, ~1 rev → 24 h on the pinned
+  GNV1B day) or σ₀-scaled sigma(B\*) vs a physically plausible B\* (~17×
+  the window catalog at ~1 rev → hold B\*; ~0.15× on the full day →
+  usable). Full doctrine + evidence in the §1.2 amendment.
 - **Chunk 7 — `FitResult` residual diagnostics** (order-independent feature,
   own branch — or shared with Chunk 6 — §1.2 amendment at chunk time;
   elected 2026-07-17): velocity residual norms + signed

@@ -1,0 +1,13 @@
+Probe 4: storm window -- storm_2024 (Gannon, May 2024)
+==============================================================================
+  anchor = day-4 start 2024-05-13T00:00:19 TAI (recovery); forecast = 1 d; catalog-free rows only
+
+  config             in-arc     +1 d         B*       r
+  fitted 2d           619.8   3095.5  3.580e-04   0.011
+  fitted 1d           571.0    907.5  1.832e-04   0.079
+  fitted 3d           777.1   5675.6  4.735e-04   0.005
+  cross-span B* consistency s = |B*(3d)-B*(2d)|/B*(2d) = 0.323
+  selfcal 2d->1d      592.3   3079.9  3.580e-04
+  held-zero 1d        595.5   2157.8  0.000e+00
+
+  wall time 30 s

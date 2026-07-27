@@ -1,6 +1,6 @@
 """GRACE-FO: propygator's TLE fitter vs. the operational catalog -- Chunk 3.
 
-Evidence for ``docs/build-plan-real-world-validation.md`` Chunk 3, the question
+Evidence for ``docs/history/build-plan-real-world-validation.md`` Chunk 3, the question
 that motivated the study: *is a propygator-fitted TLE as good as an operational
 catalog TLE at predicting a real orbit?* Per window (quiet_2019 / active_2023),
 one driver with four modes, each writing its own committed results file. The

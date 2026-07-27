@@ -6,7 +6,10 @@ Orekit's ``TLEPropagatorBuilder`` + ``BatchLSEstimator`` (Levenberg-Marquardt)
 over evenly subsampled PV measurements. ``fit_tle_detailed`` is the engine and
 returns the full :class:`FitResult` diagnostics; ``fit_tle`` is the thin
 ``.tle`` wrapper (one implementation, no drift). Binding contract:
-features.md §1.2 (amended 2026-07-10 at Checkpoint A).
+features.md §1.2 (amended 2026-07-10 at Checkpoint A; covariance / ``sigma0``
+fields added 2026-07-18 and the residual diagnostics — velocity norms +
+signed RIC position residuals — 2026-07-19: the real-world-validation
+Chunk 6 / Chunk 7 follow-ons).
 
 The defining caveat (stated loudly on the verbs): the fit is **inherently
 lossy** — SGP4 is a simplified model, so a full-force numerical orbit can never
@@ -46,6 +49,22 @@ if TYPE_CHECKING:
     from ..propagation.force_models import ForceModelConfig
     from ..propagation.spacecraft import SpacecraftConfig
 
+    # _run_estimation outputs: (fitted Orekit TLE, iterations, evaluations,
+    # rms_m, residuals_m, velocity_residuals_ms, residuals_ric_m, covariance,
+    # parameter_names, sigma0).
+    _EstimationOutputs = tuple[
+        Any,
+        int,
+        int,
+        float,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray | None,
+        tuple[str, ...],
+        float,
+    ]
+
 logger = logging.getLogger(__name__)
 
 # --- internal knobs (tunable placeholders, not contract — features §1.2) --------
@@ -63,6 +82,9 @@ _SIGMA_VELOCITY_MS = 1.0e-3  # PV measurement velocity sigma
 _MEASUREMENT_WEIGHT = 1.0  # PV base weight
 _POSITION_SCALE_M = 1.0  # TLEPropagatorBuilder parameter normalization scale
 _CONVERGENCE_THRESHOLD = 1.0e-3  # BatchLSEstimator parameters convergence threshold
+# Decomposition cutoff for getPhysicalCovariances at convergence (the Step-0
+# probe value, 2026-07-18; even a ~1-revolution arc inverts cleanly at it).
+_COVARIANCE_SINGULARITY_THRESHOLD = 1.0e-10
 
 
 def _format_rms(rms_m: float) -> str:
@@ -96,11 +118,49 @@ class FitResult:
 
         back = propagate_tle(result.tle, span, output_step=step, start=start)
 
+    The 2026-07-18 §1.2 amendment (the real-world-validation Chunk 6
+    follow-on) adds the estimator's **raw** physical parameter covariance and
+    the a-posteriori variance factor ``sigma0``. The parameter basis is the
+    one Orekit's ``TLEPropagatorBuilder`` estimates in — **Cartesian TEME
+    position / velocity at the fitted epoch** (``Px Py Pz`` in m, ``Vx Vy Vz``
+    in m/s) plus ``BSTAR`` (TLE units, 1/earth-radii) iff ``fit_bstar`` —
+    labelled row-for-row by :attr:`parameter_names`. Raw means ``(J^T J)^-1``
+    under the internal 1 m / 1 mm/s measurement sigmas: **conditioning
+    indicators**, not absolute uncertainty. The documented bridge to the
+    standard residual-scaled form is ``sigmas * sigma0`` — applied by the user
+    knowingly, never silently — and the honest B* read is **comparative**:
+    judge sigma(B*) against a physically plausible B* (e.g. the catalog's) or
+    across fit configurations. There is deliberately no self-contained
+    "B* unconstrained" flag — on weak-drag arcs the fitted B* inflates in
+    step with its sigma, so no single-fit ratio discriminates (the Chunk 6
+    probe finding that also dropped the elected correlation property).
+    ``covariance`` is ``None`` — with a ``UserWarning`` at fit time — in the
+    exactly-singular corner the probes never reached.
+
+    The 2026-07-19 §1.2 amendment (the Chunk 7 follow-on, released together
+    with the covariance fields) restores the *structure* the norms destroy:
+    :attr:`velocity_residuals_ms` (per-measurement velocity residual norms)
+    and :attr:`residuals_ric_m` — the signed position residuals decomposed
+    onto radial / along-track / cross-track axes built from the observed PV
+    at each measurement (radial along the observed position; cross-track
+    along the orbit normal ``r x v``; along-track completing the right-handed
+    triad, near the velocity for near-circular orbits). Sign convention:
+    **observed minus estimated** — a positive along-track entry means the
+    reference runs ahead of the fitted TLE. The read: *periodic*
+    (once-per-rev) structure is SGP4's short-period representation error,
+    irreducible — the fit is as good as SGP4 gets; a *secular* along-track
+    ramp is a dynamics mismatch — revisit ``fit_bstar`` / the span. Row norms
+    of ``residuals_ric_m`` reproduce ``residuals_m``. The raw TEME residual
+    vectors are deliberately not stored (one call away: propagate ``tle`` at
+    :attr:`measurement_epochs` via ``propagate_tle``, subtract the
+    reference's TEME positions).
+
     Immutable and pure-Python (constructible + validating before JVM init, the
-    architecture §10 "safe before init" surface). ``residuals_m`` follows the
-    array-backed value-type invariant (:class:`~propygator.core.states.State`
-    pattern): defensively copied, contents read-only, value-based ``__eq__`` /
-    ``__hash__``.
+    architecture §10 "safe before init" surface). The ndarray fields
+    (``residuals_m``, ``covariance``, ``velocity_residuals_ms``,
+    ``residuals_ric_m``) follow the array-backed value-type invariant
+    (:class:`~propygator.core.states.State` pattern): defensively copied,
+    contents read-only, value-based ``__eq__`` / ``__hash__``.
     """
 
     tle: TLE
@@ -109,6 +169,11 @@ class FitResult:
     rms_m: float  # final position RMS over the fit measurements, meters
     residuals_m: np.ndarray  # per-measurement position residual norms, meters, (N,)
     measurement_epochs: tuple[Epoch, ...]  # the N measurement epochs, aligned
+    covariance: np.ndarray | None  # raw physical parameter covariance, (n, n)
+    parameter_names: tuple[str, ...]  # covariance row/column labels, estimator order
+    sigma0: float  # a-posteriori variance factor sqrt(cost^2 / (m - n))
+    velocity_residuals_ms: np.ndarray  # velocity residual norms, m/s, (N,)
+    residuals_ric_m: np.ndarray  # signed RIC position residuals, meters, (N, 3)
 
     def __post_init__(self) -> None:
         if not isinstance(self.tle, TLE):
@@ -169,11 +234,156 @@ class FitResult:
             )
         object.__setattr__(self, "measurement_epochs", epochs)
 
+        n_meas = residuals.shape[0]
+        if not isinstance(self.velocity_residuals_ms, np.ndarray):
+            raise TypeError(
+                "velocity_residuals_ms must be numpy.ndarray, got "
+                f"{type(self.velocity_residuals_ms).__name__}"
+            )
+        if self.velocity_residuals_ms.ndim != 1:
+            raise ValueError(
+                "velocity_residuals_ms must be 1-D, got shape "
+                f"{self.velocity_residuals_ms.shape}"
+            )
+        if self.velocity_residuals_ms.dtype != np.float64:
+            raise ValueError(
+                "velocity_residuals_ms must be float64, got "
+                f"{self.velocity_residuals_ms.dtype}"
+            )
+        if not np.all(np.isfinite(self.velocity_residuals_ms)) or np.any(
+            self.velocity_residuals_ms < 0
+        ):
+            raise ValueError("velocity_residuals_ms must be finite and >= 0")
+        if self.velocity_residuals_ms.shape[0] != n_meas:
+            raise ValueError(
+                "velocity_residuals_ms length "
+                f"({self.velocity_residuals_ms.shape[0]}) must match "
+                f"residuals_m length ({n_meas})"
+            )
+        velocity_residuals = np.array(
+            self.velocity_residuals_ms, dtype=np.float64, copy=True
+        )
+        velocity_residuals.setflags(write=False)
+        object.__setattr__(self, "velocity_residuals_ms", velocity_residuals)
+
+        if not isinstance(self.residuals_ric_m, np.ndarray):
+            raise TypeError(
+                "residuals_ric_m must be numpy.ndarray, got "
+                f"{type(self.residuals_ric_m).__name__}"
+            )
+        if self.residuals_ric_m.ndim != 2 or self.residuals_ric_m.shape[1] != 3:
+            raise ValueError(
+                "residuals_ric_m must have shape (N, 3), got "
+                f"{self.residuals_ric_m.shape}"
+            )
+        if self.residuals_ric_m.dtype != np.float64:
+            raise ValueError(
+                f"residuals_ric_m must be float64, got {self.residuals_ric_m.dtype}"
+            )
+        # Signed components — finiteness only, no non-negativity.
+        if not np.all(np.isfinite(self.residuals_ric_m)):
+            raise ValueError("residuals_ric_m must be finite")
+        if self.residuals_ric_m.shape[0] != n_meas:
+            raise ValueError(
+                f"residuals_ric_m length ({self.residuals_ric_m.shape[0]}) "
+                f"must match residuals_m length ({n_meas})"
+            )
+        ric = np.array(self.residuals_ric_m, dtype=np.float64, copy=True)
+        ric.setflags(write=False)
+        object.__setattr__(self, "residuals_ric_m", ric)
+
+        names = tuple(self.parameter_names)
+        if not names:
+            raise ValueError(
+                "parameter_names must be non-empty (a converged fit always "
+                "estimates at least the six orbital parameters)"
+            )
+        for name in names:
+            if not isinstance(name, str):
+                raise TypeError(
+                    f"parameter_names entries must be str, got {type(name).__name__}"
+                )
+        object.__setattr__(self, "parameter_names", names)
+
+        if isinstance(self.sigma0, bool) or not isinstance(self.sigma0, (int, float)):
+            raise TypeError(f"sigma0 must be a float, got {type(self.sigma0).__name__}")
+        if not math.isfinite(self.sigma0) or self.sigma0 < 0.0:
+            raise ValueError(f"sigma0 must be finite and >= 0, got {self.sigma0!r}")
+        object.__setattr__(self, "sigma0", float(self.sigma0))
+
+        if self.covariance is not None:
+            if not isinstance(self.covariance, np.ndarray):
+                raise TypeError(
+                    "covariance must be numpy.ndarray or None, got "
+                    f"{type(self.covariance).__name__}"
+                )
+            if (
+                self.covariance.ndim != 2
+                or self.covariance.shape[0] != self.covariance.shape[1]
+            ):
+                raise ValueError(
+                    f"covariance must be square 2-D, got shape {self.covariance.shape}"
+                )
+            if self.covariance.dtype != np.float64:
+                raise ValueError(
+                    f"covariance must be float64, got {self.covariance.dtype}"
+                )
+            if not np.all(np.isfinite(self.covariance)):
+                raise ValueError("covariance must be finite")
+            if self.covariance.shape[0] != len(names):
+                raise ValueError(
+                    f"covariance shape {self.covariance.shape} must match "
+                    f"parameter_names length ({len(names)})"
+                )
+            if np.any(np.diag(self.covariance) < 0.0):
+                raise ValueError("covariance diagonal (variances) must be >= 0")
+            # Symmetry, judged against each entry's natural Cauchy-Schwarz
+            # scale sigma_i*sigma_j (|cov_ij| <= sigma_i*sigma_j for any true
+            # covariance). Entries span ~30 orders of magnitude, so a fixed
+            # atol is meaningless — and an entrywise *relative* test wrongly
+            # rejects legitimate near-zero off-diagonals whose values are
+            # pure rounding noise (measured on a real refit: entries equal to
+            # 7 digits, asymmetry 7.5e-11 of natural scale, relative
+            # difference 1.1e-8).
+            diag = np.diag(self.covariance)
+            scale = np.sqrt(np.outer(diag, diag))
+            if not np.all(
+                np.abs(self.covariance - self.covariance.T) <= 1.0e-8 * scale
+            ):
+                raise ValueError("covariance must be symmetric")
+            cov = np.array(self.covariance, dtype=np.float64, copy=True)
+            cov.setflags(write=False)
+            object.__setattr__(self, "covariance", cov)
+
+    @property
+    def sigmas(self) -> np.ndarray | None:
+        """Raw per-parameter formal sigmas, ``sqrt(diag(covariance))``.
+
+        Derived on demand from the stored :attr:`covariance` — not a second
+        stored array, so the object cannot carry an inconsistent copy and
+        equality/hash stay covariance-based. Labelled by
+        :attr:`parameter_names`, same units as the parameters (m, m/s, B* in
+        1/earth-radii). Raw conditioning indicators — multiply by
+        :attr:`sigma0` for the residual-scaled form (class docstring).
+        ``None`` when :attr:`covariance` is. Each call returns a fresh
+        writable array.
+        """
+        if self.covariance is None:
+            return None
+        return np.sqrt(np.diag(self.covariance))
+
     def __eq__(self, other: object) -> bool:
         # The dataclass-generated __eq__ would call bool() on the ndarray
         # comparison and raise; compare by value instead (the State idiom).
         if not isinstance(other, FitResult):
             return NotImplemented
+        if (self.covariance is None) != (other.covariance is None):
+            return False
+        covariance_equal = (
+            self.covariance is None
+            or other.covariance is None  # unreachable (XOR above); narrows the type
+            or np.array_equal(self.covariance, other.covariance)
+        )
         return (
             self.tle == other.tle
             and self.iterations == other.iterations
@@ -181,11 +391,16 @@ class FitResult:
             and self.rms_m == other.rms_m
             and np.array_equal(self.residuals_m, other.residuals_m)
             and self.measurement_epochs == other.measurement_epochs
+            and covariance_equal
+            and self.parameter_names == other.parameter_names
+            and self.sigma0 == other.sigma0
+            and np.array_equal(self.velocity_residuals_ms, other.velocity_residuals_ms)
+            and np.array_equal(self.residuals_ric_m, other.residuals_ric_m)
         )
 
     def __hash__(self) -> int:
-        # residuals_m is read-only (see __post_init__), so hashing its bytes is
-        # stable for the object's lifetime.
+        # The ndarray fields are read-only (see __post_init__), so hashing
+        # their bytes is stable for the object's lifetime.
         return hash(
             (
                 self.tle,
@@ -194,6 +409,11 @@ class FitResult:
                 self.rms_m,
                 self.residuals_m.tobytes(),
                 self.measurement_epochs,
+                self.covariance.tobytes() if self.covariance is not None else None,
+                self.parameter_names,
+                self.sigma0,
+                self.velocity_residuals_ms.tobytes(),
+                self.residuals_ric_m.tobytes(),
             )
         )
 
@@ -560,6 +780,33 @@ def _build_measurements(
     return measurements, tuple(epochs)
 
 
+def _decompose_ric(observed_pv: np.ndarray, position_deltas: np.ndarray) -> np.ndarray:
+    """Decompose signed position residuals onto RIC axes from the observed PV.
+
+    Axes per measurement (the study's ``experiments/real-world-validation/``
+    ``common.py`` convention — here already in TEME, so no Earth-rotation
+    correction applies): radial along the observed position unit vector;
+    cross-track along the orbit normal ``r x v`` unit; along-track completing
+    the right-handed triad (``cross x radial`` — near the velocity direction
+    for near-circular orbits). Returns ``(N, 3)`` columns
+    ``[radial, along-track, cross-track]``; the projection is orthonormal, so
+    row norms reproduce the input vector norms.
+    """
+    r = observed_pv[:, :3]
+    v = observed_pv[:, 3:]
+    r_hat = r / np.linalg.norm(r, axis=1, keepdims=True)
+    h = np.cross(r, v)
+    c_hat = h / np.linalg.norm(h, axis=1, keepdims=True)
+    a_hat = np.cross(c_hat, r_hat)
+    return np.column_stack(
+        [
+            np.sum(position_deltas * r_hat, axis=1),
+            np.sum(position_deltas * a_hat, axis=1),
+            np.sum(position_deltas * c_hat, axis=1),
+        ]
+    )
+
+
 def _build_fit_observer(
     on_iteration: "Callable[[int, float], None] | None" = None,
 ) -> "Any":
@@ -590,6 +837,10 @@ def _build_fit_observer(
             self.evaluations = 0
             self.last_pos_rms_m: float | None = None
             self.last_residuals_m: np.ndarray | None = None
+            self.last_observed_pv: np.ndarray | None = None  # (N, 6) TEME
+            self.last_deltas: np.ndarray | None = None  # (N, 6) observed - estimated
+            self.last_cost: float | None = None
+            self.last_residual_dim: int | None = None
             self._last_reported_iteration: int | None = None
 
         @jpype.JOverride  # type: ignore[attr-defined]
@@ -604,23 +855,35 @@ def _build_fit_observer(
             evaluations_provider,  # noqa: ANN001
             ls_evaluation,  # noqa: ANN001
         ):  # noqa: ANN202
-            # Physical position residual norms, observed vs estimated, from the
-            # per-measurement data the provider hands over for free (the
-            # residuals-are-free Chunk-0 finding behind FitResult).
+            # Observed and estimated PV per measurement, from the data the
+            # provider hands over for free (the residuals-are-free Chunk-0
+            # finding behind FitResult). Since the 2026-07-19 amendment the
+            # full signed 6-vectors are kept: position norms drive the
+            # progress lines here; the velocity norms and the signed RIC
+            # decomposition are derived once, after convergence.
             n = int(evaluations_provider.getNumber())
-            residuals = np.empty(n, dtype=np.float64)
+            observed_pv = np.empty((n, 6), dtype=np.float64)
+            deltas = np.empty((n, 6), dtype=np.float64)
             for i in range(n):
                 estimated = evaluations_provider.getEstimatedMeasurement(i)
                 observed = estimated.getObservedValue()
                 theoretical = estimated.getEstimatedValue()
-                dx = float(observed[0]) - float(theoretical[0])
-                dy = float(observed[1]) - float(theoretical[1])
-                dz = float(observed[2]) - float(theoretical[2])
-                residuals[i] = math.sqrt(dx * dx + dy * dy + dz * dz)
+                for k in range(6):
+                    value = float(observed[k])
+                    observed_pv[i, k] = value
+                    deltas[i, k] = value - float(theoretical[k])
+            residuals = np.sqrt(np.sum(deltas[:, :3] ** 2, axis=1))
             self.iterations = int(iterations_count)
             self.evaluations = int(evaluations_count)
+            self.last_observed_pv = observed_pv
+            self.last_deltas = deltas
             self.last_residuals_m = residuals
             self.last_pos_rms_m = float(np.sqrt(np.mean(residuals**2)))
+            # sigma0 inputs (2026-07-18 amendment): the weighted LS cost and
+            # the residual-vector dimension m (6 scalar components per PV) at
+            # the accepted final evaluation.
+            self.last_cost = float(ls_evaluation.getCost())
+            self.last_residual_dim = int(ls_evaluation.getResiduals().getDimension())
             if (
                 on_iteration is not None
                 and self.iterations != self._last_reported_iteration
@@ -638,7 +901,7 @@ def _run_estimation(
     fit_bstar: bool,
     reporter: _ProgressReporter,
     deliver_fraction: bool,
-) -> "tuple[Any, int, int, float, np.ndarray]":
+) -> "_EstimationOutputs":
     """The batch least squares itself (features.md §1.2 Fit mechanism).
 
     ``TLEPropagatorBuilder`` (MEAN position angle, Chunk-0 ``positionScale``,
@@ -657,7 +920,18 @@ def _run_estimation(
     lines; the reporter's own throttle governs the callable's cadence.
 
     Returns ``(fitted Orekit TLE, iterations, evaluations, rms_m,
-    residuals_m)``. Non-convergence — Hipparchus' too-many-iterations /
+    residuals_m, velocity_residuals_ms, residuals_ric_m, covariance,
+    parameter_names, sigma0)``. ``velocity_residuals_ms`` /
+    ``residuals_ric_m`` are the 2026-07-19 residual diagnostics, derived once
+    from the accepted final evaluation's signed 6-vectors (axes from the
+    observed PV — :func:`_decompose_ric`). The last three are the
+    2026-07-18 amendment's capture: the raw physical covariance from
+    ``getPhysicalCovariances`` (``None``, with a ``UserWarning``, if the
+    normal equations are exactly singular — the stop-and-report spirit; a
+    converged fit is not discarded over an absent diagnostic), the estimated
+    parameter labels in covariance row order, and
+    ``sigma0 = sqrt(cost^2 / (m - n))`` from the final evaluation's weighted
+    cost. Non-convergence — Hipparchus' too-many-iterations /
     too-many-evaluations, or a diverged LS — emits the honest
     ``failed at iter N | not converged | last rms …`` final line, delivers the
     exhausted budget fraction (1.0 only when a budget was actually hit), and
@@ -688,6 +962,20 @@ def _run_estimation(
     for driver in builder.getPropagationParametersDrivers().getDrivers():
         if str(driver.getName()) == "BSTAR":
             driver.setSelected(bool(fit_bstar))
+
+    # The estimated-parameter labels, in the estimator's covariance row order:
+    # orbital drivers first, then selected propagation drivers (the Step-0
+    # probe, 2026-07-18: Px Py Pz Vx Vy Vz [BSTAR] — TLEPropagatorBuilder
+    # estimates in Cartesian TEME at epoch; no mean-element basis exists).
+    parameter_names = tuple(
+        str(driver.getName())
+        for drivers in (
+            builder.getOrbitalParametersDrivers().getDrivers(),
+            builder.getPropagationParametersDrivers().getDrivers(),
+        )
+        for driver in drivers
+        if driver.isSelected()
+    )
 
     estimator = BatchLSEstimator(LevenbergMarquardtOptimizer(), builder)
     estimator.setParametersConvergenceThreshold(_CONVERGENCE_THRESHOLD)
@@ -731,11 +1019,57 @@ def _run_estimation(
             f"Orekit: {exc.getMessage()}"
         ) from None
 
-    if observer.last_residuals_m is None or observer.last_pos_rms_m is None:
+    if (
+        observer.last_residuals_m is None
+        or observer.last_pos_rms_m is None
+        or observer.last_observed_pv is None
+        or observer.last_deltas is None
+        or observer.last_cost is None
+        or observer.last_residual_dim is None
+    ):
         # estimate() always evaluates at least once, so this is unreachable in
         # practice; fail honestly rather than assemble a result with no data.
         raise TLEFitError(
             "TLE fit produced no evaluations; cannot assemble a FitResult."
+        )
+
+    # sigma0^2 = cost^2 / (m - n): the weighted residual sum of squares over
+    # the degrees of freedom. m - n >= 5 always (the 2-sample reference
+    # minimum gives m >= 12; n <= 7), so the division is safe.
+    sigma0 = math.sqrt(
+        observer.last_cost**2 / (observer.last_residual_dim - len(parameter_names))
+    )
+    # The 2026-07-19 residual diagnostics, from the accepted final
+    # evaluation's signed 6-vectors: velocity residual norms and the signed
+    # RIC position decomposition (axes from the observed PV, in TEME).
+    velocity_residuals_ms = np.sqrt(np.sum(observer.last_deltas[:, 3:] ** 2, axis=1))
+    residuals_ric_m = _decompose_ric(
+        observer.last_observed_pv, observer.last_deltas[:, :3]
+    )
+    covariance: np.ndarray | None
+    try:
+        cov_j = estimator.getPhysicalCovariances(_COVARIANCE_SINGULARITY_THRESHOLD)
+    except jpype.JException as exc:  # type: ignore[attr-defined]
+        # Converged fit, singular normal equations: stop-and-report rather
+        # than raise (the guard-system spirit) — the fit stands, the
+        # diagnostic is honestly absent. Unreached in the Step-0 probes (even
+        # a ~1-revolution arc inverted cleanly); kept for the exactly-singular
+        # corner.
+        warnings.warn(
+            "fit_tle: the fit converged but the parameter covariance could "
+            f"not be extracted (singular normal equations: {exc.getMessage()})"
+            ". FitResult.covariance/sigmas are None; B* is likely fully "
+            "unobservable in this arc — consider fit_bstar=False.",
+            UserWarning,
+            # warn -> _run_estimation -> fit_tle_detailed -> caller.
+            stacklevel=3,
+        )
+        covariance = None
+    else:
+        dim = int(cov_j.getRowDimension())
+        covariance = np.array(
+            [[float(cov_j.getEntry(i, j)) for j in range(dim)] for i in range(dim)],
+            dtype=np.float64,
         )
     return (
         # The stub type is the Propagator base; the runtime type for a
@@ -745,6 +1079,11 @@ def _run_estimation(
         int(estimator.getEvaluationsCount()),
         observer.last_pos_rms_m,
         observer.last_residuals_m,
+        velocity_residuals_ms,
+        residuals_ric_m,
+        covariance,
+        parameter_names,
+        sigma0,
     )
 
 
@@ -811,7 +1150,8 @@ def fit_tle_detailed(
     The engine behind :func:`fit_tle` (features.md §1.2 "``FitResult`` and
     ``fit_tle_detailed``"): identical parameters, one implementation; use this
     form when you want the fit diagnostics (iterations, RMS, per-measurement
-    residuals) alongside the fitted TLE.
+    residual norms + the signed RIC residual structure, the raw parameter
+    covariance + ``sigma0``) alongside the fitted TLE.
 
     See :func:`fit_tle` for the full parameter and behavior contract.
 
@@ -909,7 +1249,18 @@ def fit_tle_detailed(
         # --- the fit -------------------------------------------------------------
         measurements, measurement_epochs = _build_measurements(ref_teme)
         logger.info("fit_tle: %d PV measurements", len(measurements))
-        fitted_j, iterations, evaluations, rms_m, residuals_m = _run_estimation(
+        (
+            fitted_j,
+            iterations,
+            evaluations,
+            rms_m,
+            residuals_m,
+            velocity_residuals_ms,
+            residuals_ric_m,
+            covariance,
+            parameter_names,
+            sigma0,
+        ) = _run_estimation(
             seed, measurements, max_iterations, fit_bstar, reporter, deliver_fraction
         )
         fitted = _assemble_fitted_tle(fitted_j, identity)
@@ -920,6 +1271,11 @@ def fit_tle_detailed(
             rms_m=rms_m,
             residuals_m=residuals_m,
             measurement_epochs=measurement_epochs,
+            covariance=covariance,
+            parameter_names=parameter_names,
+            sigma0=sigma0,
+            velocity_residuals_ms=velocity_residuals_ms,
+            residuals_ric_m=residuals_ric_m,
         )
         reporter.finish(
             f"done | converged in {iterations} iterations | rms {_format_rms(rms_m)}"
@@ -1001,8 +1357,11 @@ def fit_tle(
     fitting arc warns once (weak observability) and proceeds.
 
     Returns the fitted :class:`TLE`. For the fit diagnostics (iterations,
-    RMS, per-measurement residuals) use :func:`fit_tle_detailed`, whose
-    parameters are identical and of which this is a thin ``.tle`` wrapper.
+    RMS, per-measurement residual norms + the signed RIC residual structure —
+    the periodic-vs-secular fit-quality read — and the raw parameter
+    covariance + ``sigma0``, the B*-observability instrument) use
+    :func:`fit_tle_detailed`, whose parameters are identical and of which
+    this is a thin ``.tle`` wrapper.
     """
     return fit_tle_detailed(
         reference,

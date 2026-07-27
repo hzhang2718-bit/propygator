@@ -1,6 +1,6 @@
 # Real-world validation study
 
-Evidence for `docs/build-plan-real-world-validation.md`: propygator's numerical
+Evidence for `docs/history/build-plan-real-world-validation.md`: propygator's numerical
 propagator and TLE fitter measured against **real orbits** for the first time.
 Every propygator surface is extensively tested, but internal tests are
 structurally blind to *self-consistent wiring bugs* (a factor-of-2 in area, a

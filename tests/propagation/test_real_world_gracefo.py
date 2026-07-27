@@ -1,6 +1,6 @@
 """Real-world pinned regression: GRACE-FO drag stack vs. GNV1B truth.
 
-The study Chunk 4 pins (docs/build-plan-real-world-validation.md; evidence in
+The study Chunk 4 pins (docs/history/build-plan-real-world-validation.md; evidence in
 ``experiments/real-world-validation/gracefo/``):
 
 1. **Drag-signal + pipeline ratio** — over the pinned solar-active day, the

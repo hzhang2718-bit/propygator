@@ -1,6 +1,6 @@
 # LAGEOS-2 vs. ILRS precise orbits (real-world validation, Chunks 0–1)
 
-Evidence for `docs/build-plan-real-world-validation.md` Chunk 0 — the
+Evidence for `docs/history/build-plan-real-world-validation.md` Chunk 0 — the
 conservative-force + wiring diagnostic. A measured orbit is the one oracle that
 can't share a wiring misconception with propygator's own tests: LAGEOS-2 is a
 passive laser-ranged sphere (the one satellite `SpacecraftGeometry.sphere`

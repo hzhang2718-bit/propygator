@@ -911,7 +911,7 @@ User → Trajectory  (via from_arrays / from_states / earlier propagation)
      → TLE
 ```
 
-`fit_tle` returns a bare `TLE`; its sibling `fit_tle_detailed` (identical parameters, one shared engine) returns a `FitResult` carrying the fitted TLE plus the fit diagnostics (iterations, evaluations, RMS, per-measurement residuals + epochs) — pulled in scope at 1.2's Checkpoint A (2026-07-10) when the feasibility probe showed the diagnostics fall out of the estimator for free. Full contract: features §1.2 "`FitResult` and `fit_tle_detailed`". (There is deliberately no `converged` flag — non-convergence raises `TLEFitError` with no partial result.)
+`fit_tle` returns a bare `TLE`; its sibling `fit_tle_detailed` (identical parameters, one shared engine) returns a `FitResult` carrying the fitted TLE plus the fit diagnostics (iterations, evaluations, RMS, per-measurement residuals + epochs; since the 2026-07-18 Chunk 6 amendment also the raw parameter covariance, its parameter labels, the a-posteriori variance factor σ₀, and the derived `sigmas` property) — pulled in scope at 1.2's Checkpoint A (2026-07-10) when the feasibility probe showed the diagnostics fall out of the estimator for free. Full contract: features §1.2 "`FitResult` and `fit_tle_detailed`" + "Covariance and σ₀". (There is deliberately no `converged` flag — non-convergence raises `TLEFitError` with no partial result.)
 
 ### 1.3 TLE propagation
 
