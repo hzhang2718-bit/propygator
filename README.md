@@ -250,6 +250,8 @@ the committed evidence lives under
 Tutorial and demo notebooks live in [`notebooks/`](notebooks/), numbered for
 ordering:
 
+- [`00_showcase.ipynb`](notebooks/00_showcase.ipynb) — the guided tour: all five
+  features plus the validation results in one pass. Start here.
 - [`01_intro.ipynb`](notebooks/01_intro.ipynb) — the five-minute on-ramp.
 - [`02_numerical_propagation.ipynb`](notebooks/02_numerical_propagation.ipynb) —
   the full numerical propagator (force models, spacecraft, attitude, guards, exports).
@@ -263,7 +265,8 @@ ordering:
 - [`07_tle_fitting.ipynb`](notebooks/07_tle_fitting.ipynb) — fit a shareable TLE
   to a numerical trajectory, quantify the lossiness, and read the fit diagnostics.
 
-Rendered HTML versions will be posted on the projects page in the future.
+`00_showcase.ipynb` is the one rendered to static HTML for the projects page — it
+runs fully offline and deterministically, so the export reproduces exactly.
 
 ## Architecture
 
