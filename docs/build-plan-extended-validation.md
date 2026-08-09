@@ -1,6 +1,6 @@
 # Build plan: Extended Validation — the GRACE lineage, the density-bias lever, and the fitting playbook under transfer
 
-> **Status: BUILD PLAN (not started).** Derived from the binding contract
+> **Status: BUILD PLAN (started).** Derived from the binding contract
 > `docs/extended-validation.md` — **the contract wins on every conflict**; this is a working
 > blueprint, not a contract. It is a **validation study, not a feature**: nothing here
 > touches `src/`, and the binding outputs are evidence (committed results, a findings doc, a
@@ -212,7 +212,7 @@ stays JVM-free; fixtures small enough to live as in-file literals.
 
 ---
 
-## Chunk 0 — GRACE-FO 2, the noise floor, and Checkpoint A
+## Chunk 0 — GRACE-FO 2, the noise floor, and Checkpoint A - Done
 
 **Goal.** Activate the formation twin on truth already on disk, measure the noise floor the
 study has never had, and resolve **Checkpoint A**. Zero downloads.

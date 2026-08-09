@@ -415,6 +415,14 @@ which is the failure mode a binary reader actually has.
 > point-value assertion would false-fail a correct reader. The band catches a field
 > misalignment (which throws the separation by orders of magnitude, not percent), and
 > |r| / |v| carry the sharp part of the check.
+>
+> **Correction, 2026-08-09.** The `(min 180.4 / max 181.5)` above was measured over the
+> 1-day fit arc. Chunk 0's committed evidence measures the separation over the **3-day
+> load** — where the formation block belongs, since it is part of the parse report — and
+> reports **min 180.4 / max 181.6**; the mean is 181.0 either way. The 100 m is immaterial
+> to the rule, and the wider figure only strengthens it: `active_2023` measures **202.7 km**
+> against `storm_2024`'s **177.8 km**, so the gap moves by ~25 km across this study's own
+> three windows. `gracefo/results_twin.txt` is authoritative for all of these.
 
 If both format branches prove unworkable, the documented fallbacks are, in order: the **GFZ
 ISDC** archive as a second source for the same L1B product (worth checking before rewriting
