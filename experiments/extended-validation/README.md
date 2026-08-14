@@ -1,14 +1,16 @@
-# Extended Validation — the GRACE lineage, the density-bias lever, and the fitting playbook under transfer
+# Extended Validation — drag propagations, TLE fitting tests, and table noise
 
-Evidence tree for the study contracted in `docs/extended-validation.md` and
-sequenced by `docs/build-plan-extended-validation.md`. **The contract wins on
-every conflict**; `docs/features.md` and `docs/architecture.md` win over the
-contract.
+Evidence tree for the study contracted in `docs/extended-validation-updated.md`.
+**The contract wins on every conflict**; `docs/features.md` and
+`docs/architecture.md` win over the contract. There is no build plan yet —
+`docs/build-plan-extended-validation.md` belongs to the retired GRACE-lineage
+design and must not be implemented from.
 
 Every external claim propygator makes rests on one satellite (GRACE-FO 1). This
-study takes those claims across the **GRACE lineage** — GRACE-FO 2 (a formation
-twin already inside the tarballs on disk) and original GRACE A/B (the same bus
-lineage, 2002–2017).
+study widens that base in three parts: **drag propagations** over ~10 stratified
+GRACE-FO windows plus **Swarm A/B** as a limited-information stress case,
+**TLE fitting tests** against the playbook and the r/s gate, and **table noise**
+measured on the GRACE-FO C/D formation twin.
 
 ## Layout
 
@@ -18,8 +20,8 @@ extended-validation/
 ├── run_all.py         regenerate / --verify orchestrator
 ├── data/              raw truth + reference docs (gitignored, never committed)
 │   └── reference/     third-party reference PDFs (see "Reference documents")
-├── gracefo/           the twin + LST-stratified legs
-├── grace/             the GRACE leg (its own reader, config, drivers)
+├── gracefo/           the GRACE-FO drag, TLE-fitting and twin runs
+├── swarm/             the Swarm A/B leg (its own reader, config, drivers)
 └── probes/            fitter / storm / fading-memory probes
 ```
 
