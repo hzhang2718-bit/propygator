@@ -160,6 +160,18 @@ because GRACE-FO C's mass changes over time due to propellant use.
 > that fails is retired and replaced by another draw from the same
 > activity band, and the retirement is recorded. The same screen
 > applies to the Swarm windows in Part B.
+>
+> The polynomial screen is the secondary gate, not the only one. The
+> daily tarball also carries THR1B, the thruster activation record,
+> whose `on_time_orb_ctrl_1`/`_2` and `accum_dur_orb_ctrl` fields are
+> separate from the twelve attitude-control thrusters. Those give the
+> screen an exact primary gate -- no burn iff the accumulator is flat
+> and both on-times are zero across the window -- with no threshold to
+> fix and no confounding with a storm's slope kink, which is where the
+> polynomial alone is weakest. The polynomial stays because it also
+> catches what a thruster log cannot: safe-mode entries, attitude
+> anomalies and bad truth days. Swarm has no THR1B analogue, so
+> Part B's screen remains the polynomial alone.
 
 > Important: all the runs will be conducted on GRACE-FO C, which is
 > the leading of the two satellites. The table noise section below
@@ -168,13 +180,14 @@ because GRACE-FO C's mass changes over time due to propellant use.
 
 > Important: the data used for these runs will be information that
 > is extracted out of daily tarballs. This helps to cut down on
-> storage stress. The extraction keeps two products for both
+> storage stress. The extraction keeps three products for both
 > satellites: GNV1B, the truth ephemeris, at about 23 MB per
-> satellite per day before compression, and MAS1B, the tank-gas
+> satellite per day before compression, MAS1B, the tank-gas
 > record the window mass is read from, at about 8 kB per satellite
-> per day. Everything else in the tarball is discarded. Attempt to
-> reuse parser code from the earlier real world validation
-> experiment.
+> per day, and THR1B, the thruster activation record, kept for the
+> maneuver screen above. Everything else in the tarball is
+> discarded. Attempt to reuse parser code from the earlier real
+> world validation experiment.
 
 > Important: an attempt should be made while constructing the build
 > plan to make the run for each window separable. This allows for
@@ -521,7 +534,7 @@ the committed numbers is the only way to catch a silent break, and
 one stray random call retires that check.
 
 **New truth data lands in the new study's own folder.** Extracting
-the GNV1B and MAS1B members from a tarball and discarding the rest
+the GNV1B, MAS1B and THR1B members from a tarball and discarding the rest
 cuts storage from about 148 MB per day to about 19 MB per day for
 both satellites. GNV1B is the truth ephemeris and MAS1B is the mass
 record; MAS1B is tiny (~8 kB per satellite per day) but it is not
