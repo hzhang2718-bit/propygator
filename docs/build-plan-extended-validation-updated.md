@@ -264,6 +264,267 @@ absent from the model. That is why these ratios can leave 1.0 at all.
 
 ## Part 2: drag-significant propagations
 
+Needs Chunk 1 (13 days landed and screened per window) and Chunk 2
+(`gracefo_ext_common.py` rewritten to this contract, `thr1b.py` exercised). The
+ten windows run **in table order**, one per chunk, and are independent of each
+other -- `--only drag_04` is a complete unit of work.
+
+**This part has no benchmark and none is added below.** The contract states an
+expectation, not a requirement; the evidence exists to be analysed. Nothing here
+is scored HIT/MISS and no driver flags a verdict.
+
+### **Chunk 3: Part 2 apparatus (no committed evidence)**
+
+**Goal.** Build everything the ten window chunks share, and settle the Swarm
+question *before* ten chunks are written against it. This chunk commits no 7-day
+evidence; it is verified on a smoke arc and on JVM-free identities.
+
+**Create.**
+- `gracefo/run_drag_window.py` -- the per-window driver. `<window>` positional;
+  `--sat C|D` (default `C`), `--data-root`, `--parse-only`, `--only-config` (a
+  debugging resume, never a route to committed evidence), and `--emit-fixture`
+  for Deliverable 4's pinned-test literals -- carried from birth so Part 4 does
+  not retrofit it.
+- `swarm/swarm_common.py`, `swarm/<reader>.py`, `swarm/run_drag_window.py`,
+  `swarm/README.md` -- conditional on the gate below. Box 5.0 (length, +Y on the
+  wind) x 1.0 (height) x 1.0 (width) m, mass 419.0 kg, `A_ref` 1.0 m^2, every one
+  of them an estimate and labelled as one in the header.
+- `summarize_drag.py` -> `results_drag_summary.txt`. A pure text parse of the
+  committed per-window files -- JVM-free, seconds. It runs against partial
+  evidence and prints `N/10 windows`, so it is useful from Chunk 4 onward and the
+  tenth window closes it for free.
+
+**Edit.**
+- `gracefo/gracefo_ext_common.py` -- add `ARC_DAYS = 7.0`, `LOAD_DAYS = 8`,
+  `READ_HORIZONS_D = (1, 3, 7)`. Nothing else: Chunk 2 lands the geometry, the
+  fitter, `force_config`, the scan ceilings and the table accessors.
+- `run_all.py` -- register the 20 window groups and the summary, plus a small
+  alias map (`drag` -> `drag_01..drag_10`, `swarm` -> `swarm_01..swarm_10`).
+  Twenty bare names in `--only` is unusable otherwise.
+- `README.md` -- layout, and a findings row per window.
+
+**Reuse.** Frozen and read-only: `common.py` (`ric_components`, `rms`) and
+`gracefo/gnv1b.py` (`parse_gnv1b`). This study's own: `windows.py` and the `.gz`
+finder from Chunk 1, `mas1b.py`, and Chunk 2's `thr1b.py`.
+
+**The Swarm gate.** The contract's 4-step format resolution runs here, against
+one delivered file rather than against documentation, because step 4 is "drop
+Part B" and that decision must be made once rather than discovered at Chunk 9.
+Time scale is the known trap: Swarm products are served on GPS time, so
+**GPS + 19 s = TAI via the locked route (`gracefo/gnv1b.py:44-46`), never a
+hand-rolled leap table**. Checks before the reader's output is trusted: PV
+magnitudes in range, epoch continuity across file seams, uniform grid, and the
+one that actually catches a wrong time scale -- propagate from t0 and compare
+the first sample against truth, the frozen study's 4.2e-9 m class. Then the
+maintainer's download, and the polynomial-only screen (Swarm has no THR1B
+analogue) produces the Swarm window list and its divergences; a divergent window
+confounds body with epoch and is recorded on the row. Record from the delivered
+ephemeris rather than from literature: **Swarm A and B are not a twin pair** --
+B flies the higher orbit -- so an A-vs-B drag difference is an altitude
+difference before it is a body difference. If the gate fails, Part B is dropped:
+each window chunk loses its `swarm_NN` group, the drop is recorded in the README,
+and nothing else in the study moves.
+
+**Layout.** One results file per window per leg, in named folders so twenty files
+stay legible:
+
+```
+gracefo/results_drag/window_01_low_2019_12.txt   group drag_01
+swarm/results_drag/window_01_low_2019_12.txt     group swarm_01
+results_drag_summary.txt                         group drag_summary
+```
+
+`_run_group` already mkdirs each output's parent, so the folders cost nothing,
+and `--list` prints every group's path, which keeps the terse group names
+self-documenting. The contract's "one results file per part" gives way here to
+its own twice-stated per-window separability requirement;
+`results_drag_summary.txt` is what restores the one-file read.
+
+**Verify.**
+- JVM-free identities, both bodies: GRACE-FO ram `H*W` = 1.0013468 and side total
+  `2L(H+W)` = 15.0060150 to 8 figures; Swarm ram `1.0 * 1.0` = 1.0 m^2. Axis check
+  PASS for both boxes (the wired +Y-on-wind mapping gives the smallest face-sum
+  `Sigma Cd_i*A_i`). Table lookups finite at window-mean conditions.
+- **Smoke arc, explicitly not evidence:** 0.5 d, drag-off and Cd = 2.3 only, on
+  window 1, both legs -- proves driver, reader, RIC read and output shape end to
+  end in ~2 min.
+- The Swarm reader's checks above.
+- `run_all.py --list` shows the 20 groups plus the summary, and the aliases
+  expand.
+
+**Checklist**
+- [ ] Swarm gate resolved (format inspected, or Part B dropped and recorded)
+- [ ] `run_drag_window.py` + smoke arc
+- [ ] `swarm/` leg, reader checks, smoke arc
+- [ ] `summarize_drag.py`, `run_all.py` groups + aliases, README
+
+### Chunks 4-13 -- one window each, in table order
+
+**The runs. Five configurations, five propagations, per body.** One 7-day
+propagation each from the window's t0, `output_step` 60 s,
+`IntegratorConfig.high_precision()`:
+
+1. drag off
+2. drag on, `Cd = 2.3`
+3. drag on, in-arc scalar Cd fit over the **full 7-day** along-track RMS
+4. sphere table (`VariableCd.sphere_default()`) on `A_ref`
+5. box table (`BoxFaceCd.default()`), flown `InPlaneTracking(velocity_reference="ecef")`
+
+**The 0-1 d, 0-3 d and 0-7 d numbers are read off those five trajectories, never
+re-propagated** -- the contract says so, and it is the easiest way to
+accidentally triple the study's cost.
+
+**What is recorded.** Radial / along / cross / 3D RMS accumulated from t0 over
+0-1 d, 0-3 d and 0-7 d, plus the same four for each of days 1-7. RIC via
+`ric_components(..., earth_fixed=True)`, the frozen study's convention. 8 days
+are loaded, not 7, so the t0 + 7 d endpoint sample exists; Chunk 1 already
+extracted 13, so it costs parse time only.
+
+**Header.** propygator and resolved `orekit_jpype` versions; `A_ref`, box
+dimensions and the axis check; the window's MAS1B mass (Swarm: the fixed 419.0 kg,
+flagged as an estimate); the re-printed THR1B verdict with the accumulator values
+that justify it; window-aggregate F10.7 / Ctr81 / Ap / ap3 / Kp re-read from CSSI
+at runtime. **Every fitted Cd prints `B = Cd*A/m` beside it** -- the only
+convention-free number.
+
+**The fit block prints its coarse scan**, not just the winner. Those seven
+evaluations are already paid for, and the table is the only way a reader can see
+whether the 7-day objective was single-welled; golden section otherwise papers
+over a second well. Print bracket width, evaluation count, and an explicit
+RAILED marker if the fit sits at the ceiling. Ceilings are 5.0, or 8.0 on the
+three storm windows (6, 8, 10).
+
+**Verify**, per body:
+- t0 ITRF -> EME2000 -> ITRF round-trip <= 5e-9 m; seam continuity; uniform grid
+- screens re-printed CLEAN (GRACE-FO both, Swarm polynomial)
+- **no trajectory carries `terminated` metadata** -- a guard trip would silently
+  shorten an RMS window, and 7 days through a storm is where that stops being
+  hypothetical
+- the drag-off signal clears the conservative floor by an order of magnitude
+- the fit is not railed and its bracket is <= `CD_FIT_TOL`
+- `run_all.py --verify --only drag_NN` reproduces -- a scheduled act at 20-40 min;
+  `--parse-only` is the routine cheap check
+
+**Read.** Fill the window's row in the summary, and note any Swarm divergence.
+
+**Cost**, from Chunk 0's measured timings (a 23-evaluation 1-day fit at 110-180 s,
+so 5-8 s per 1-day propagation):
+
+| | per body | per window (3 bodies) | x10 |
+|---|---|---|---|
+| 4 non-fit 7-day runs | ~2-4 min | ~6-12 min | 1-2 h |
+| the 7-day Cd fit (~23 evals) | ~13-23 min | ~40-70 min | 7-12 h |
+| parse + screens | ~1-3 min | ~5-10 min | ~1 h |
+| **total** | **~16-30 min** | **~50-90 min** | **~9-15 h** |
+
+The fit is ~80 % of the study's compute, which is why per-window separability is
+the only mitigation that matters. Measure the 8-day 1 Hz parse in Chunk 3; if it
+turns out to cost minutes rather than seconds, cache the subsampled arrays as
+gitignored `.npy` under `data/`.
+
+**The expectation, recorded for reading -- not a bar.** The contract's table of
+the fraction of the drag-off signal each option removed:
+
+| removed | quiet | active | storm |
+|---|---|---|---|
+| Cd = 2.3 | 86 % | 67 % | 56 % |
+| sphere table | 53 % | 80 % | 63 % |
+| box table | -24 % | 79 % | 96 % |
+
+`summarize_drag.py` prints each window's removed fraction beside it, with **no
+verdict column**. Continuity note: those figures were built from 1-day results,
+so it is the 0-1 d row that compares to them. A bounded loss where drag is weak
+alongside a large gain where drag is strong is what the contract expects to see
+repeated; an inversion is written into the findings as what it is.
+
+One conversion to state before someone misreads it: putting a frozen v0.7.2
+fitted Cd onto this study's convention takes **both** factors,
+`(A_frozen/A_this) * (m_this/m_frozen)` = `(1.027/1.0013468) * (m_this/600.0)`,
+and at GRACE-FO's MAS1B mass they very nearly cancel. So this study's fitted Cd
+will land close to the frozen 1.98 / 3.32 / 3.97 in level. That is two
+conventions moving in opposite directions, not a cross-study check.
+
+Each chunk below carries the same three items: GRACE-FO C, Swarm A/B, and the
+read into the summary.
+
+### **Chunk 4: window 1 -- `low_2019_12`** (low, t0 2019-12-23, ceiling 5.0)
+
+First full run of the apparatus: read the output shape critically here, before
+the other nine inherit it.
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 5: window 2 -- `low_2021_04`** (low, t0 2021-04-15, ceiling 5.0)
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 6: window 3 -- `low_2021_06`** (low, t0 2021-06-17, ceiling 5.0)
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 7: window 4 -- `moderate_2022_04`** (moderate, t0 2022-04-30, ceiling 5.0)
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 8: window 5 -- `intense_2024_06`** (intense, t0 2024-06-14, ceiling 5.0)
+
+Intense exists only in 2024, so this row and Chunk 10's are confounded with
+mission epoch and altitude. Record it on the row rather than in the findings
+alone.
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 9: window 6 -- `storm_2024_08`** (storm, t0 2024-08-11, ceiling 8.0)
+
+Ap 127 on day 1. The first window where the 7-day in-arc fit is a compromise
+across storm and non-storm portions, so expect a poor fit residual and a Cd
+sitting between the two -- the contract already flags that storms defeat a
+scalar Cd. Read the coarse scan here.
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 10: window 7 -- `intense_2024_11`** (intense, t0 2024-11-23, ceiling 5.0)
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 11: window 8 -- `storm_2025_05`** (storm, t0 2025-05-26, ceiling 8.0)
+
+Storm across days 3-8, i.e. inside Part 2's arc and across its end.
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 12: window 9 -- `moderate_2025_07`** (moderate, t0 2025-07-23, ceiling 5.0)
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
+### **Chunk 13: window 10 -- `storm_2026_01`** (storm, t0 2026-01-13, ceiling 8.0)
+
+Onset sits at day 6, so Part 2's arc is entirely pre-onset -- the drag runs here
+are the clean-arc counterpart to Part 3's mandated fit-right-before-onset case.
+Closes `results_drag_summary.txt` at 10/10.
+
+- [ ] GRACE-FO C
+- [ ] Swarm A/B
+- [ ] read + summary row
+
 ## Part 3: TLE fitting validation
 
 ## Part 4: Wrap-up and docs work
