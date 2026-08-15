@@ -129,19 +129,138 @@ accumulator values that justify the call.
 
 ## Part 1: table noise
 
-Important points
-- Rewrite old chunk 0 code according to updated contract
-- Do each window separately (3 chunks) unless they are light
-- Use CD_FIT_TOL = 0.002
-- Record the following metrics:
-    - Cd_fit(C)/Cd_fit(D)               in sample, 1D
-    - RMS_Cd_fit(C)/RMS_Cd_fit(D)       propagated on fitted Cd, 1D
-    - RMS_sphere(C)/RMS_sphere(D)       propagated, 1D
-    - RMS_box(C)/RMS_box(D)             propagated, 1D
-    - All the numerators and denominators above separately in a separate, compact table
-- Use new GRACE-FO dimensions from updated contract
-- Everything is re-run, do *not* use old chunk 0 results
-- Examine the results to see if they pass the qualification in the contract
+**Independent of Chunk 1 and cheap, so it runs first.** It reads only the three
+frozen v0.7.2 windows already on disk -- zero downloads, no dependency on the
+ten-window landing. Doing it ahead of Part 2 also shakes down the shared module
+and the THR1B parser that Part 2 then inherits.
+
+### **Chunk 2: table noise -- GRACE-FO C/D over the three inherited windows**
+
+**Goal.** Re-measure the twin ratios on this contract's geometry, over the three
+frozen v0.7.2 windows (`quiet_2019`, `active_2023`, `storm_2024`). Chunk 0's
+numbers are superseded by the 2026-08-13 geometry and are **not** carried
+forward: every run here is fresh, and the stale artifacts are deleted rather
+than left in the tree to be misread.
+
+**One chunk, not three.** Measured from Chunk 0's timings, one window costs
+~7 min (per satellite: the 23-evaluation fit ~110-180 s, three 1-day
+propagations ~40 s, the deg-5 screen ~20 s), so all three run in one process in
+**~25-30 min** against Part 2's ~16 h. The driver still takes a window argument
+for debugging; `run_all.py` invokes it once over all three so the cross-window
+summary is computed rather than transcribed, and two JVM boots are saved.
+
+**Decisions locked** (2026-08-14, maintainer):
+1. **Per-satellite MAS1B mass.** Chunk 0 shared one mass between the twins, but
+   that was mandated by the retired `T` contract, where the constant had to
+   cancel. Mass is a reading, so each twin gets its own. The effect on the Cd
+   ratio is exactly the mass ratio (0.001 / 0.102 / 0.097 %); the shared-mass
+   form is one multiplication away and is printed beside it.
+2. **3D RMS is the headline, alone.** Radial / along / cross go in the
+   breakdown table, not the ratio table.
+3. **Stale artifacts are deleted**, not duplicated around.
+4. **Both screens run here**, THR1B and the deg-5 polynomial, as the contract
+   mandates for every window.
+5. **Qualification is reported as explicit HIT/MISS**, per window and in the
+   summary. A miss is written down as a miss.
+
+**Create.**
+- `gracefo/thr1b.py` -- the tier-1 thruster parser. **Resolve the record format
+  by inspecting one delivered file before writing it**, the same discipline the
+  contract applies to the Swarm reader; the fields wanted are
+  `on_time_orb_ctrl_1`/`_2` and `accum_dur_orb_ctrl`, which are separate from
+  the twelve attitude-control thrusters. Written here against data already on
+  disk so Part 2's Chunk 1 inherits a parser that has been exercised.
+- `gracefo/run_table_noise.py` -- the driver.
+- `gracefo/results_table_noise.txt` -- the evidence (one file for the part).
+
+**Edit.**
+- `gracefo/gracefo_ext_common.py` -- rewritten to this contract. `A_REF_M2` =
+  **1.0013468** m^2 (Table 5 front panel 0.9551567 + boom 0.0461901, boom folded
+  into the ram face); box **x = 0.7588835** (height) **, y = 3.6100207**
+  (length)**, z = 1.3195** (width) m, matching `InPlaneTracking`'s +Y-on-wind
+  axes. `CD_FIT_TOL` stays **0.002**. Scan ceilings return to v0.7.2's **5.0 /
+  8.0** -- Chunk 0 raised them to 5.4/8.6 to compensate for its smaller
+  `A_ref`, and at `A_ref ~ 1.0 m^2` the original values are again right (`Cd`
+  and `CdA` are numerically near-equal). Delete `A_REF_BRACKET_M2`,
+  `BOX_GEOMETRY_SYSTEMATIC`, `MEASURED_ANCHORS` and the whole `T` framing --
+  the contract judges the tables by position error, not by `T`.
+  `fit_cd_scalar`, `force_config`, `sphere_spacecraft`, `box_spacecraft` and
+  the table accessors carry over unchanged.
+- `run_all.py` -- drop the `twin` group, register `noise` ->
+  `gracefo/results_table_noise.txt`, one invocation, `--data-root` pointed at
+  the frozen tree exactly as `twin` did.
+- `README.md` -- replace the A/m convention table and the Chunk 0 findings
+  block; the `T`-era prose goes with them.
+
+**Delete.** `gracefo/run_twin_checkout.py` and `gracefo/results_twin.txt`. Both
+are built on the retired `A_ref` and the retired metric, and moving the shared
+constants would red their `--verify` anyway. Git history keeps them, and
+Checkpoint A's GO rests on ratios this chunk re-measures.
+
+**Reuse.** Frozen and read-only: `common.py` (`ric_components`, `rms`,
+`OMEGA_EARTH`) and `gracefo/gnv1b.py` (`find_window_files`, `parse_gnv1b`),
+reached via `--data-root` so the frozen tarballs are read in place -- nothing
+extracted, compressed, moved or deleted there. This study's `mas1b.py` is
+already correct and is not touched.
+
+**The runs.** 1-day arc from each window's t0, both satellites, per the
+contract: the scalar-Cd fit, then three propagations -- fitted Cd, sphere table,
+box table flown `InPlaneTracking(velocity_reference="ecef")`. No drag-off run;
+the drag signal per window is Part 2's job. Window t0s are the frozen study's,
+unchanged: 2019-11-14, 2023-12-20, and **2024-05-11** for the storm (skipping
+the on-disk 05-10 onset day, matching both the frozen study and Chunk 0).
+Screen span is 3 loaded days for both screens, so the two verdicts cover the
+same window.
+
+**Output shape.** Per window: versions + convention header (`A_ref`, box
+dimensions, per-satellite mass), parse report, MAS1B masses, formation and
+leader, both screen verdicts, parser checks, then per satellite the t0
+round-trip, the fitted Cd with its `B = Cd*A/m` beside it, and the three runs.
+Then two tables and, at the end, the cross-window summary:
+
+- `[ratios]` -- the four contract metrics on **3D RMS**, one row each, with C/D,
+  the deviation from 1.0, and HIT/MISS against its bar.
+- `[values]` -- the compact numerator/denominator table: the same four
+  quantities, C and D printed separately.
+- `[breakdown]` -- full radial / along / cross / 3D per satellite per run, plus
+  arc-mean conditions and what the shipped tables predict at them.
+
+**Two pre-registered predictions, checkable before the run.** The geometry
+change cancels exactly from a twin ratio, so `Cd_fit(C)/Cd_fit(D)` must
+reproduce Chunk 0's **0.88 % / 0.41 % / 0.46 %**; and every fitted Cd must land
+at Chunk 0's value scaled by 0.9551567/1.0013468 = 0.95387, i.e. **~2.032 /
+3.385 / 4.047**. Missing either is a wiring signal, not a finding. The three RMS
+ratios are the genuinely new numbers -- Chunk 0 never propagated the tables
+per twin.
+
+**Verify.**
+- Both geometry identities asserted and printed: ram face `H*W` = 1.00134678 vs
+  `A_ref` 1.0013468, side total `2L(H+W)` = 15.0060149 vs Table 5's 15.0060150.
+  Both hold to 8 figures.
+- t0 ITRF -> EME2000 -> ITRF round-trip <= 5e-9 m, C/D epoch grids aligned,
+  grid uniformity and `|r0|` as Chunk 0 printed them.
+- Both screens CLEAN for all three windows and both satellites, printed with the
+  accumulator values that justify the tier-1 call.
+- The two predictions above.
+- `run_all.py --verify --only noise` reproduces the committed file.
+
+**Qualification** (contract, "The design - table noise"). `Cd_fit(C)/Cd_fit(D)`
+within **10 %** of 1.0 -- a failure warrants a bug search. The three RMS ratios
+close to 1.0, with a departure **> 20 %** demanding attention and possibly a bug
+search if no non-bug explanation is found. Record with the run: the model gives
+both twins *identical* geometry (the box's +/-Y faces are equal-area, so the
+180 deg relative yaw is invisible to `InPlaneTracking`), so the tapered-bus
+asymmetry the contract flags as expected physics is present in the truth and
+absent from the model. That is why these ratios can leave 1.0 at all.
+
+**Checklist**
+- [ ] `thr1b.py` (format resolved by inspection first)
+- [ ] `gracefo_ext_common.py` rewritten; stale Chunk 0 artifacts deleted
+- [ ] `run_table_noise.py` + `run_all.py` group
+- [ ] quiet_2019
+- [ ] active_2023
+- [ ] storm_2024
+- [ ] Qualification read; README updated
 
 ## Part 2: drag-significant propagations
 
