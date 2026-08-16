@@ -63,11 +63,14 @@ propagator failure rather than as missing input. GRACE-FO launched
 span -- ample, covering the 2019-2020 minimum, the 2023-2025 maximum
 and Gannon 2024-05. Re-check the boundary if orekit-data is ever
 refreshed; it moves.
-The aim is to have 10 windows, each 13 days long -- 13 because the
-longest fit arc in the study is the fading-memory 6-day arc and every
-fit is scored 7 days past its arc. Part A propagates days 1-7 from
-t0; the TLE forecasts run days 7-13, which is why the maneuver screen
-has to be clean across all 13 days and not just Part A's seven. For
+The aim is to have 10 windows, each 14 days long. The longest fit arc
+is the fading-memory 6-day arc, which ends at day 6, and every fit is
+scored 7 days past its arc, so the last forecast sample sits at day
+13. Truth arrives in daily files covering [day, day+1), so that
+endpoint sample is the first sample of the *fourteenth* file: 13 days
+stop one sample short. Part A propagates days 0-7 from t0; the TLE
+forecasts run days 6-13, which is why the maneuver screen has to be
+clean across all 14 days and not just Part A's seven. For
 each window, the drag test will be the same as the one for the earlier
 real world validation experiment. Each window will get propagations
 with drag off, drag on (Cd=2.3), drag on (in-arc Cd fit), sphere table, and
@@ -78,12 +81,20 @@ storms, since they are time-sensitive. If a maneuver coincides with
 a storm, a different storm will be selected.
 
 Each of those five configurations is **one** propagation, run for
-7 days from the window's t0. The 1 day, 3 day and 7 day results are
+7 days from the window's t0. The day 1, day 3 and day 7 results are
 read off that single run; they are not three separate runs. For each
 configuration the results file records radial, along, cross and 3D
-RMS accumulated from t0 over 0-1 d, 0-3 d and 0-7 d, and the same
-four numbers for each individual day. Five propagations per window
+RMS over each individual day, days 1-7. Five propagations per window
 per body, not fifteen.
+
+**Every RMS in this study is a per-day value, never accumulated from
+t0.** An RMS accumulated over 0-N d is dominated by its early, still
+well-fitted portion, so it understates the error at the far end --
+exactly the horizon a forecast is read at. Day N means the RMS over
+[N-1 d, N d] alone. This also matches how the TLE fit strategy
+experiment measured the numbers the TLE fitting benchmarks below are
+calibrated on
+(`experiments/tle-fit-strategy/probe1_strategy_matrix.py:140`).
 
 The fit is the exception to that count and carries the study's
 compute: golden section is ~20 propagations, so on a 7 day arc it
@@ -91,7 +102,7 @@ costs ~20-25 min against ~1-3 min for each other run, putting Part A
 near 16 h overall. Per-window separability is the mitigation; a
 whole-study regenerate is a scheduled act. The Cd is in-arc by
 design -- the best a scalar Cd can do over the window, and the
-reference the other four are judged against. Note its 0-1 d row is
+reference the other four are judged against. Note its day-1 row is
 therefore not comparable to the earlier study's 1 day fitted result
 (1.9 / 6.4 m): that Cd was optimal over one day, this one over seven.
 
@@ -300,8 +311,9 @@ is weak is expected, provided the absolute error stays small.
 This part will involve fitting TLE to GRACE-FO (no Swarms) data
 using various means. For each window, the following TLE fittings
 will be conducted on an arc, propagated, and compared to reality.
-RMS values against reality 1D, 3D, and 7D after the end of the
-fitting arc will be recorded:
+Per-day RMS values against reality on days 1, 3 and 7 after the end
+of the fitting arc will be recorded -- each the RMS over that single
+day, per the per-day rule above:
 - A naive, one-time fitting on the shipped 2-day default (1)
 - A fitting for each of the 3 playbook decisions (3)
 - Catalogue fitting (pulled from Space-Track by maintainer) (1)
@@ -372,15 +384,17 @@ whole part would be measuring arc-end epoch rather than method.
 This part does have benchmarks, outlined below:
 - In order for the r/s gate and the TLE playbook to be validated,
 the playbook and gate must beat the naive, one-time fit ≥ 70% of
-all propagations for 1D, 3D, and 7D (30 comparisons in total).
+all propagations on days 1, 3 and 7 (30 comparisons in total).
 In addition, the success rate (success if picking the correct choice,
 or picking one of the correct choices) of the r/s gate must be
 higher than the success rate of sticking point-blank to any of the
 3 gated options.
 - In order for the fading memory to be considered for a promotion,
 it requires a
-median +3 d improvement ≥1.5× in at least two regimes, no
-regime >1.25× worse, under a single recommended τ.
+median day-3 improvement ≥1.5× in at least two regimes, no
+regime >1.25× worse, under a single recommended τ. Day-3 here is the
+per-day value, which is what the bar's source measured -- the
+threshold is carried over unchanged, not restated.
 The default for fading memory is to defer.
 
 Anchor-to-anchor scatter in comparisons of this kind runs 2-3×, so
@@ -389,11 +403,12 @@ within 1.5× of each other at the same anchor, both count as correct.
 Without this rule the gate is scored on choices it had no way to get
 right, and the bar above becomes harder than it is meant to be.
 
-The 30 comparisons come from 10 independent runs read at three nested
-horizons, not 30 independent trials. And a miss on the second clause
-means the gate is *redundant*, not wrong -- one arm did the job
-everywhere -- which revises the playbook toward that arm rather than
-against the gate.
+The 30 comparisons come from 10 independent runs read on three
+disjoint days, not 30 independent trials -- per-day reads do not nest
+the way 0-1/0-3/0-7 d would, but they still share a run and a fit.
+And a miss on the second clause means the gate is *redundant*, not
+wrong -- one arm did the job everywhere -- which revises the playbook
+toward that arm rather than against the gate.
 
 In addition, it is expected that the TLE fitting trials will
 all converge and give reasonably close values to reality. If that

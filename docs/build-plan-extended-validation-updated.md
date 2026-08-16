@@ -2,25 +2,25 @@
 
 ## GRACE-FO and Swarm windows used
 
-10 windows in total, each 13 days long. Drawn once, frozen here and in the
+10 windows in total, each 14 days long. Drawn once, frozen here and in the
 driver, never re-drawn at runtime.
 
 | # | name | t0 | end (excl.) | F10.7 (range) | Ctr81 | Ap max | ap3 max | Kp max |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `low_2019_12` | 2019-12-23 | 2020-01-05 | 71.9 (70-73) | 71.3 | 5 | 12 | 2.7 |
-| 2 | `low_2021_04` | 2021-04-15 | 2021-04-28 | 77.4 (75-83) | 75.0 | 28 | 48 | 5.0 |
-| 3 | `low_2021_06` | 2021-06-17 | 2021-06-30 | 82.3 (76-92) | 79.3 | 6 | 15 | 3.0 |
-| 4 | `moderate_2022_04` | 2022-04-30 | 2022-05-13 | 120.0 (109-133) | 129.9 | 15 | 32 | 4.3 |
-| 5 | `intense_2024_06` | 2024-06-14 | 2024-06-27 | 187.8 (167-203) | 191.1 | 17 | 39 | 4.7 |
-| 6 | `storm_2024_08` | 2024-08-11 | 2024-08-24 | 243.3 (225-282) | 218.6 | **127** | 207 | 8.0 |
-| 7 | `intense_2024_11` | 2024-11-23 | 2024-12-06 | 200.2 (174-225) | 201.0 | 11 | 32 | 4.3 |
-| 8 | `storm_2025_05` | 2025-05-26 | 2025-06-08 | 139.2 (121-164) | 134.8 | **98** | 179 | 7.7 |
-| 9 | `moderate_2025_07` | 2025-07-23 | 2025-08-05 | 147.2 (143-156) | 145.8 | 27 | 39 | 4.7 |
-| 10 | `storm_2026_01` | 2026-01-13 | 2026-01-26 | 167.1 (117-232) | 145.2 | **144** | 300 | 8.7 |
+| 1 | `low_2019_12` | 2019-12-23 | 2020-01-06 | 71.9 (70-73) | 71.3 | 8 | 18 | 3.3 |
+| 2 | `low_2021_04` | 2021-04-15 | 2021-04-29 | 77.3 (75-83) | 75.0 | 28 | 48 | 5.0 |
+| 3 | `low_2021_06` | 2021-06-17 | 2021-07-01 | 83.1 (76-94) | 79.3 | 13 | 27 | 4.0 |
+| 4 | `moderate_2022_04` | 2022-04-29 | 2022-05-13 | 120.2 (109-133) | 129.8 | 15 | 32 | 4.3 |
+| 5 | `intense_2024_06` | 2024-06-14 | 2024-06-28 | 187.4 (167-203) | 191.3 | 17 | 39 | 4.7 |
+| 6 | `storm_2024_08` | 2024-08-11 | 2024-08-25 | 242.5 (225-282) | 218.8 | **127** | 207 | 8.0 |
+| 7 | `intense_2024_11` | 2024-11-23 | 2024-12-07 | 198.6 (174-225) | 200.8 | 11 | 32 | 4.3 |
+| 8 | `storm_2025_05` | 2025-05-26 | 2025-06-09 | 137.4 (115-164) | 134.7 | **98** | 179 | 7.7 |
+| 9 | `moderate_2025_07` | 2025-07-23 | 2025-08-06 | 147.8 (143-157) | 145.8 | 27 | 39 | 4.7 |
+| 10 | `storm_2026_01` | 2026-01-13 | 2026-01-27 | 166.0 (117-232) | 145.2 | **144** | 300 | 8.7 |
 
 Indices are window aggregates read from the same CSSI file NRLMSISE-00
 consumes (`orekit-data/CSSI-Space-Weather-Data/SpaceWeather-All-v1.2.txt`):
-F10.7 and Ctr81 are 13-day means, Ap/ap3/Kp are 13-day maxima. The driver
+F10.7 and Ctr81 are 14-day means, Ap/ap3/Kp are 14-day maxima. The driver
 re-reads them at runtime rather than trusting this table.
 
 ### How they were selected
@@ -30,19 +30,50 @@ Candidates were all 2,887 13-day windows in the drawable span (t0 from
 crosses the 2026-05-09 OBSERVED boundary). Band rules were fixed before the
 draw: **both** NRLMSISE-00 solar inputs in range -- window-mean daily F10.7
 *and* Ctr81 -- at low <= 85, moderate 110-150, intense >= 185; non-storm bands
-additionally need daily Ap <= 30 *and* 3-hourly ap <= 50 across all 13 days
-(quiet in the model and in reality) and F10.7 max/min <= 1.35; >= 30 days from
-every other window and from the three frozen v0.7.2 windows; <= 2 per band per
-calendar year. Within each band the pick is a uniform draw, `random.Random`,
-**seed 20260814**. Storm windows are not a draw -- only 8 events in the whole
-span reach daily Ap >= 80, so the three are a selection from a census, chosen
-for placement (below) and for spread in the F10.7 backdrop.
+additionally need daily Ap <= 30 *and* 3-hourly ap <= 50 across every day of
+the window (quiet in the model and in reality) and F10.7 max/min <= 1.35;
+>= 30 days from every other window and from the three frozen v0.7.2 windows;
+<= 2 per band per calendar year. Within each band the pick is a uniform draw,
+`random.Random`, **seed 20260814**. Storm windows are not a draw -- only 8
+events in the whole span reach daily Ap >= 80, so the three are a selection
+from a census, chosen for placement (below) and for spread in the F10.7
+backdrop.
 
 Two consequences to record rather than engineer away. Solar flux is bimodal
 (a near-empty gap at Ctr81 86-103), so "moderate" is a transition rather than a
 plateau. And **"intense" exists only in 2024** -- 17 eligible starts, all
 2024-06-13 to 2024-11-28 -- so that band is confounded with mission epoch and
 altitude, and the findings say so.
+
+### The 13 -> 14 day extension (2026-08-15)
+
+Windows were lengthened to 14 days after the draw, because the TLE part's
+last forecast sample sits at day 13 and daily truth files cover [day, day+1),
+so that sample is the first one in the fourteenth file. **The draw was not
+re-run.** Re-deriving the candidate set on 14-day windows and re-drawing under
+the same seed would return a different ten, discarding the storm placement
+design below -- and the storms are a census selection rather than a draw, so
+they would not survive it either. The extra day is a data-loading requirement,
+not a change to the regime being sampled.
+
+What was done instead: **every drawn window was re-verified against the same
+band rules over its full 14 days.** Nine passed unchanged. Window 4
+`moderate_2022_04` failed -- its fourteenth day, 2022-05-13 at F10.7 149.5,
+pushed the F10.7 max/min flatness rule from 1.220 to **1.372** against a cap of
+1.35 fixed before the draw. Under this plan's own failure rule it slid by the
+fewest whole days that clears: **-1 day, t0 2022-04-30 -> 2022-04-29**, which
+restores the ratio to 1.220 (Ap max 15, ap3 max 32, separation 302 d). The
+slide prepends a day rather than appending one, so the window keeps its
+original span and only its t0 anchor moves. Recorded as the retirement this
+plan requires; no other window moved.
+
+The band rules above are therefore stated on 14 days, while the candidate count
+and the draw itself remain 13-day facts. Both readings are recorded rather than
+reconciled, because reconciling them would mean re-drawing. One number in that
+13-day record does not tie out and is left as drawn: 2,887 candidates implies a
+t0 span starting 2018-06-01, not the 2018-09-01 the same sentence states (the
+gap is exactly 92 days). Since the draw is not being re-run, it is recorded
+rather than corrected.
 
 ### Storm placement is deliberate
 
@@ -74,7 +105,7 @@ format inspection -> Swarm window list.
 
 ### **Chunk 1: Data download, extraction, and maneuver screening**
 
-**Goal.** Land each window's 13 days, keep only what the study reads, and gate
+**Goal.** Land each window's 14 days, keep only what the study reads, and gate
 every window before any compute is spent on it. Windows above are provisional
 until they clear this chunk.
 
@@ -91,7 +122,7 @@ The new folder gets its own small finder that globs `.gz`; the frozen tree's
 finder does not glob it and is not edited.
 
 **Screen, tier 1 -- THR1B, at extraction time.** Pure parse, no JVM. Clean iff
-`accum_dur_orb_ctrl` is unchanged across all 13 days *and* every per-record
+`accum_dur_orb_ctrl` is unchanged across all 14 days *and* every per-record
 `on_time_orb_ctrl_1`/`_2` is zero, for both satellites. Runs *before* the
 tarball is discarded, so a failing window can still be slid while its source is
 on disk. Exact, no threshold, and unconfounded by storms.
@@ -264,7 +295,7 @@ absent from the model. That is why these ratios can leave 1.0 at all.
 
 ## Part 2: drag-significant propagations
 
-Needs Chunk 1 (13 days landed and screened per window) and Chunk 2
+Needs Chunk 1 (14 days landed and screened per window) and Chunk 2
 (`gracefo_ext_common.py` rewritten to this contract, `thr1b.py` exercised). The
 ten windows run **in table order**, one per chunk, and are independent of each
 other -- `--only drag_04` is a complete unit of work.
@@ -296,8 +327,11 @@ evidence; it is verified on a smoke arc and on JVM-free identities.
 
 **Edit.**
 - `gracefo/gracefo_ext_common.py` -- add `ARC_DAYS = 7.0`, `LOAD_DAYS = 8`,
-  `READ_HORIZONS_D = (1, 3, 7)`. Nothing else: Chunk 2 lands the geometry, the
-  fitter, `force_config`, the scan ceilings and the table accessors.
+  `READ_DAYS = (1, 3, 7)`. Named `READ_DAYS`, not `READ_HORIZONS_D`: these
+  index **individual days**, not cumulative horizons, and the old name invites
+  the accumulate-from-t0 read the contract forbids. Nothing else: Chunk 2 lands
+  the geometry, the fitter, `force_config`, the scan ceilings and the table
+  accessors.
 - `run_all.py` -- register the 20 window groups and the summary, plus a small
   alias map (`drag` -> `drag_01..drag_10`, `swarm` -> `swarm_01..swarm_10`).
   Twenty bare names in `--only` is unusable otherwise.
@@ -370,15 +404,19 @@ propagation each from the window's t0, `output_step` 60 s,
 4. sphere table (`VariableCd.sphere_default()`) on `A_ref`
 5. box table (`BoxFaceCd.default()`), flown `InPlaneTracking(velocity_reference="ecef")`
 
-**The 0-1 d, 0-3 d and 0-7 d numbers are read off those five trajectories, never
+**The day 1, day 3 and day 7 numbers are read off those five trajectories, never
 re-propagated** -- the contract says so, and it is the easiest way to
 accidentally triple the study's cost.
 
-**What is recorded.** Radial / along / cross / 3D RMS accumulated from t0 over
-0-1 d, 0-3 d and 0-7 d, plus the same four for each of days 1-7. RIC via
-`ric_components(..., earth_fixed=True)`, the frozen study's convention. 8 days
-are loaded, not 7, so the t0 + 7 d endpoint sample exists; Chunk 1 already
-extracted 13, so it costs parse time only.
+**What is recorded.** Radial / along / cross / 3D RMS for **each individual day,
+days 1-7**. Nothing is accumulated from t0: per the contract, day N is the RMS
+over [N-1 d, N d] alone, because a 0-N d window is dominated by its early,
+still well-fitted portion and understates the error at the horizon actually
+being read. There is no 0-1 / 0-3 / 0-7 d row anywhere in this study. Day 1 is
+the one value the two conventions share, which is what keeps the v0.7.2
+comparison below valid. RIC via `ric_components(..., earth_fixed=True)`, the
+frozen study's convention. 8 days are loaded, not 7, so the t0 + 7 d endpoint
+sample exists; Chunk 1 already extracted 14, so it costs parse time only.
 
 **Header.** propygator and resolved `orekit_jpype` versions; `A_ref`, box
 dimensions and the axis check; the window's MAS1B mass (Swarm: the fixed 419.0 kg,
@@ -433,9 +471,12 @@ the fraction of the drag-off signal each option removed:
 
 `summarize_drag.py` prints each window's removed fraction beside it, with **no
 verdict column**. Continuity note: those figures were built from 1-day results,
-so it is the 0-1 d row that compares to them. A bounded loss where drag is weak
-alongside a large gain where drag is strong is what the contract expects to see
-repeated; an inversion is written into the findings as what it is.
+so it is the **day-1** row that compares to them -- and day 1 is identical under
+both conventions, so the comparison survives the per-day rule exactly. Reading
+them against day 3 or day 7 would not be like-for-like. A bounded loss where
+drag is weak alongside a large gain where drag is strong is what the contract
+expects to see repeated; an inversion is written into the findings as what it
+is.
 
 One conversion to state before someone misreads it: putting a frozen v0.7.2
 fitted Cd onto this study's convention takes **both** factors,
@@ -468,7 +509,10 @@ the other nine inherit it.
 - [ ] Swarm A/B
 - [ ] read + summary row
 
-### **Chunk 7: window 4 -- `moderate_2022_04`** (moderate, t0 2022-04-30, ceiling 5.0)
+### **Chunk 7: window 4 -- `moderate_2022_04`** (moderate, t0 2022-04-29, ceiling 5.0)
+
+The one window whose t0 moved for the 14-day extension (slid -1 d; see "The
+13 -> 14 day extension" above). Its span is otherwise the drawn one.
 
 - [ ] GRACE-FO C
 - [ ] Swarm A/B
@@ -526,5 +570,257 @@ Closes `results_drag_summary.txt` at 10/10.
 - [ ] read + summary row
 
 ## Part 3: TLE fitting validation
+
+Needs Chunk 1 (14 days landed and screened) and Chunk 2 (`gracefo_ext_common.py`
+rewritten). Independent of Part 2's runs -- this part fits to *truth*, the two
+state-path rows being the only exception. GRACE-FO C only, no Swarm.
+
+**This is the part that carries benchmarks**, three of them, all pre-registered
+and adjudicated in Chunk 18.
+
+**Arc geometry.** `T = t0 + 6 d` is the common arc end. Every arc ends there and
+they differ only in how far back they reach; left-aligning them would leave each
+method forecasting from a different epoch and the part would measure arc-end
+epoch rather than method. Forecast is `[T, T + 7 d]`, i.e. window days 6-13, read
+at **day 1, day 3 and day 7 past T**. The longest arc is the 6 d fading-memory
+one, reaching back to exactly t0 -- which, with the 7 d forecast, is why the
+window is 14 days.
+
+**Cost: ~5-10 min per window, ~1-1.5 h for the part**, dominated by the 14-day
+1 Hz parse. There is no golden-section Cd fit anywhere here; 14 BatchLS fits over
+<= 300 measurements each are seconds apiece. Windows therefore run **3-4 to a
+chunk** rather than one, while staying separately addressable as `--only tle_NN`.
+
+### The 13 scored configurations
+
+| id | configuration | arc | B\* |
+|---|---|---|---|
+| `naive_2d` | the shipped 2 d default -- **also staging fit `fit2`** | T-2 d .. T | free |
+| `arm_transplant` | hold `fit2`'s B\* on a fresh 1 d refit (carrier idiom) | T-1 d .. T | held |
+| `arm_zero` | fresh 1 d refit, B\* = 0 | T-1 d .. T | held at 0 |
+| `arm_fresh` | freshest 1 d fit | T-1 d .. T | free |
+| `catalog` | Space-Track `gp_history`, latest epoch at or before T | -- | -- |
+| `state_sphere` | numerical reference (sphere table), then fit | T-2 d .. T | free |
+| `state_box` | numerical reference (box table, IPT-ecef), then fit | T-2 d .. T | free |
+| `fade_tau_{0.5,0.75,1,1.5,2,3}` | 300 measurements, sigma inflated `exp(age/tau)` | T-6 d .. T | free |
+
+**14 fits run, 13 scored.** The 3 d staging fit (`fit3`, B\* free, T-3 d .. T)
+exists only to supply `s` and is not a scored row.
+
+**The gate is evaluated at runtime, exactly as the playbook prescribes.**
+`r = sigma0 * sigma(B*) / |B*|` off `fit2`; `s = |B*(fit3) - B*(fit2)| / |B*(fit2)|`.
+Thresholds frozen at **r < 0.05 and s < 0.1**, carried verbatim and never
+re-fitted (contract). All three arms run in every window regardless, so the
+driver never needs to know which one the gate picked: **the gate -> arm mapping
+lives in `summarize_tle.py`**, a JVM-free text pass that can be re-scored in
+seconds without re-running a fit.
+
+| r < 0.05 | s < 0.1 | arm |
+|---|---|---|
+| yes | yes | `arm_transplant` |
+| no | -- | `arm_zero` |
+| yes | no | `arm_fresh` |
+
+The third row reads "freshest 1 d fit" in the playbook, ambiguous between free
+and held B\*. It is named `arm_fresh` (free) on the contract's own arithmetic --
+three *distinct* playbook fits, and held-zero is already `arm_zero`. The summary
+prints the `arm_zero`-substituted mapping as a labelled sensitivity line; both
+configurations are measured in every window either way.
+
+**r and s come from the unweighted fits only.** Age weighting turns `sigma0` and
+the covariance into weighted quantities and the thresholds do not carry over, so
+the weighted fits' own diagnostics are printed but never feed the gate (contract
+build caveat; `tle-fit-strategy-findings.md` sec 3, the conservative default).
+
+**Not measured, and the findings must say so:** the log-spaced-sampling axis that
+naturally pairs with short tau. The contract specifies uniform 300 measurements,
+so the fading-memory result characterises the uniform-sampling version alone.
+
+### **Chunk 14: Part 3 apparatus (no committed evidence)**
+
+**Goal.** Build what the window chunks share and land the catalogue pull, before
+ten windows are written against either. Verified on JVM-free identities and a
+smoke arc.
+
+**Create.**
+- `gracefo/tle_fit_common.py` -- arc geometry (`ARC_END_DAY = 6.0`,
+  `FORECAST_DAYS = 7.0`, `READ_DAYS = (1, 3, 7)`, `LOAD_DAYS = 14`); the 13
+  configurations **as data**, so the driver loops and the summary keys off row
+  ids; `parse_bstar`; `compute_rs`; `R_THRESHOLD = 0.05` / `S_THRESHOLD = 0.1`
+  as constants carrying the no-refit note; and the age-weighted fit harness
+  lifted from `tle-fit-strategy/probe2_epoch_and_weights.py`. **This is the one
+  module in the study that imports fitter privates** (`_run_estimation`,
+  `_MEASUREMENT_CAP`, `_SIGMA_POSITION_M`, `_SIGMA_VELOCITY_MS`,
+  `_ProgressReporter`) -- documented unsupported usage, framed exactly as probe 2
+  framed it, and the reason age weighting is testable with no API change.
+- `gracefo/catalog_tles.py` -- the pulled two-line sets keyed by window, with
+  epoch and staleness. Frozen literals; no runtime network (reproducibility rule).
+- `gracefo/run_tle_window.py` -- `<window>` positional, `--data-root`,
+  `--only-config`, `--parse-only`, `--emit-fixture` for Deliverable 4.
+- `summarize_tle.py` -> `results_tle_summary.txt` -- JVM-free text parse of the
+  committed per-window files; runs against partial evidence and prints `N/10`.
+
+**Edit.** `run_all.py` -- register `tle_01..tle_10` plus `tle_summary`, alias
+`tle` -> `tle_01..tle_10`. `README.md` -- layout and a findings row per window.
+
+**Reuse.** Frozen: `common.py` (`ric_components`, `rms`), `gracefo/gnv1b.py`
+(`parse_gnv1b`). This study's own: `windows.py` and the `.gz` finder (Chunk 1),
+`mas1b.py`, `thr1b.py` (Chunk 2), and `gracefo_ext_common.py`'s `force_config`,
+`sphere_spacecraft`, `box_spacecraft`, `sphere_table`, `box_table` for the two
+state rows.
+
+**Layout.**
+
+```
+gracefo/results_tle/window_01_low_2019_12.txt   group tle_01
+results_tle_summary.txt                         group tle_summary
+```
+
+**The Space-Track pull** (maintainer's step, blocking). NORAD **43476**
+(GRACE-FO C), `gp_history`, the latest epoch at or before T, for each of the ten
+windows. Cross-tagging between close-flying objects is a known failure mode, so
+each pull is checked before use: propagate it into the forecast window and
+confirm the residual against **C** truth is smaller than against **D** truth. The
+twins fly ~180 km apart, so a cross-tag shows as a ~200 km along-track offset
+that mere staleness will not produce. Staleness (T minus TLE epoch) is recorded
+on every catalogue row -- it is the known confounder in any catalogue comparison.
+
+**Verify.**
+- **Arc-end alignment**: every scored arc's last sample is T, asserted and
+  printed. The structural check of the whole part.
+- The gate function returns the documented arm for each corner case, and its
+  thresholds assert equal to the playbook's literals.
+- **tau = None no-op**: the weighted harness on an unweighted arc reproduces
+  public `fit_tle_detailed` to < 1 m in-arc RMS with the same B\* -- catches
+  drift in `_run_estimation` behind the private import.
+- Truth coverage: the last loaded sample is at or past T + 7 d.
+- Smoke arc, explicitly not evidence: window 1, three configurations
+  (`naive_2d`, `arm_zero`, one tau), day-1 read only, ~2 min.
+- `run_all.py --list` shows the groups and the alias expands.
+
+**Checklist**
+- [ ] Space-Track pull + cross-tag check, all 10 windows
+- [ ] `tle_fit_common.py` (+ the tau = None no-op)
+- [ ] `run_tle_window.py` + smoke arc
+- [ ] `summarize_tle.py`, `run_all.py` groups + alias, README
+
+### Chunks 15-17 -- the windows, in table order
+
+**Per window.** Load 14 days of GNV1B for C at 60 s; MAS1B mass; THR1B verdict
+re-printed. `T = t0 + 6 d`. Run `fit2` and `fit3`, then the 13 scored
+configurations, forecasting each fitted TLE over `[T, T + 7 d]` at 60 s against
+truth.
+
+**What is recorded.** Per configuration: in-arc RMS, B\*, and radial / along /
+cross / 3D RMS for **day 1, day 3 and day 7 past T** -- per-day, `[N-1 d, N d]`,
+nothing accumulated, matching Part 2 and the units the playbook's own published
+numbers were measured in. RIC via `ric_components(..., earth_fixed=True)`.
+
+**Output blocks.** `[gate]` r, s, the `sigma0` and `sigma(B*)` that produced r,
+and the arm the mapping selects. `[rows]` the 13 configurations, fixed-width with
+a stable id column so the summary stays a plain text parse. `[catalog]` epoch,
+staleness, cross-tag verdict. `[state]` each numerical reference's drift vs truth
+over the arc, RMS and end -- the number that explains any degradation in those
+two rows. `[breakdown]` full RIC per configuration per day.
+
+**The two state rows.** 2 d arc ending at T, matching `naive_2d` so the delta is
+purely reference-model error. Numerical propagation from the truth state at
+T-2 d (ITRF -> EME2000), `force_config(drag=True)`,
+`IntegratorConfig.high_precision()`, 60 s output; the box flown
+`InPlaneTracking(velocity_reference="ecef")` through the external
+propagate-then-fit route, which `results_fit_state_path.txt` measured as
+equivalent to the native State path (rows 4 vs 5, deltas <= 1.9 m) and which is
+the only route that can express that attitude. Expect degradation roughly the
+size of the reference drift -- the a-priori tables cannot meet sec 1.2's
+single-digit-% calibration bar. Recorded as an expectation, not a bar.
+
+**Verify**, per window:
+- every fit converged (no `TLEFitError`), in-arc RMS in the ~500-700 m SGP4
+  lossiness class, anything past ~2 km flagged
+- arc-end alignment re-asserted; catalogue epoch <= T and cross-tag PASS
+- neither state-path reference carries `terminated` metadata
+- r and s computed from `fit2`/`fit3` only, printed with their inputs
+- `run_all.py --verify --only tle_NN` reproduces
+
+**Read.** Fill the window's rows in `results_tle_summary.txt`.
+
+### **Chunk 15: windows 1-3** -- `low_2019_12`, `low_2021_04`, `low_2021_06`
+
+Read window 1's output shape critically before the other nine inherit it. All
+three are low-activity, so expect r to fail its threshold (v0.7.2 measured
+0.15-1.14 quiet) and the mapping to select `arm_zero` throughout -- the first
+transfer test of the gate's quiet arm.
+
+- [ ] window 1 (shape read)
+- [ ] window 2
+- [ ] window 3
+
+### **Chunk 16: windows 4-6** -- `moderate_2022_04`, `intense_2024_06`, `storm_2024_08`
+
+First storm window. `storm_2024_08`'s Ap 127 sits on day 1, behind both staging
+arcs, so the gate sees a calm arc there; selecting a non-storm arm is the correct
+call, not a miss.
+
+- [ ] window 4
+- [ ] window 5
+- [ ] window 6
+
+### **Chunk 17: windows 7-10** -- `intense_2024_11`, `storm_2025_05`, `moderate_2025_07`, `storm_2026_01`
+
+`storm_2025_05` spans days 3-8, so its storm is inside the staging arcs and
+across the forecast start -- the `s` half of the gate is what is under test.
+`storm_2026_01`'s model onset sits at the 2026-01-19 UTC day boundary, which is
+where day 6 starts, so its arc is entirely pre-onset and the forecast opens at
+onset: the contract's mandated fit-right-before-onset case, needing no extra
+download. Closes `results_tle_summary.txt` at 10/10.
+
+- [ ] window 7
+- [ ] window 8
+- [ ] window 9
+- [ ] window 10
+
+### **Chunk 18: adjudication**
+
+**Goal.** Score the three pre-registered benchmarks and write down what missed.
+A text pass over the ten committed files -- no JVM, no re-runs.
+
+**Scoring rule.** Anchor-to-anchor scatter runs 2-3x, so differences under
+**1.5x** are noise (contract). Where two configurations land within 1.5x at the
+same window and day, both count as correct.
+
+**`[bench-1]` the gate + playbook beat the naive fit.** Gate-selected arm vs
+`naive_2d` at days 1, 3 and 7 across ten windows = **30 comparisons**; bar is
+**>= 70 % (21/30)**. Printed strict *and* under the 1.5x tie rule, so a reader
+can see whether the verdict hinges on it. Stated on the row: these are ten
+independent runs read at three days, not 30 independent trials.
+
+**`[bench-2]` the gate beats any fixed arm.** For each window and day the correct
+set is every arm within 1.5x of the best. The gate's success rate must be
+**strictly higher** than the rate for always-`arm_transplant`, always-`arm_zero`
+and always-`arm_fresh`. A miss means the gate is *redundant*, not wrong -- one arm
+did the job everywhere -- which revises the playbook toward that arm. Reported
+alongside the sensitivity line for the `arm_zero`-substituted mapping.
+
+**`[bench-3]` fading memory.** Per band, the median over that band's windows of
+`day-3 RMS(gate-selected arm) / day-3 RMS(fade_tau_X)`. Promotion needs a
+**single** tau at **>= 1.5x in at least two bands** with **no band below 0.8x**
+(none made > 1.25x worse). Default is **DEFER**. Bands are the window table's
+low / moderate / intense / storm.
+
+**`[misclass]`** every window whose gate-selected arm was not in the correct set,
+listed with its r, s and the arm that won. A misclassification is the finding.
+
+**`[post-hoc]`** labelled and separate: what r/s thresholds would have classified
+this data best. A post-hoc observation, never a claim that the frozen gate passed.
+
+**Also recorded.** Catalogue staleness against each catalogue row's outcome; the
+state-path rows' degradation against their measured reference drift; every
+configuration's convergence and in-arc RMS class.
+
+**Checklist**
+- [ ] `results_tle_summary.txt` closed at 10/10
+- [ ] three benchmark verdicts, HIT/MISS, misses written as misses
+- [ ] post-hoc block labelled
+- [ ] playbook revision decision recorded (the doc rewrite is Part 4)
 
 ## Part 4: Wrap-up and docs work
