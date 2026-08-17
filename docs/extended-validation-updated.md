@@ -107,7 +107,8 @@ therefore not comparable to the earlier study's 1 day fitted result
 (1.9 / 6.4 m): that Cd was optimal over one day, this one over seven.
 
 The GRACE-FO body will be approximated as a box of the following
-dimensions, every one of them traceable to the L1 Handbook:
+dimensions, every one of them traceable to the L1 Handbook
+(https://isdc-data.gfz.de/grace-fo/DOCUMENTS/Level-1/GRACE-FO_L1_Data_Product_User_Handbook_20190911.pdf):
 - width = 1.3195 m (average of the trapezoid's top (0.695 m) and
 bottom (1.944 m) bases in Figure 2 of the Handbook)
 - height = 0.7588835 m (fitted to make the box have the same front

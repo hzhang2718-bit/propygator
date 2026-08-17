@@ -824,3 +824,244 @@ configuration's convergence and in-arc RMS class.
 - [ ] playbook revision decision recorded (the doc rewrite is Part 4)
 
 ## Part 4: Wrap-up and docs work
+
+Needs Chunk 18 for anything that quotes a verdict; Chunk 19 needs nothing at all.
+This is the only part that touches `tests/`, `docs/`, the root `README.md` and the
+notebooks, and the only part whose deliverables are sentences rather than numbers.
+The guidance below is deliberately broad -- the contract's Deliverables section is
+the authority on *what* must exist; this plan only sequences it.
+
+The six contract deliverables map on as: 1 -> Chunk 20, 2 -> Chunk 21, 3 -> Chunk
+22, 4 -> Chunk 23, 5 -> Chunks 24 and 25, 6 -> Chunk 19.
+
+**Nothing here regenerates evidence or softens a verdict.** Wrap-up transcribes
+committed results files; a missed benchmark is written down as missed.
+
+### **Chunk 19: the DSMC correction (prose only)**
+
+**Goal.** Apply the contract's "One important correction" and nothing else.
+Independent of every result in this study, so it can run at any point; it is first
+because it is the only wrap-up item with no dependency.
+
+**Edit.** The four live claims the contract lists, each additively, each with a
+dated note, every surrounding measured number left in place -- the two spots in the
+findings doc, the frozen study README's summary row, and `CLAUDE.md` -- plus one
+correction block appended to `gracefo/README.md`.
+
+**Wording discipline: withdrawn, not refuted.** The band's lower edge traces to a
+genuine DSMC study of the GRACE bus whose values were never checked against the
+paper, so the correction may **not** assert the tables fall outside a correct band.
+It may only say the credibility claim rested on a mis-sourced upper edge.
+
+**Do not touch.** `gracefo_common.py:65`, `results.txt`, `run_gracefo.py`, and
+`docs/history/`. No results file is regenerated.
+
+**The rename links ride here** (maintainer-approved 2026-08-16). Chunk 21 renames
+the findings doc, leaving two stale paths in the frozen study's README (lines 30
+and 90). Repoint those two links as part of this chunk's prose edit and record them
+as riding the sanctioned exception -- link text only, no number, no table, no code,
+same file the DSMC block already lands in. `CHANGELOG.md`'s mention is a historical
+entry and stays as written. The rename is a certainty, not a contingency, so the
+new name goes in even if this chunk runs first.
+
+**Verify.** The frozen study's `run_all.py --verify` still passes. That is the
+proof the correction stayed additive.
+
+**Checklist**
+- [ ] four live claims corrected, additively and dated
+- [ ] `gracefo/README.md` correction block
+- [ ] two frozen-README link paths repointed
+- [ ] frozen `--verify` green
+
+### **Chunk 20: evidence surface close-out**
+
+**Goal.** Deliverable 1 -- every results file committed and regenerable by one
+orchestrator command, with the per-window separability the contract asks for twice.
+
+**Edit.**
+- `run_all.py` -- final group set (Chunk 1's screen group, `noise`, `drag_01..10`,
+  `swarm_01..10`, `drag_summary`, `tle_01..10`, `tle_summary`) plus the aliases;
+  `--list` prints every group with its output path; `--verify` masks wall-clock
+  lines and matches the committed files' line endings.
+- `experiments/extended-validation/README.md` -- finalized: layout, the window
+  table, how to regenerate a single window, and a findings-at-a-glance table with
+  one row per part.
+
+**Record the verify policy in that README.** A whole-study `--verify` re-runs Part
+2 and is a scheduled multi-hour act, not a pre-commit check. `--only <group>` is
+what a normal session runs and `--parse-only` is the cheap check. Say it there so a
+later reader does not launch the full sweep casually.
+
+**Verify.** `--list` complete and every listed path exists; one group per part
+re-verified; no results file carries a wall-clock-dependent line `--verify` cannot
+mask.
+
+**Checklist**
+- [ ] `run_all.py` groups, aliases, `--list`, `--verify`
+- [ ] study README finalised incl. findings-at-a-glance and the verify policy
+
+### **Chunk 21: findings -- append to the existing doc, then rename**
+
+**Goal.** Deliverable 2. This study does **not** get its own findings document. Its
+findings are appended to `docs/real-world-validation-findings.md`, which is then
+renamed **`docs/validation-findings.md`** -- one validation record for the
+repository rather than two that have to be read together.
+
+**Rules.**
+- **Continue the section numbering**, new sections from **section 9**. Sections 1-8
+  keep their numbers so every existing citation into section 3 / 4 / 5 still
+  resolves.
+- **The v0.7.2 numbers are not edited.** Where this study re-scopes an earlier
+  claim -- the single-satellite readings in sections 4 and 5 above all -- the
+  re-scope is an additive forward pointer, never a rewrite.
+- Rewrite only the title and the status block, to cover both studies and to name
+  the archived contract and build plan.
+
+**What the new sections cover** (guidance, not an outline to transcribe): why the
+study exists and what it attacks; truth provenance for the new windows, including
+the Swarm reader's format and time-scale resolution or Part B's drop; the window
+table and how it was drawn; one section per part; every pre-registered benchmark
+resolved HIT or MISS, with misses written as misses; the post-hoc threshold block
+labelled as post-hoc; the contract's "What this study does not claim" carried over,
+so no statement of the form "the tables are off by X %" appears anywhere; honest
+caveats -- at minimum the intense band's 2024-only epoch confound, any window where
+Swarm diverged, the uniform-sampling scope of the fading-memory result, and the
+daily-Ap storm smearing; and the named follow-ons.
+
+**Fix broken references**: this touches v0.7.2 frozen material and likely others.
+First conduct a blast radius scan, then update the references. This is a sanctioned
+edit to the frozen docs.
+
+**Verify.** Every number traceable to a committed results file; sections 1-8
+unchanged apart from the additive re-scoping notes (diff-checkable); the
+fading-memory verdict stated with its bar quoted rather than paraphrased.
+
+**Checklist**
+- [ ] new sections appended from section 9
+- [ ] sections 1-8 numbers intact; re-scoping notes additive
+- [ ] renamed to `docs/validation-findings.md`; title + status block rewritten
+
+### **Chunk 22: playbook revision**
+
+**Goal.** Deliverable 3. This study exists partly to invalidate the playbook, so
+the revision follows Chunk 18's verdict rather than defending the recipe.
+
+**Edit `docs/tle-fitting-playbook.md`.** Evidence base restated (ten windows across
+four activity bands, GRACE-FO C for Part 3); the r/s thresholds validated **or
+corrected**; any recalibration presented as post-hoc and labelled as such; the
+third arm's free-vs-held ambiguity resolved the way the study measured it; and the
+gate's domain of validity written down -- r certifies in-arc observability, s
+catches nonstationarity, neither certifies forward validity.
+
+**Also.** `docs/tle-fit-strategy-findings.md` -- record which of its open routes
+this study executed and which survive. Archive it to `docs/history/` if only the
+refit-cadence route is left; otherwise trim it to what remains. Its pre-registered
+fading-memory bar is resolved in Chunk 18 and is quoted here, not restated.
+
+**Checklist**
+- [ ] playbook revised to the measured verdict
+- [ ] `tle-fit-strategy-findings.md` closed, trimmed, or archived
+
+### **Chunk 23: pinned regression tests**
+
+**Goal.** Deliverable 4. These exist to catch a wiring regression, not to freeze a
+physical result.
+
+**Create** new test files rather than editing the v0.7.2 pins, which stay exactly
+as they are. Roughly one per part: a twin-ratio pin from Part 1, a drag-relationship
+pin from one Part 2 window, and a gate-classification pin from Part 3.
+
+**Policy, inherited verbatim.** Measured value x a margin generous enough to absorb
+an orekit-data refresh, and **relationships over absolutes** -- the tables beat
+drag-off in a strong-drag window, the twin ratio sits near 1.0, the gate classifies
+a named window as it did -- rather than an RMS pinned to three figures.
+
+**Mechanics.** Fixtures are in-file literals emitted by the drivers'
+`--emit-fixture` flags (carried from Chunks 3 and 14), so no test reads truth data
+or the network. Any JVM-touching test acquires the JVM through the `orekit`
+fixture -- that is how `conftest.py`'s ordering hook knows to schedule it after the
+no-JVM guards.
+
+**Verify.** Full `pytest` green; each new test fails when its fixture literal is
+perturbed; added suite runtime in seconds, not minutes.
+
+**Checklist**
+- [ ] Part 1 pin
+- [ ] Part 2 pin
+- [ ] Part 3 pin
+- [ ] full suite green, v0.7.2 pins untouched
+
+### **Chunk 24: reconciliation**
+
+**Goal.** Deliverable 5, everything except the showcase.
+
+**Edit.**
+- Root `README.md` "Validation" -- the evidence base is no longer a single
+  satellite; refresh the drag and TLE bullets and repoint the findings link.
+- `notebooks/07_tle_fitting.ipynb` section 9 -- hand-transcribed playbook numbers,
+  updated by hand per the repo convention.
+- `CLAUDE.md` -- the study moves from in-flight to shipped: release history,
+  validation-evidence section, source-of-truth list (contract and build plan
+  archived, findings doc renamed), and the follow-on state.
+- **Inbound-link sweep for the rename** -- grep for the old filename and repoint
+  every live reference. Expected: root README, `CLAUDE.md`, both notebooks, and the
+  frozen study README (done in Chunk 19). `CHANGELOG.md` and anything under
+  `docs/history/` are historical records and stay as written.
+
+**Checklist**
+- [ ] README validation section
+- [ ] notebook 07 section 9
+- [ ] `CLAUDE.md`
+- [ ] rename sweep clean (no live reference to the old path)
+
+### **Chunk 25: `notebooks/00_showcase.ipynb`**
+
+**Goal.** The showcase gets its own chunk, because it is the one artifact rendered
+outside the repository.
+
+**The maintainer provides the details of this edit at build time.** Do not infer
+them from the findings doc -- the showcase is a curated tour, and which numbers it
+carries is an editorial call rather than a transcription.
+
+**Constraints that hold whatever the edit turns out to be.** The notebook is
+deliberately offline and deterministic -- pinned TLE, explicit `start=`, no
+`fetch_tle`, no `Epoch.now()`, writes no files -- so the export reproduces exactly;
+its validation numbers are hand-transcribed and updated by hand; `nbstripout` strips
+outputs on commit.
+
+**Export** A fresh static HTML export if any number moved -- the export
+tooling is deliberately not committed and the rendered HTML lives in the website
+repo.
+
+**Checklist**
+- [ ] edit details received from maintainer
+- [ ] showcase updated; runs offline and deterministically end to end
+- [ ] export needed? recorded either way
+
+### **Chunk 26: release readiness and archival**
+
+**Goal.** Leave the branch mergeable and the docs tree honest.
+
+**Run.** `pre-commit run --all-files`; `conda run -n propygator pytest`; per-group
+`run_all.py --verify` across the three parts, plus the frozen study's `--verify`.
+
+**Archive.** `docs/extended-validation-updated.md` (the contract instructs its own
+archival) and this build plan, both to `docs/history/`.
+`docs/build-plan-extended-validation.md`, the retired GRACE-lineage plan, was
+**deleted 2026-08-16** -- it invited implementing a design that no longer exists,
+and git history keeps it.
+
+**Record the fading-memory verdict.** DEFER closes the question and the sweep stays
+committed as a recipe. PROMOTE ships this study **without** the API change; the
+`measurement_decay_tau` amendment is then its own feature branch off `main`, with
+its own minor release.
+
+**Maintainer's.** Version bump to `v0.8.1` and the editable reinstall that bump
+requires, the CHANGELOG entry, the PR, the squash-merge, the tag. If anything landed
+on `main` during the study, the study is re-run before the merge.
+
+**Checklist**
+- [ ] hooks, full suite, per-group verifies, frozen verify
+- [ ] contract + build plan archived to `docs/history/`
+- [ ] fading-memory verdict recorded (DEFER default)
+- [ ] handed to maintainer for version bump, CHANGELOG, PR, tag
