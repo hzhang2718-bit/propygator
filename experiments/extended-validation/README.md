@@ -2,9 +2,8 @@
 
 Evidence tree for the study contracted in `docs/extended-validation-updated.md`.
 **The contract wins on every conflict**; `docs/features.md` and
-`docs/architecture.md` win over the contract. There is no build plan yet —
-`docs/build-plan-extended-validation.md` belongs to the retired GRACE-lineage
-design and must not be implemented from.
+`docs/architecture.md` win over the contract. The working blueprint is
+`docs/build-plan-extended-validation-updated.md`.
 
 Every external claim propygator makes rests on one satellite (GRACE-FO 1). This
 study widens that base in three parts: **drag propagations** over ~10 stratified
@@ -20,10 +19,12 @@ extended-validation/
 ├── run_all.py         regenerate / --verify orchestrator
 ├── data/              raw truth + reference docs (gitignored, never committed)
 │   └── reference/     third-party reference PDFs (see "Reference documents")
-├── gracefo/           the GRACE-FO drag, TLE-fitting and twin runs
-├── swarm/             the Swarm A/B leg (its own reader, config, drivers)
-└── probes/            fitter / storm / fading-memory probes
+├── gracefo/           the GRACE-FO table-noise, drag and TLE-fitting runs
+└── swarm/             the Swarm A/B leg (its own reader, config, drivers)
 ```
+
+The rest of this file is **retired-design text** (the `T` framing, Legs, Checkpoints,
+the superseded `A_ref`) and is rewritten in Chunk 2.
 
 ## Running
 

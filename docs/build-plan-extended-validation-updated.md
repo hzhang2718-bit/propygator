@@ -1047,9 +1047,6 @@ repo.
 
 **Archive.** `docs/extended-validation-updated.md` (the contract instructs its own
 archival) and this build plan, both to `docs/history/`.
-`docs/build-plan-extended-validation.md`, the retired GRACE-lineage plan, was
-**deleted 2026-08-16** -- it invited implementing a design that no longer exists,
-and git history keeps it.
 
 **Record the fading-memory verdict.** DEFER closes the question and the sweep stays
 committed as a recipe. PROMOTE ships this study **without** the API change; the

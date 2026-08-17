@@ -48,7 +48,8 @@ docs/_build/
 # real-world-validation truth files (never committed; ~10 MB/day GNV1B, SP3 weeks)
 experiments/real-world-validation/data/
 
-# extended-validation truth files (never committed; GRACE-FO + GRACE L1B tarballs, ~148 MB/day)
+# extended-validation truth files (never committed; GRACE-FO noLRI tarballs ~148 MB/day
+# and their extracted GNV1B/MAS1B/THR1B, Swarm truth, reference PDFs, cached .npy)
 experiments/extended-validation/data/
 
 # personal propagation scripts + outputs
