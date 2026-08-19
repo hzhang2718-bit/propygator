@@ -1,3 +1,5 @@
+# Needs future work
+
 """Orchestrator for the extended-validation study (reference-only).
 
 Regenerates every committed results file from its driver invocations -- the
@@ -14,6 +16,7 @@ orchestrator is built incrementally, from Chunk 0" -- the last study added
 run_all.py late and paid for it in a reorganization).
 
     twin        gracefo/results_twin.txt        Chunk 0
+    screen      gracefo/results_screen.txt      Chunk 1
 
 PER-GROUP --verify IS THE DOCUMENTED DEFAULT. A whole-study regenerate is a
 multi-hour, deliberately scheduled act (contract sec 9), not a pre-commit check.
@@ -52,6 +55,15 @@ GROUPS: dict[str, tuple[str, list[tuple[str, list[str]]]]] = {
         # process that has seen all three windows rather than transcribed
         # afterwards. Costs nothing and saves two JVM boots.
         [("gracefo/run_twin_checkout.py", [_FROZEN_ROOT])],
+    ),
+    "screen": (
+        "gracefo/results_screen.txt",
+        # ONE invocation covering all ten windows. The cross-window verdict
+        # table is the chunk's deliverable, so it is computed in a process that
+        # has seen every window rather than transcribed afterwards. --data-root
+        # is left at the driver's default, THIS study's own truth tree
+        # (data/gracefo), which is what distinguishes it from the twin group.
+        [("gracefo/run_screen.py", [])],
     ),
 }
 
@@ -156,6 +168,19 @@ def main() -> None:
     for name in names:
         if name not in GROUPS:
             raise SystemExit(f"unknown group {name!r}; choose from {', '.join(GROUPS)}")
+
+    # Groups are registered by the chunk that CREATES them, so a group routinely
+    # exists here before its evidence does. Catch that now rather than after the
+    # multi-hour run it would otherwise take to reach the diff.
+    if args.verify:
+        pending = [n for n in names if not (STUDY / GROUPS[n][0]).exists()]
+        if pending:
+            raise SystemExit(
+                "[verify] no committed evidence yet for: "
+                + ", ".join(f"{n} -> {GROUPS[n][0]}" for n in pending)
+                + "\n  Regenerate it first (drop --verify), or --only the groups "
+                "that have evidence."
+            )
 
     out_root = args.out_dir
     if out_root is None:

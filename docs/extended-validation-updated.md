@@ -184,6 +184,13 @@ because GRACE-FO C's mass changes over time due to propellant use.
 > catches what a thruster log cannot: safe-mode entries, attitude
 > anomalies and bad truth days. Swarm has no THR1B analogue, so
 > Part B's screen remains the polynomial alone.
+>
+> Known limit of that gate (2026-08-19): THR1B `qualflg` bit 0 (on-time
+> not calculated) and bit 1 (unaccounted thrusts) invalidate the columns
+> it reads -- under bit 0 a zero on-time means unknown, not quiet -- and
+> the two-condition test cannot see either. Neither bit occurs in any
+> window held to date (0 of 16,248 records); the screen reports them by
+> name if they appear. Widening the gate would be an amendment here.
 
 > Important: all the runs will be conducted on GRACE-FO C, which is
 > the leading of the two satellites. The table noise section below
@@ -271,6 +278,12 @@ on Swarm. So: GPS + 19 s = TAI, both leap-free, never a hand-rolled
 leap-second table (the locked route, `gracefo/gnv1b.py:44-46`), and
 add the check that does catch it -- propagate from t0 and compare the
 first sample against truth, as the earlier study does at 4.2e-9 m.
+
+That 4.2e-9 m is one sample, not a bar. The round trip is float noise
+scaling with `|r|` (one ulp at GRACE-FO's radius is 9.3e-10 m); 240
+epochs measured across window 1 span 0 to 27 ulps, i.e. up to 2.5e-8 m.
+The bound is therefore **5e-8 m** (build plan, 2026-08-18); a tighter
+one rejects valid epochs.
 
 > Only Swarm A and B will be used for these tests. Swarm A
 > and C are very similar, and this section aims for variety.

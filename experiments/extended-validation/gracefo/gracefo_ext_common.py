@@ -148,13 +148,10 @@ def window_mass_kg(gas_mass_kg: float) -> float:
     return DRY_MASS_KG + gas_mass_kg
 
 
-# BOTH TWINS SHARE ONE ASSUMED MASS PER WINDOW -- this is binding, not a
-# convenience. Contract sec 2.3 M1 requires the shared constant to cancel from
-# kappa so that T(C,w)/T(D,w) measures the ratio of the twins' TRUE A/m, and it
-# makes the three-term label ("noise floor + fore/aft asymmetry + any true A/m
-# difference") mandatory. Giving each twin its own MAS1B mass would remove the
-# third term by construction and force the forbidden two-term form. The
-# measured C-vs-D mass difference is REPORTED instead, as the bound on term 3.
+# MASS IS PER SATELLITE -- each twin gets its own MAS1B tank-gas reading
+# (maintainer, 2026-08-14). The shared-mass rule this block used to state was
+# mandated by the retired T contract, where the constant had to cancel; mass is
+# a reading, so it is read. Its effect on a Cd ratio is exactly the mass ratio.
 
 # --- attitude -----------------------------------------------------------------
 # Handbook sec 3.2.3: "During flight, the satellites have nadir-pointing Yaw

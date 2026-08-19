@@ -109,6 +109,14 @@ format inspection -> Swarm window list.
 every window before any compute is spent on it. Windows above are provisional
 until they clear this chunk.
 
+**Create.** `gracefo/windows.py` (frozen window list, CSSI re-read, this study's
+`.gz` finder; JVM-free), `gracefo/thr1b.py` (the tier-1 parser -- **resolve the
+record format by inspecting a delivered file first**, and note the wanted fields
+are separate from the twelve attitude-control thrusters),
+`gracefo/fetch_windows.py`, `gracefo/run_screen.py`, and
+`gracefo/results_screen.txt` -- the last **regenerated in Chunk 2** on the
+rewritten geometry, so this chunk's is a rehearsal.
+
 **Download** (maintainer's step). Daily `noLRI` tarballs. GFZ ISDC serves the
 identical JPL RL04 bundles from an open directory with **no login** --
 `isdc-data.gfz.de/grace-fo/Level-1B/JPL/INSTRUMENT/RL04/<year>/` -- so this is
@@ -121,11 +129,11 @@ before downloading -- confirmed against both PO.DAAC and ISDC.
 The new folder gets its own small finder that globs `.gz`; the frozen tree's
 finder does not glob it and is not edited.
 
-**Screen, tier 1 -- THR1B, at extraction time.** Pure parse, no JVM. Clean iff
-`accum_dur_orb_ctrl` is unchanged across all 14 days *and* every per-record
-`on_time_orb_ctrl_1`/`_2` is zero, for both satellites. Runs *before* the
-tarball is discarded, so a failing window can still be slid while its source is
-on disk. Exact, no threshold, and unconfounded by storms.
+**Screen, tier 1 -- THR1B, as each window's fourteenth day lands.** Pure parse,
+no JVM. Clean iff `accum_dur_orb_ctrl` is unchanged across all 14 days *and*
+every per-record `on_time_orb_ctrl_1`/`_2` is zero, for both satellites. It
+reads the extracted `.gz` products, not the tarballs, so discarding each tarball
+at extraction time costs it nothing. Exact, no threshold, unconfounded by storms.
 
 **Screen, tier 2 -- the contract's deg-5 polynomial**, as its own orchestrator
 group over all ten windows, before any Part 2/3 run. Minutes per window against
@@ -145,8 +153,15 @@ begins. Every retirement is recorded.
 screens CLEAN for all ten windows and both satellites, printed with the
 accumulator values that justify the call.
 
+**The t0 round-trip bound is 5e-8 m, raised from 5e-9 m (2026-08-18).** The
+round trip is pure float noise through two rotations: one ulp at GRACE-FO's
+6.8746e6 m is 9.3e-10 m. Measured hourly across the three frozen windows, both
+satellites (1,152 epochs): median 5.6e-9 m, worst 2.99e-8 m -- so 5e-8 m clears
+the worst case by **1.7x**. The old bound sat just above the frozen study's
+single observed 4.2e-9 m, which was one draw from this distribution, not a bar.
+
 **Checklist**
-- [ ] Window 1
+- [X] Window 1
 - [ ] Window 2
 - [ ] Window 3
 - [ ] Window 4
@@ -195,12 +210,6 @@ summary is computed rather than transcribed, and two JVM boots are saved.
    summary. A miss is written down as a miss.
 
 **Create.**
-- `gracefo/thr1b.py` -- the tier-1 thruster parser. **Resolve the record format
-  by inspecting one delivered file before writing it**, the same discipline the
-  contract applies to the Swarm reader; the fields wanted are
-  `on_time_orb_ctrl_1`/`_2` and `accum_dur_orb_ctrl`, which are separate from
-  the twelve attitude-control thrusters. Written here against data already on
-  disk so Part 2's Chunk 1 inherits a parser that has been exercised.
 - `gracefo/run_table_noise.py` -- the driver.
 - `gracefo/results_table_noise.txt` -- the evidence (one file for the part).
 
@@ -222,6 +231,11 @@ summary is computed rather than transcribed, and two JVM boots are saved.
   the frozen tree exactly as `twin` did.
 - `README.md` -- replace the A/m convention table and the Chunk 0 findings
   block; the `T`-era prose goes with them.
+- `gracefo/run_screen.py` -- delete the `A_REF CAVEAT` paragraph from the module
+  docstring, and the matching note in `README.md`'s "Landing the truth data".
+  Both exist only to warn that Chunk 1's tier-2 numbers predate this geometry;
+  once it lands they are false. Then regenerate `results_screen.txt` on the new
+  `A_ref` -- Chunk 1's is a rehearsal and is not committed evidence.
 
 **Delete.** `gracefo/run_twin_checkout.py` and `gracefo/results_twin.txt`. Both
 are built on the retired `A_ref` and the retired metric, and moving the shared
@@ -268,7 +282,7 @@ per twin.
 - Both geometry identities asserted and printed: ram face `H*W` = 1.00134678 vs
   `A_ref` 1.0013468, side total `2L(H+W)` = 15.0060149 vs Table 5's 15.0060150.
   Both hold to 8 figures.
-- t0 ITRF -> EME2000 -> ITRF round-trip <= 5e-9 m, C/D epoch grids aligned,
+- t0 ITRF -> EME2000 -> ITRF round-trip <= 5e-8 m, C/D epoch grids aligned,
   grid uniformity and `|r0|` as Chunk 0 printed them.
 - Both screens CLEAN for all three windows and both satellites, printed with the
   accumulator values that justify the tier-1 call.
@@ -285,7 +299,6 @@ asymmetry the contract flags as expected physics is present in the truth and
 absent from the model. That is why these ratios can leave 1.0 at all.
 
 **Checklist**
-- [ ] `thr1b.py` (format resolved by inspection first)
 - [ ] `gracefo_ext_common.py` rewritten; stale Chunk 0 artifacts deleted
 - [ ] `run_table_noise.py` + `run_all.py` group
 - [ ] quiet_2019
@@ -296,7 +309,7 @@ absent from the model. That is why these ratios can leave 1.0 at all.
 ## Part 2: drag-significant propagations
 
 Needs Chunk 1 (14 days landed and screened per window) and Chunk 2
-(`gracefo_ext_common.py` rewritten to this contract, `thr1b.py` exercised). The
+(`gracefo_ext_common.py` rewritten to this contract). The
 ten windows run **in table order**, one per chunk, and are independent of each
 other -- `--only drag_04` is a complete unit of work.
 
@@ -338,8 +351,8 @@ evidence; it is verified on a smoke arc and on JVM-free identities.
 - `README.md` -- layout, and a findings row per window.
 
 **Reuse.** Frozen and read-only: `common.py` (`ric_components`, `rms`) and
-`gracefo/gnv1b.py` (`parse_gnv1b`). This study's own: `windows.py` and the `.gz`
-finder from Chunk 1, `mas1b.py`, and Chunk 2's `thr1b.py`.
+`gracefo/gnv1b.py` (`parse_gnv1b`). This study's own: `windows.py`, the `.gz`
+finder and `thr1b.py` from Chunk 1, and `mas1b.py`.
 
 **The Swarm gate.** The contract's 4-step format resolution runs here, against
 one delivered file rather than against documentation, because step 4 is "drop
@@ -349,7 +362,8 @@ Time scale is the known trap: Swarm products are served on GPS time, so
 hand-rolled leap table**. Checks before the reader's output is trusted: PV
 magnitudes in range, epoch continuity across file seams, uniform grid, and the
 one that actually catches a wrong time scale -- propagate from t0 and compare
-the first sample against truth, the frozen study's 4.2e-9 m class. Then the
+the first sample against truth, judged against the 5e-8 m bound above rather
+than the frozen study's single 4.2e-9 m reading. Then the
 maintainer's download, and the polynomial-only screen (Swarm has no THR1B
 analogue) produces the Swarm window list and its divergences; a divergent window
 confounds body with epoch and is recorded on the row. Record from the delivered
@@ -433,7 +447,7 @@ RAILED marker if the fit sits at the ceiling. Ceilings are 5.0, or 8.0 on the
 three storm windows (6, 8, 10).
 
 **Verify**, per body:
-- t0 ITRF -> EME2000 -> ITRF round-trip <= 5e-9 m; seam continuity; uniform grid
+- t0 ITRF -> EME2000 -> ITRF round-trip <= 5e-8 m; seam continuity; uniform grid
 - screens re-printed CLEAN (GRACE-FO both, Swarm polynomial)
 - **no trajectory carries `terminated` metadata** -- a guard trip would silently
   shorten an RMS window, and 7 days through a storm is where that stops being
@@ -665,7 +679,7 @@ smoke arc.
 
 **Reuse.** Frozen: `common.py` (`ric_components`, `rms`), `gracefo/gnv1b.py`
 (`parse_gnv1b`). This study's own: `windows.py` and the `.gz` finder (Chunk 1),
-`mas1b.py`, `thr1b.py` (Chunk 2), and `gracefo_ext_common.py`'s `force_config`,
+`mas1b.py`, `thr1b.py` (Chunk 1), and `gracefo_ext_common.py`'s `force_config`,
 `sphere_spacecraft`, `box_spacecraft`, `sphere_table`, `box_table` for the two
 state rows.
 

@@ -1,3 +1,5 @@
+**This document needs future work**
+
 # Extended Validation — drag propagations, TLE fitting tests, and table noise
 
 Evidence tree for the study contracted in `docs/extended-validation-updated.md`.
@@ -18,13 +20,30 @@ extended-validation/
 ├── README.md          this file
 ├── run_all.py         regenerate / --verify orchestrator
 ├── data/              raw truth + reference docs (gitignored, never committed)
-│   └── reference/     third-party reference PDFs (see "Reference documents")
+│   ├── reference/     third-party reference PDFs (see "Reference documents")
+│   ├── tarballs/      TRANSIENT download staging; one tarball at a time,
+│   │                  deleted as soon as its six members are extracted
+│   └── gracefo/       one directory per window, named for the window, so
+│       └── <window>/  --data-root behaves as it does on the frozen tree:
+│                        GNV1B_<date>_<C|D>_04.txt.gz   truth ephemeris
+│                        MAS1B_<date>_<C|D>_04.txt.gz   tank-gas mass
+│                        THR1B_<date>_<C|D>_04.txt.gz   thruster log
+│                      14 days x 3 products x 2 satellites = 84 files/window,
+│                      ~269 MB/window, ~2.6 GB for all ten
 ├── gracefo/           the GRACE-FO table-noise, drag and TLE-fitting runs
+│   ├── windows.py     the frozen ten-window list, its CSSI re-read, and this
+│   │                  study's .gz finder                        (Chunk 1)
+│   ├── thr1b.py       the tier-1 thruster parser                (Chunk 1)
+│   ├── fetch_windows.py   download -> extract -> gzip -> screen (Chunk 1)
+│   ├── run_screen.py  both maneuver gates -> results_screen.txt (Chunk 1)
+│   ├── mas1b.py       the MAS1B mass parser
+│   └── gracefo_ext_common.py   leg-wide geometry, fitter, force set
 └── swarm/             the Swarm A/B leg (its own reader, config, drivers)
 ```
 
-The rest of this file is **retired-design text** (the `T` framing, Legs, Checkpoints,
-the superseded `A_ref`) and is rewritten in Chunk 2.
+**The A/m convention** and **Findings at a glance / Chunk 0** below are
+**retired-design text** (the `T` framing, Legs, Checkpoints, the superseded
+`A_ref`); Chunk 2 rewrites them. Everything else on this page is current.
 
 ## Running
 
@@ -41,6 +60,33 @@ conda run -n propygator python run_all.py --verify --only twin
 
 **Per-group `--verify` is the documented default.** A whole-study regenerate is
 a multi-hour, deliberately scheduled act, not a pre-commit check.
+
+### Landing the truth data (Chunk 1, maintainer's step)
+
+All commands on this page run from the study root (`experiments/extended-validation/`).
+
+```
+conda run -n propygator python gracefo/fetch_windows.py --all --dry-run  # URLs + budget
+conda run -n propygator python gracefo/fetch_windows.py --all            # ~1.5-3 h
+```
+
+One day at a time: fetch, extract the six kept members, gzip them, run the
+tier-1 THR1B screen when the window's fourteenth day lands, delete the tarball.
+Idempotent — an interrupted run resumes by being re-run, and a partial transfer
+resumes mid-file. Peak disk is the retained tree plus one 148 MB tarball.
+
+Then the committed screening evidence, both gates over all ten windows:
+
+```
+conda run -n propygator python run_all.py --only screen              # ~1-1.5 h
+conda run -n propygator python gracefo/run_screen.py --parse-only    # tier 1, no JVM
+```
+
+**`results_screen.txt` must be generated after Chunk 2's geometry rewrite.** The
+tier-2 propagation reads `A_REF_M2` from `gracefo_ext_common.py`, which Chunk 2
+moves from 0.9551567 to 1.0013468 m², so generating it earlier guarantees a red
+`--verify` the moment Chunk 2 lands. The resolved value is printed in the
+results header so any file says which geometry produced it.
 
 ## The frozen-evidence rule
 
@@ -95,18 +141,31 @@ study withholds. The one claim they touch is **B1**'s sign test on `T_box` near
 
 ## Data access
 
-- **GRACE-FO GNV1B** — PO.DAAC daily tarballs, Earthdata login, **148 MB/day**
-  and the daily bundle is the only route (checked 2026-08-09; PO.DAAC does not
-  serve `GNV1B` standalone). Each tarball carries **both** satellites, so
-  GRACE-FO 2 costs zero downloads. The quiet, active and Gannon windows are
-  already on disk in the frozen tree.
-- **GRACE L1B** — PO.DAAC **monthly bundles, ~250 MB** ≈ 8 MB/day, roughly 18×
-  cheaper per day than GRACE-FO. The granularity inverts, though: cost scales
-  with **distinct months touched**, not days, so a 3-day window and a 10-day
-  window cost the same. The upside is that a month bought is a month of days
-  free, which makes GRACE window screening (sliding off a maneuver) cost
-  nothing. Chunk 1 confirms the figure from the first delivered bundle and
-  records the record format.
+- **GRACE-FO daily tarballs — GFZ ISDC, no login.**
+  `isdc-data.gfz.de/grace-fo/Level-1B/JPL/INSTRUMENT/RL04/<year>/gracefo_1B_<date>_RL04.ascii.noLRI.tgz`
+  serves the identical JPL RL04 bundles PO.DAAC does, from an open directory,
+  which is what makes `fetch_windows.py` scriptable without Earthdata auth. The
+  `ACX` and `LRI` variants hold only accelerometer and laser-ranging products;
+  GNV1B, MAS1B and THR1B are all in `noLRI`, so there is **no lighter route to
+  THR1B and no way to screen before downloading.** Each tarball carries **both**
+  satellites, so GRACE-FO 2 costs zero extra downloads.
+  Verified 2026-08-17: every day of all ten windows is served (archive currently
+  runs through 2026-07-30), and **no checksums are published** — hence
+  `fetch_windows.py`'s functional integrity check (Content-Length match, tarball
+  opens, all six members present and non-empty).
+  Note `low_2019_12` straddles two yearly directories (2019-12-23 → 2020-01-05),
+  so the URL year comes from each **day**, never from the window's `t0`.
+- **Measured budget** (one delivered tarball, 2019-11-14): **148 MB/day in,
+  19.23 MB/day retained** gzipped for both satellites — 8× smaller. Ten windows
+  = 140 days = **~20.2 GB downloaded, ~2.6 GB retained.** Sustained ISDC
+  throughput measured at **2.1–3.6 MB/s**, so the full pull is **~1.5–3 h** plus
+  ~21 min of extract/gzip CPU. Single-threaded and resumable (HTTP Range);
+  re-running skips days already extracted.
+- **Parse cost, measured:** **0.6 s/day/satellite from the extracted `.gz`**
+  against 4.7 s from a tarball — the tarball cost is `tarfile.getmembers()`
+  scanning 148 MB, which the extracted tree skips entirely. So the build plan's
+  conditional `.npy` cache (Chunk 3, "if it turns out to cost minutes rather
+  than seconds") is **not needed**: a 14-day two-satellite load is ~17 s.
 - **Catalog TLEs** — per-anchor Space-Track `gp_history` pulls. Close-formation
   pairs are a cross-tagging hazard; object identity is checked on every pull.
 - **Raw truth files are never committed** (`data/` gitignored).
