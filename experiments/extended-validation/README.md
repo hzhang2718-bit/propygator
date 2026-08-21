@@ -88,6 +88,37 @@ moves from 0.9551567 to 1.0013468 m², so generating it earlier guarantees a red
 `--verify` the moment Chunk 2 lands. The resolved value is printed in the
 results header so any file says which geometry produced it.
 
+### Data gaps and burns in the landed windows (2026-08-20)
+
+**Zero-record days.** Some daily products legitimately carry no records; both
+parsers record and report them rather than raising. Neither case is a truncated
+download — every file declares `num_records` in its header, and both parsers
+cross-check it against the records actually read.
+
+- **THR1B, C only** — one day in `storm_2024_08`, two in `storm_2025_05`, one in
+  `moderate_2025_07`. C's thruster-activation rate fell from ~450/day in
+  2019–2022 to 1–5/day by 2024–2025, so a day with none is ordinary. All are
+  interior, bracketed by days reading an identical *cumulative*
+  `accum_dur_orb_ctrl` — a burn inside a gap would have raised the next reading.
+  None did: C is flat at 29574000 across windows 6–8, stepping to 29712000
+  before window 9, outside every window. A zero-record day at a window **edge**
+  would be a real hole and is escalated; none has occurred.
+- **MAS1B, both satellites** — 2024-08-23 in `storm_2024_08`, and seven
+  consecutive days (2025-07-25…31) in `moderate_2025_07`. MAS1B is periodic, so
+  these are telemetry outages, not quiet days. The window mass is a mean over a
+  nearly constant series; the missing days can move it by at most 0.007 kg
+  (0.001 % of total mass), far below the fit's own resolution, and that bound is
+  printed beside the mass.
+
+**Burns on GRACE-FO D.** `intense_2024_11` (2024-12-04, +288 s) and
+`storm_2025_05` (2025-06-04, +214 s) carry real orbit-maintenance burns on D; C
+is clean in both. The screen prints `REVIEW -- burn on D` and leaves the
+disposition to the maintainer. Recorded call: **keep both windows** — every run
+is on C, and D is read on the ten windows only as Chunk 14's cross-tag
+discriminator, which a burn makes easier rather than harder. They are also the
+study's only known-positive maneuvers, so tier 2 is scored against them — the
+one calibration available for the gate that screens Swarm alone.
+
 ## The frozen-evidence rule
 
 `experiments/real-world-validation/` is **imported, never edited**. This tree

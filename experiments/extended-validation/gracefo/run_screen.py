@@ -333,8 +333,25 @@ def run_window(
         mass_kg[sat] = window_mass_kg(m.gas_mean_kg)
         print(
             f"  {sat}: gas mean {m.gas_mean_kg:.4f} kg over {m.n_records} records "
+            f"(range {m.gas_min_kg:.4f}..{m.gas_max_kg:.4f}) "
             f"-> total {mass_kg[sat]:.3f} kg"
         )
+        if m.empty_files:
+            # MAS1B is periodic, so a zero-record day is an OUTAGE, not a quiet
+            # day. Named, with the bound it puts on the mean, so the reader can
+            # see the gap is immaterial instead of being told it is.
+            bound = m.mean_shift_bound_kg
+            print(
+                f"     {len(m.empty_files)} day(s) declare num_records: 0 "
+                f"({', '.join(m.empty_files)}) -- telemetry outage, not a "
+                f"truncated file (header cross-checked)"
+            )
+            print(
+                f"     the mean is over the {m.n_records} records that exist; "
+                f"the missing days can move it by at most {bound:.4f} kg "
+                f"({100.0 * bound / mass_kg[sat]:.4f}% of total mass), against a "
+                f"CD_FIT_TOL resolution of ~0.05-0.1% in Cd"
+            )
 
     print("[parser checks]")
     for sat in SAT_IDS:
@@ -444,6 +461,20 @@ def run_window(
                 f"the screened span is short of {span_s / 86400.0:.1f} d. Treated "
                 f"as NOT CLEAN regardless of the departure."
             )
+        # THE ONLY TRUE-POSITIVE TEST TIER 2 GETS. Swarm has no THR1B analogue,
+        # so the polynomial is its ONLY maneuver gate -- and nothing else in this
+        # study exercises it against a maneuver known to be real. A tier-1 BURN
+        # is exactly that known positive, so record whether tier 2 saw it. A MISS
+        # here is a finding about the Swarm screen, not about this window.
+        if not verdicts[sat]["tier1"]:
+            print(
+                f"     TIER-2 TRUE-POSITIVE CHECK -- tier 1 reports a burn on "
+                f"{sat}, and tier 2 {'CAUGHT' if not clean else 'MISSED'} it "
+                f"({100.0 * departure / max(signal, 1.0):.1f}% departure against "
+                f"the {TIER2_FRACTION:.0%} bar). Swarm is screened by tier 2 "
+                f"alone, so this is the only calibration of that gate against a "
+                f"maneuver known to be real."
+            )
         if window.is_storm and not clean:
             print(
                 "     storm window: a real onset is itself a slope kink, so this "
@@ -497,19 +528,37 @@ def main() -> None:
     for gate in gates:
         for sat in SAT_IDS:
             header += f" {gate + ' ' + sat:>9s}"
-    print(header + f" {'verdict':>9s}")
+    print(header + "  verdict")
 
+    # THE VERDICT NAMES WHAT FLAGGED, and is derived rather than judged: the
+    # summary states which gate fired on which satellite and stops there. The
+    # disposition -- retire, slide, or record and keep -- is the maintainer's,
+    # per the build plan's failure rule, and is not inferred here. In particular
+    # this table never resolves a flag by deciding some satellite does not count.
     n_clean = 0
+    d_only = False
     for window in selected:
         row = f"  {window.name:18s} {window.band:9s}"
-        ok = True
         for gate in gates:
             for sat in SAT_IDS:
                 value = results[window.name][sat].get(gate)
-                ok = ok and bool(value)
-                row += f" {'CLEAN' if value else 'REVIEW':>9s}"
-        n_clean += int(ok)
-        print(row + f" {'CLEAN' if ok else 'REVIEW':>9s}")
+                # tier 1 has no threshold, so its failure IS a burn -- say so,
+                # rather than flattening both gates onto one word.
+                bad = "BURN" if gate == "tier1" else "REVIEW"
+                row += f" {'CLEAN' if value else bad:>9s}"
+        # One reason per satellite: where tier 1 fires, tier 2 firing too is the
+        # expected consequence, not a second finding.
+        reasons = []
+        for sat in SAT_IDS:
+            if not results[window.name][sat].get("tier1", True):
+                reasons.append(f"burn on {sat}")
+            elif not results[window.name][sat].get("tier2", True):
+                reasons.append(f"kink on {sat}")
+        n_clean += int(not reasons)
+        if reasons and all(r.endswith(f" {SAT_IDS[-1]}") for r in reasons):
+            d_only = True
+        verdict = "CLEAN" if not reasons else "REVIEW -- " + ", ".join(reasons)
+        print(row + f"  {verdict}")
 
     print()
     print(
@@ -523,6 +572,16 @@ def main() -> None:
             "clears the burn by >= 1 day (up to +/-10 d, staying in band), storm "
             "windows are never slid but replaced from the census. Every retirement "
             "is recorded."
+        )
+    if d_only:
+        print(
+            f"  Where the only flag is on {SAT_IDS[-1]}, applying that rule is a "
+            f"judgement the maintainer records rather than one this script makes. "
+            f"The contract runs every window on {SAT_IDS[0]} ('all the runs will "
+            f"be conducted on GRACE-FO C'); {SAT_IDS[-1]} is read on the ten "
+            f"windows only as Chunk 14's cross-tag discriminator, which a burn "
+            f"makes easier rather than harder, and the table-noise part that does "
+            f"need it runs on the three frozen v0.7.2 windows."
         )
     print(f"  wall time: {_time.perf_counter() - t0:.0f} s")
 

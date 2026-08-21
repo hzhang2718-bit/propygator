@@ -191,6 +191,13 @@ because GRACE-FO C's mass changes over time due to propellant use.
 > the two-condition test cannot see either. Neither bit occurs in any
 > window held to date (0 of 16,248 records); the screen reports them by
 > name if they appear. Widening the gate would be an amendment here.
+>
+> Zero-record days (2026-08-20): by 2024-2025 GRACE-FO C logs only 1-5
+> activations a day, so some days carry none at all. The accumulator is
+> cumulative, so an interior gap is screened through -- a burn inside it
+> would raise the next reading -- and such a day is recorded rather than
+> treated as a failure. A gap at the window's first or last day has
+> nothing to bracket it and is escalated, like the qualflg bits above.
 
 > Important: all the runs will be conducted on GRACE-FO C, which is
 > the leading of the two satellites. The table noise section below
@@ -207,6 +214,14 @@ because GRACE-FO C's mass changes over time due to propellant use.
 > maneuver screen above. Everything else in the tarball is
 > discarded. Attempt to reuse parser code from the earlier real
 > world validation experiment.
+>
+> MAS1B outages (2026-08-20): some days carry no MAS1B records at all
+> -- one in `storm_2024_08`, seven consecutive in `moderate_2025_07`,
+> both satellites. The mass is the mean over the days that exist. Tank
+> gas varies by under 0.03 % of total mass across a whole window, so
+> every estimator of it agrees far inside the fit's own resolution and
+> the gap cannot move a result. The days are reported with the mass,
+> never interpolated: the mass is a reading, not a reconstruction.
 
 > Important: an attempt should be made while constructing the build
 > plan to make the run for each window separable. This allows for

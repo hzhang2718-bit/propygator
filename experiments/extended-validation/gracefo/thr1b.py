@@ -67,6 +67,24 @@ across window 1 and the three frozen v0.7.2 windows (16,248 records,
 2026-08-19): neither bit is ever set. Bit 6 occurs 3 times, always on D, and
 affects a burn's reported TIME rather than its detection.
 
+ZERO-RECORD DAYS ARE NORMAL, AND ARE NOT A HOLE IN THE SCREEN (2026-08-20).
+GRACE-FO's activation rate fell from ~450 records/day in 2019-2022 to 1-5/day for
+C by 2024-2025, so an occasional day logs nothing at all -- four of them, all on
+C, across windows 6, 8 and 9. They are complete products rather than short
+downloads: each declares ``num_records: 0`` in its own header, and that declared
+count is cross-checked against the parsed body on EVERY file (252/252 match on
+the data held). Such a day is recorded and skipped rather than raised on, because
+``accum_dur_orb_ctrl`` is CUMULATIVE -- a burn inside the gap would raise the
+value read on the next day that carries records. A gap bracketed by an unchanged
+accumulator is therefore exactly as screened as a day full of records.
+
+KNOWN LIMIT -- EDGE GAPS. That bracketing argument needs a record on BOTH sides,
+so a zero-record day at the START or END of the window is a genuine hole: a burn
+there moves the accumulator before its first reading, or after its last. Edge
+gaps are reported through the same escalation path as the gate-critical qualflg
+bits and, like them, are deliberately NOT folded into :attr:`Thr1bScreen.clean`.
+No window held to date has one.
+
 Not shipped, not in CI, outside ``testpaths``. ASCII-only output rule applies to
 the callers; this module only parses.
 """
@@ -74,12 +92,18 @@ the callers; this module only parses.
 from __future__ import annotations
 
 import gzip
+import re
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 _HEADER_END = "End of YAML header"
+# The product's own declared record count, cross-checked against the parsed body
+# on every file. This is what makes a zero-record day distinguishable from a file
+# truncated to its header -- the two are byte-size-indistinguishable to
+# fetch_windows.py's integrity check, which only requires members to be non-empty.
+_NUM_RECORDS = re.compile(r"^\s*num_records:\s*(\d+)\s*$")
 
 _N_COLUMNS = 47
 _IDX_TIME_INTG = 0
@@ -115,11 +139,35 @@ class Thr1bScreen:
     first_firing_file: str | None  # where the first non-zero on-time appears
     first_firing_gps_s: float | None  # ... and its time_intg, for locating the burn
     qualflg_values: tuple[str, ...]  # distinct quality flags seen (reported only)
+    empty_files: tuple[str, ...]  # days declaring num_records: 0 (see module docstring)
 
     @property
     def accum_moved_ms(self) -> int:
         """Total accumulator movement across the window; 0 on a clean window."""
         return self.accum_last_ms - self.accum_first_ms
+
+    @property
+    def edge_gap_files(self) -> tuple[str, ...]:
+        """Zero-record days at the window's START or END -- the gate's one hole.
+
+        An interior gap is bracketed by records on both sides, so the cumulative
+        accumulator screens straight through it. A leading or trailing gap is
+        not: a burn there falls outside ``[first record, last record]`` entirely.
+        Reported, never folded into :attr:`clean` -- see the module docstring.
+        """
+        if not self.empty_files:
+            return ()
+        empty = set(self.empty_files)
+        edges: list[str] = []
+        for name in self.source_files:  # the leading run of empty days
+            if name not in empty:
+                break
+            edges.append(name)
+        for name in reversed(self.source_files):  # ... and the trailing run
+            if name not in empty:
+                break
+            edges.append(name)
+        return tuple(dict.fromkeys(edges))
 
     @property
     def clean(self) -> bool:
@@ -172,16 +220,29 @@ def _read_member_lines(path: Path, sat_id: str) -> list[str]:
 def _parse_one_file(
     path: Path, sat_id: str
 ) -> list[tuple[float, int, int, int, str]]:
-    """One file's records as (gps_time, on_time_1, on_time_2, accum, qualflg)."""
+    """One file's records as (gps_time, on_time_1, on_time_2, accum, qualflg).
+
+    The header's ``num_records`` is cross-checked against the number of body
+    lines actually read. That is what lets an empty day be TOLERATED safely: a
+    file truncated to its header parses to zero records exactly as a genuinely
+    quiet day does, and nothing else in the pipeline can tell them apart.
+    """
     records: list[tuple[float, int, int, int, str]] = []
+    declared: int | None = None
+    n_body = 0
     in_header = True
     for line in _read_member_lines(path, sat_id):
         if in_header:
+            if declared is None:
+                match = _NUM_RECORDS.match(line)
+                if match is not None:
+                    declared = int(match.group(1))
             if line.strip().endswith(_HEADER_END):
                 in_header = False
             continue
         if not line.strip():
             continue
+        n_body += 1
         parts = line.split()
         if len(parts) != _N_COLUMNS:
             raise ValueError(
@@ -200,6 +261,18 @@ def _parse_one_file(
                 parts[_IDX_QUALFLG],
             )
         )
+    if declared is None:
+        raise ValueError(
+            f"{path.name}: no 'num_records' in the YAML header. The screen reads "
+            f"it to tell a quiet day from a truncated file, so the THR1B header "
+            f"format must be re-inspected before trusting a verdict from it."
+        )
+    if declared != n_body:
+        raise ValueError(
+            f"{path.name}: header declares num_records: {declared} but "
+            f"{n_body} record(s) were read. The file is truncated or corrupt -- "
+            f"re-download this day before screening the window."
+        )
     return records
 
 
@@ -209,9 +282,12 @@ def screen_thr1b(
     """Run the tier-1 orbit-control screen over one or more daily THR1B files.
 
     ``paths`` are read in the order given, which the finders produce
-    chronologically. A day with no records for ``sat_id`` raises rather than
-    being skipped: a silently missing day is a hole in the screen, and the whole
-    value of this gate is that it covers every day of the window.
+    chronologically. A day carrying no records is recorded in ``empty_files`` and
+    skipped: it is a real, complete product (``num_records: 0``, cross-checked in
+    :func:`_parse_one_file`), and the cumulative accumulator screens straight
+    through an interior gap. An EDGE gap is the exception the caller must act on
+    -- see :attr:`Thr1bScreen.edge_gap_files`. Only a window with no records at
+    all raises, because then there is no gate to report.
     """
     file_list: list[Path] = [paths] if isinstance(paths, Path) else list(paths)
     if not file_list:
@@ -219,6 +295,7 @@ def screen_thr1b(
 
     accum_values: list[int] = []
     qualflgs: list[str] = []
+    empty_files: list[str] = []
     n_records = 0
     n_firing = 0
     max_1 = 0
@@ -231,7 +308,8 @@ def screen_thr1b(
     for path in file_list:
         day = _parse_one_file(path, sat_id)
         if not day:
-            raise ValueError(f"{path.name}: no THR1B records for satellite {sat_id!r}")
+            empty_files.append(path.name)
+            continue
         for gps, on1, on2, accum, qualflg in day:
             n_records += 1
             if accum_first is None:
@@ -249,7 +327,13 @@ def screen_thr1b(
                     first_firing_file = path.name
                     first_firing_gps = gps
 
-    assert accum_first is not None and accum_last is not None  # non-empty by now
+    if accum_first is None or accum_last is None:
+        raise ValueError(
+            f"no THR1B records for satellite {sat_id!r} in any of the "
+            f"{len(file_list)} file(s) given -- there is no gate to report. "
+            f"Every day declares num_records: 0, which is not a plausible "
+            f"window: re-check the download and the satellite id."
+        )
     return Thr1bScreen(
         sat_id=sat_id,
         n_records=n_records,
@@ -264,6 +348,7 @@ def screen_thr1b(
         first_firing_file=first_firing_file,
         first_firing_gps_s=first_firing_gps,
         qualflg_values=tuple(qualflgs),
+        empty_files=tuple(empty_files),
     )
 
 
@@ -285,6 +370,17 @@ def format_screen(screen: Thr1bScreen, *, indent: str = "  ") -> list[str]:
         f"{screen.on_time_max_1_ms} / {screen.on_time_max_2_ms} ms over "
         f"{screen.n_firing_records} firing record(s)",
     ]
+    edge_gaps = screen.edge_gap_files
+    if screen.empty_files:
+        # Named, never silent: the gate tolerates these, so the reader has to be
+        # able to see which days they were and check the bracketing themselves.
+        interior = [n for n in screen.empty_files if n not in set(edge_gaps)]
+        lines.append(
+            f"{indent}  {len(screen.empty_files)} day(s) declare num_records: 0 "
+            f"({', '.join(screen.empty_files)}); {len(interior)} interior, "
+            f"bracketed by an unchanged cumulative accumulator, so the gate reads "
+            f"through them"
+        )
     # Silent unless a gate-critical bit is set (never, on any data held as of
     # 2026-08-19). A raw flag string in the line above is easy to skim past, and
     # skimming past one of these means accepting a CLEAN built on a column that
@@ -304,6 +400,18 @@ def format_screen(screen: Thr1bScreen, *, indent: str = "  ") -> list[str]:
             + f". The {screen.verdict} above rests on columns these bits "
             f"invalidate; the contract's two-condition test cannot see them. "
             f"Escalate before using this window."
+        )
+    # Same escalation path, same reason: the verdict rests on a span the data
+    # does not cover. An edge gap is the ONE case where a zero-record day is a
+    # real hole -- there is no record on one side to bracket it against.
+    if edge_gaps:
+        lines.append(
+            f"{indent}  ZERO-RECORD DAY AT THE WINDOW EDGE ({', '.join(edge_gaps)}) "
+            f"-- nothing brackets it, so a burn there would fall outside "
+            f"[first record, last record] and move the accumulator before its "
+            f"first reading or after its last. The {screen.verdict} above cannot "
+            f"see it. Extend the load by a day or escalate before using this "
+            f"window."
         )
     if not screen.clean:
         if screen.first_firing_gps_s is not None:
@@ -327,7 +435,8 @@ def format_screen(screen: Thr1bScreen, *, indent: str = "  ") -> list[str]:
             f"{screen.accum_values[:6]}"
         )
         lines.append(
-            f"{indent}  This window is retired or slid per the build plan's "
-            f"failure rule; the retirement is recorded."
+            f"{indent}  The build plan's failure rule applies -- slide, replace, "
+            f"or record and keep. Which one is the maintainer's call, not this "
+            f"screen's: it reports the burn and stops there."
         )
     return lines

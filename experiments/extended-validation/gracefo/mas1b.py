@@ -29,6 +29,34 @@ two tanks' gas masses from tank observations. The handbook marks ``mass_tnk``
 (total spacecraft mass) "Not available", which is why total mass is
 reconstructed as dry + gas rather than read directly.
 
+ZERO-RECORD DAYS (2026-08-20). Unlike THR1B, MAS1B is PERIODIC -- 24 records a
+day, every day -- so a day with none is a telemetry outage, not a quiet day: the
+tank gas existed, it simply was not reported. Two occur in the windows held:
+``storm_2024_08`` loses 2024-08-23 and ``moderate_2025_07`` loses seven
+consecutive days, 2025-07-25 to 07-31, both on BOTH satellites. Each declares
+``num_records: 0``, and the declared count is cross-checked against the parsed
+body on every file, so an outage cannot be confused with a truncated download.
+
+Such a day is recorded and skipped rather than raised on, and the reason is that
+THE QUANTITY BARELY VARIES AT ALL. Tank gas moves by 0.014 kg across the whole of
+``moderate_2025_07`` and 0.14 kg across ``storm_2024_08`` (the latter inflated by
+a thermal excursion on 08-13/14), i.e. 0.002 % and 0.024 % of the ~596 kg total.
+``B = Cd*A/m`` inherits a mass error one-for-one, and a ``CD_FIT_TOL = 0.002``
+fit resolves 0.05-0.1 % in Cd -- so mean, midpoint, first or last all agree well
+inside the fit's own noise floor, and no sampling of this series can move a
+result. The mass is never interpolated across a gap: it is a reading, and
+synthesising one would invert the reason this module exists.
+
+:attr:`Mas1bMass.mean_shift_bound_kg` refines that into a per-window number,
+``(k/n) * (max - min)`` for ``k`` of ``n`` days missing -- 0.010 kg and 0.007 kg
+respectively. It ASSUMES the missing days fall inside the observed range, which
+is a physical judgement about a slowly-varying quantity rather than a theorem:
+``moderate_2025_07`` is strictly monotone across its gap so its missing values
+are pinned between their neighbours, while ``storm_2024_08`` is not monotone, and
+there the bound is generous precisely because the excursion that widens
+``max - min`` is already inside the observed range. Reported so a reader can
+recompute it, not relied on as the argument.
+
 Not shipped, not in CI, outside ``testpaths``. ASCII-only output rule applies
 to the callers; this module only parses.
 """
@@ -36,12 +64,17 @@ to the callers; this module only parses.
 from __future__ import annotations
 
 import gzip
+import re
 import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 _HEADER_END = "End of YAML header"
+# Cross-checked against the parsed body on every file: a MAS1B outage and a file
+# truncated to its header both parse to zero records, and nothing else in the
+# pipeline distinguishes them.
+_NUM_RECORDS = re.compile(r"^\s*num_records:\s*(\d+)\s*$")
 
 # prod_flag bit index -> field name, in ascending index order.
 _FIELDS = (
@@ -68,6 +101,23 @@ class Mas1bMass:
     gas_first_kg: float  # tank1 + tank2 at the first record
     gas_last_kg: float  # tank1 + tank2 at the last record
     gas_mean_kg: float  # mean over all records -- the window's assumed value
+    gas_min_kg: float  # min and max bound what a missing day could have held,
+    gas_max_kg: float  # so the gap's effect on the mean is computable
+    empty_files: tuple[str, ...]  # days declaring num_records: 0 (module docstring)
+
+    @property
+    def mean_shift_bound_kg(self) -> float:
+        """Most the window mean can be wrong by, given the days that are missing.
+
+        With ``k`` of ``n`` days absent and every reading inside
+        ``[gas_min_kg, gas_max_kg]``, the full-window mean differs from the mean
+        actually taken by at most ``(k/n) * (max - min)``. Zero when nothing is
+        missing. Reported rather than asserted -- see the module docstring.
+        """
+        n_days = len(self.source_files)
+        if not n_days or not self.empty_files:
+            return 0.0
+        return (len(self.empty_files) / n_days) * (self.gas_max_kg - self.gas_min_kg)
 
 
 def _read_member_lines(path: Path, sat_id: str) -> list[str]:
@@ -100,16 +150,28 @@ def _read_member_lines(path: Path, sat_id: str) -> list[str]:
 
 
 def _parse_one_file(path: Path, sat_id: str) -> list[float]:
-    """Total tank gas mass (tank1 + tank2) per record, for ``sat_id``."""
+    """Total tank gas mass (tank1 + tank2) per record, for ``sat_id``.
+
+    The header's ``num_records`` is cross-checked against the body lines read, so
+    a genuine outage (``num_records: 0``) cannot be mistaken for a truncated
+    file -- the two are otherwise identical to every check in the pipeline.
+    """
     totals: list[float] = []
+    declared: int | None = None
+    n_body = 0
     in_header = True
     for line in _read_member_lines(path, sat_id):
         if in_header:
+            if declared is None:
+                match = _NUM_RECORDS.match(line)
+                if match is not None:
+                    declared = int(match.group(1))
             if line.strip().endswith(_HEADER_END):
                 in_header = False
             continue
         if not line.strip():
             continue
+        n_body += 1
         parts = line.split()
         if len(parts) < 6:
             raise ValueError(
@@ -137,6 +199,18 @@ def _parse_one_file(path: Path, sat_id: str) -> list[float]:
             )
         # Values appear in ascending field order: tnk1 then tnk2.
         totals.append(float(values[0]) + float(values[1]))
+    if declared is None:
+        raise ValueError(
+            f"{path.name}: no 'num_records' in the YAML header. The parser reads "
+            f"it to tell a telemetry outage from a truncated file, so the MAS1B "
+            f"header format must be re-inspected before trusting a mass from it."
+        )
+    if declared != n_body:
+        raise ValueError(
+            f"{path.name}: header declares num_records: {declared} but "
+            f"{n_body} record(s) were read. The file is truncated or corrupt -- "
+            f"re-download this day before reading a mass from the window."
+        )
     return totals
 
 
@@ -147,11 +221,24 @@ def parse_mas1b(paths: Path | Sequence[Path], *, sat_id: str = "C") -> Mas1bMass
         raise ValueError("no MAS1B files given")
 
     totals: list[float] = []
+    empty_files: list[str] = []
     for path in file_list:
         day = _parse_one_file(path, sat_id)
         if not day:
-            raise ValueError(f"{path.name}: no MAS1B records for satellite {sat_id!r}")
+            # A telemetry outage, verified against the header rather than
+            # assumed. Skipped, not fatal: the mean it feeds is bounded by
+            # `mean_shift_bound_kg`. See the module docstring.
+            empty_files.append(path.name)
+            continue
         totals.extend(day)
+
+    if not totals:
+        raise ValueError(
+            f"no MAS1B records for satellite {sat_id!r} in any of the "
+            f"{len(file_list)} file(s) given -- there is no mass to read. Every "
+            f"day declares num_records: 0: re-check the download and the "
+            f"satellite id."
+        )
 
     return Mas1bMass(
         sat_id=sat_id,
@@ -160,4 +247,7 @@ def parse_mas1b(paths: Path | Sequence[Path], *, sat_id: str = "C") -> Mas1bMass
         gas_first_kg=totals[0],
         gas_last_kg=totals[-1],
         gas_mean_kg=sum(totals) / len(totals),
+        gas_min_kg=min(totals),
+        gas_max_kg=max(totals),
+        empty_files=tuple(empty_files),
     )

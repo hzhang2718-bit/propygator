@@ -129,11 +129,23 @@ before downloading -- confirmed against both PO.DAAC and ISDC.
 The new folder gets its own small finder that globs `.gz`; the frozen tree's
 finder does not glob it and is not edited.
 
+**MAS1B outages** (2026-08-20). Some days carry no MAS1B records -- one in
+`storm_2024_08`, seven consecutive in `moderate_2025_07`, both satellites; real
+outages, not truncated files (`num_records` is cross-checked against the body on
+every file). The mass is the mean over the days that exist, never interpolated.
+Tank gas varies by under 0.03 % of total mass across a whole window, so every
+estimator of it lands far inside the fit's own 0.05-0.1 % resolution; the driver
+prints the missing days and the bound they put on the mean beside it.
+
 **Screen, tier 1 -- THR1B, as each window's fourteenth day lands.** Pure parse,
 no JVM. Clean iff `accum_dur_orb_ctrl` is unchanged across all 14 days *and*
 every per-record `on_time_orb_ctrl_1`/`_2` is zero, for both satellites. It
 reads the extracted `.gz` products, not the tarballs, so discarding each tarball
 at extraction time costs it nothing. Exact, no threshold, unconfounded by storms.
+A day may legitimately carry no records at all (C logs 1-5 activations a day by
+2024-2025); because the accumulator is cumulative, an interior gap is screened
+through and is recorded rather than failed, while a gap on the window's first or
+last day is escalated.
 
 **Screen, tier 2 -- the contract's deg-5 polynomial**, as its own orchestrator
 group over all ten windows, before any Part 2/3 run. Minutes per window against
@@ -149,9 +161,20 @@ that, take the next seeded pick. Storm windows are never slid -- replace from
 the remaining five events in the census, in a ranking fixed before screening
 begins. Every retirement is recorded.
 
+**A burn on D alone is recorded, not retired** (2026-08-20). The contract runs
+every window on C; D is read on the ten windows only as Chunk 14's cross-tag
+discriminator, which a burn makes easier, and the table-noise part that needs D
+runs on the three frozen v0.7.2 windows. The screen prints `REVIEW -- burn on D`
+and stops there -- the disposition is the maintainer's, never the script's.
+Those burns are also the study's only known-positive maneuvers, so tier 2 is
+scored against them: Swarm has no THR1B and is screened by tier 2 alone, and
+this is the only calibration of that gate against a maneuver known to be real.
+
 **Verify.** t0 round-trip and seam continuity as the frozen study does; both
-screens CLEAN for all ten windows and both satellites, printed with the
-accumulator values that justify the call.
+screens CLEAN **for C** on all ten windows, printed with the accumulator values
+that justify the call. D is screened and reported identically, but a flag on D
+alone does not fail the window (see the failure rule) -- `intense_2024_11` and
+`storm_2025_05` both carry a real D burn and are kept.
 
 **The t0 round-trip bound is 5e-8 m, raised from 5e-9 m (2026-08-18).** The
 round trip is pure float noise through two rotations: one ulp at GRACE-FO's
@@ -162,11 +185,11 @@ single observed 4.2e-9 m, which was one draw from this distribution, not a bar.
 
 **Checklist**
 - [X] Window 1
-- [ ] Window 2
-- [ ] Window 3
-- [ ] Window 4
-- [ ] Window 5
-- [ ] Window 6
+- [X] Window 2
+- [X] Window 3
+- [X] Window 4
+- [X] Window 5
+- [?] Window 6
 - [ ] Window 7
 - [ ] Window 8
 - [ ] Window 9
