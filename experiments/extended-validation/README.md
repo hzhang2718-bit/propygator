@@ -115,9 +115,22 @@ cross-check it against the records actually read.
 is clean in both. The screen prints `REVIEW -- burn on D` and leaves the
 disposition to the maintainer. Recorded call: **keep both windows** — every run
 is on C, and D is read on the ten windows only as Chunk 14's cross-tag
-discriminator, which a burn makes easier rather than harder. They are also the
-study's only known-positive maneuvers, so tier 2 is scored against them — the
-one calibration available for the gate that screens Swarm alone.
+discriminator, which a burn makes easier rather than harder.
+
+**Tier 2 missed both** (2026-08-20) — 0.7 % and 1.6 % departure against its 10 %
+bar, short by 14x and 6.3x. These are the study's only known-positive maneuvers,
+so this is the one calibration the gate will ever get, and it fails it. The bar
+is **not** re-fitted: the rule normalizes by the along-track error of an
+*unfitted* Cd = 2.3 propagation, which over 14 days at 474–483 km through solar
+max reaches 90–192 km, so a real ~700–850 m burn signature cannot register.
+v0.7.2 set the same 10 % against a 186.6 m signal — the rule did not change, its
+denominator moved three orders of magnitude. The burn *is* visible in the twin
+difference (departure 692.1 → 1335.1 m in window 7, 600.1 → 1443.8 m in
+window 8, ~2x on the satellite that fired), but that is a diagnostic, not a
+gate: two points are not a calibration, and it does not transfer to Swarm, whose
+A/B pair differs by altitude. Levels here are pre-Chunk-2 geometry (`A_ref`
+0.9551567) and are superseded when `results_screen.txt` is regenerated; the
+ratio should survive, since the geometry scales both twins alike.
 
 ## The frozen-evidence rule
 

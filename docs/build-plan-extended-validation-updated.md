@@ -103,7 +103,7 @@ epoch. The Swarm list cannot be finalised before the contract's 4-step format
 resolution settles, because Part B may be dropped outright; sequence it as
 format inspection -> Swarm window list.
 
-### **Chunk 1: Data download, extraction, and maneuver screening**
+### **Chunk 1: Data download, extraction, and maneuver screening** - Done, results.txt generation **skipped**
 
 **Goal.** Land each window's 14 days, keep only what the study reads, and gate
 every window before any compute is spent on it. Windows above are provisional
@@ -189,11 +189,11 @@ single observed 4.2e-9 m, which was one draw from this distribution, not a bar.
 - [X] Window 3
 - [X] Window 4
 - [X] Window 5
-- [?] Window 6
-- [ ] Window 7
-- [ ] Window 8
-- [ ] Window 9
-- [ ] Window 10
+- [X] Window 6
+- [X] Window 7
+- [X] Window 8
+- [X] Window 9
+- [X] Window 10
 
 
 ## Part 1: table noise
@@ -392,7 +392,19 @@ analogue) produces the Swarm window list and its divergences; a divergent window
 confounds body with epoch and is recorded on the row. Record from the delivered
 ephemeris rather than from literature: **Swarm A and B are not a twin pair** --
 B flies the higher orbit -- so an A-vs-B drag difference is an altitude
-difference before it is a body difference. If the gate fails, Part B is dropped:
+difference before it is a body difference.
+
+**Tier 2 is 0-for-2 against real burns** (Chunk 1, 2026-08-20: 0.7 % and 1.6 %
+against its 10 % bar, windows 7 and 8 D). It normalizes by a 90-192 km
+unfitted-Cd signal, so a burn cannot register; the bar is not re-fitted. No
+certified replacement is available -- a TLE SMA step buries the same small
+signature in the same storm-variable decay. **Swarm therefore has no maneuver
+gate**, prospective or retrospective: nothing in this study emits the
+along-track series a burn's slope break is visible in, only per-day RMS. A
+divergence is found, if at all, by the maintainer noticing an incoherent daily
+progression and investigating from there. Weigh this in the step-4 drop decision.
+
+If the gate fails, Part B is dropped:
 each window chunk loses its `swarm_NN` group, the drop is recorded in the README,
 and nothing else in the study moves.
 
