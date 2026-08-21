@@ -1,0 +1,287 @@
+Extended validation -- Chunk 2: table noise, GRACE-FO C/D
+==============================================================================
+=== window quiet_2019, 3 days loaded, 1-day arc ===
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/real-world-validation/data/gracefo  (frozen v0.7.2 tree, read in place)
+[convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
+  A_ref = 1.0013468 m^2 = Table 5 front panel 0.9551567 + boom 0.0461901 (boom folded into the ram face)
+  box x 0.7588835 (height) x y 3.6100207 (length) x z 1.3195 (width) m; +Y held on the wind by InPlaneTracking(ecef)
+  identity 1, ram face H*W  = 1.00134678 m^2 vs A_ref 1.0013468 (rel 2.2e-08)
+  identity 2, sides 2L(H+W) = 15.0060149 m^2 vs Table 5 15.0060150 (rel 5.7e-09)
+  mass = dry 569.914 kg + MAS1B tank gas, PER SATELLITE (decision 1, 2026-08-14)
+  Cd fit: tol 0.002, scan ceiling 5.0 (8.0 on storm windows)
+  [pre-registered] tier-2: degree-5 fit to the 3-day along-track residual of a drag-on Cd = 2.3 propagation, CLEAN iff max departure < 10% of max |along-track|. Carried verbatim from v0.7.2 run_gracefo.py:586.
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 3 daily files
+    1 Hz records 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2019-11-14T00:00:19 -> 2019-11-16T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 3 daily files
+    1 Hz records 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2019-11-14T00:00:19 -> 2019-11-16T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 30.5281 kg over 72 records (range 30.5270..30.5293) -> total 600.442 kg
+  D: gas mean 30.5352 kg over 72 records (range 30.5341..30.5363) -> total 600.449 kg
+  C/D mass ratio 0.999988 (-0.001%) -- the Cd ratio below carries this factor exactly, and dividing it out gives the shared-mass form
+[formation]
+  C/D epoch grids aligned: max |dt| = 0.000e+00 s over 4320 samples
+  separation |r_D - r_C|: mean 181.0 km (min 180.4, max 181.6)
+  signed along-track (D - C): -181.0 km -> C LEADS; sign constant over the load: True
+  Handbook sec 3.2.3 puts the roll axis anti-flight for the leader, so C meets the wind with its rear face. Front and Rear panels are both 0.9551567 m^2, so A_ram is IDENTICAL between the twins and the model cannot see the 180 deg relative yaw.
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 4320: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6876.1 km (altitude ~ 498 km)
+  D: from_iso(to_iso()) == epoch for all 4320: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6876.4 km (altitude ~ 498 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    1393 records over 3 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 3500000 ms, last 3500000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    1276 records over 3 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 2092000 ms, last 2092000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 4.172e-09 m, |dv| = 7.290e-12 m/s (bound 5e-08 m)
+  D: |dr| = 4.268e-09 m, |dv| = 5.225e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the 3-day load, so both gates cover the same span
+  C: signal 187.2 m, departure 6.7 m (3.6%) -> CLEAN  (15 s wall)
+  D: signal 191.8 m, departure 6.7 m (3.5%) -> CLEAN  (14 s wall)
+[C]  GRACE-FO 1 (GRACE C), mass 600.442 kg
+  Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
+    fitted Cd = 2.03393 on A_ref = 1.0013468 m^2, B = Cd*A/m = 3.391949e-03 m^2/kg
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (109 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 7 s wall
+[D]  GRACE-FO 2 (GRACE D), mass 600.449 kg
+  Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
+    fitted Cd = 2.01081 on A_ref = 1.0013468 m^2, B = Cd*A/m = 3.353347e-03 m^2/kg
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (229 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 7 s wall
+[ratios]  the four contract metrics, C/D, on 3D RMS
+  metric                               C/D       dev     bar   verdict
+  Cd_fit(C)/Cd_fit(D)              1.01150    +1.15%    10%   HIT
+  RMS_Cd_fit(C)/RMS_Cd_fit(D)      1.00791    +0.79%    20%   HIT
+  RMS_sphere(C)/RMS_sphere(D)      0.97915    -2.09%    20%   HIT
+  RMS_box(C)/RMS_box(D)            0.99086    -0.91%    20%   HIT
+  shared-mass form of the Cd ratio: 1.01151 (+1.15%) -- the per-satellite ratio above divided by the C/D mass ratio 0.999988, which is the whole of the difference between the two forms
+  A non-zero deviation is expected physics, not only noise: the twins fly a 180 deg relative yaw that puts opposite ends of the same tapered bus into the wind, but the box's +/-Y faces are equal-area, so that yaw is invisible to InPlaneTracking and the model gives both twins IDENTICAL geometry. The asymmetry is in the truth and absent from the model.
+[values]  numerator and denominator of each ratio
+  quantity                                 C             D
+  fitted Cd                          2.03393       2.01081
+  mass (kg)                          600.442       600.449
+  B = Cd*A/m (m^2/kg)           3.391949e-03  3.353347e-03
+  3D RMS fitted Cd (m)                  1.95          1.93
+  3D RMS sphere table (m)              19.26         19.67
+  3D RMS box table (IPT) (m)           56.82         57.34
+[breakdown]  1-day arc, propagated - truth, ITRF RIC RMS (m)
+  sat  run                   radial       along     cross          3D
+  C    fitted Cd               0.52        1.86      0.24        1.95
+  C    sphere table            0.66       19.24      0.24       19.26
+  C    box table (IPT)         1.13       56.80      0.21       56.82
+  D    fitted Cd               0.53        1.84      0.24        1.93
+  D    sphere table            0.67       19.65      0.24       19.67
+  D    box table (IPT)         1.14       57.33      0.21       57.34
+  C arc-mean conditions: r 6873.6 km, rho 8.907e-14 kg/m^3
+     shipped tables there: sphere Cd 2.918 -> CdA 2.9219 m^2; box per-face ram 3.326 / side 0.086 / leeward 0.000 -> face-sum CdA 4.6218 m^2
+     fitted CdA 2.0367 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
+  D arc-mean conditions: r 6873.6 km, rho 8.907e-14 kg/m^3
+     shipped tables there: sphere Cd 2.918 -> CdA 2.9221 m^2; box per-face ram 3.326 / side 0.086 / leeward 0.000 -> face-sum CdA 4.6220 m^2
+     fitted CdA 2.0135 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
+
+==============================================================================
+=== window active_2023, 3 days loaded, 1-day arc ===
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/real-world-validation/data/gracefo  (frozen v0.7.2 tree, read in place)
+[convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
+  A_ref = 1.0013468 m^2 = Table 5 front panel 0.9551567 + boom 0.0461901 (boom folded into the ram face)
+  box x 0.7588835 (height) x y 3.6100207 (length) x z 1.3195 (width) m; +Y held on the wind by InPlaneTracking(ecef)
+  identity 1, ram face H*W  = 1.00134678 m^2 vs A_ref 1.0013468 (rel 2.2e-08)
+  identity 2, sides 2L(H+W) = 15.0060149 m^2 vs Table 5 15.0060150 (rel 5.7e-09)
+  mass = dry 569.914 kg + MAS1B tank gas, PER SATELLITE (decision 1, 2026-08-14)
+  Cd fit: tol 0.002, scan ceiling 5.0 (8.0 on storm windows)
+  [pre-registered] tier-2: degree-5 fit to the 3-day along-track residual of a drag-on Cd = 2.3 propagation, CLEAN iff max departure < 10% of max |along-track|. Carried verbatim from v0.7.2 run_gracefo.py:586.
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 3 daily files
+    1 Hz records 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2023-12-20T00:00:19 -> 2023-12-22T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 3 daily files
+    1 Hz records 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2023-12-20T00:00:19 -> 2023-12-22T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 26.6319 kg over 72 records (range 26.6315..26.6323) -> total 596.546 kg
+  D: gas mean 27.2394 kg over 72 records (range 27.2388..27.2400) -> total 597.153 kg
+  C/D mass ratio 0.998983 (-0.102%) -- the Cd ratio below carries this factor exactly, and dividing it out gives the shared-mass form
+[formation]
+  C/D epoch grids aligned: max |dt| = 0.000e+00 s over 4320 samples
+  separation |r_D - r_C|: mean 202.7 km (min 201.8, max 203.4)
+  signed along-track (D - C): -202.7 km -> C LEADS; sign constant over the load: True
+  Handbook sec 3.2.3 puts the roll axis anti-flight for the leader, so C meets the wind with its rear face. Front and Rear panels are both 0.9551567 m^2, so A_ram is IDENTICAL between the twins and the model cannot see the 180 deg relative yaw.
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 4320: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6879.4 km (altitude ~ 501 km)
+  D: from_iso(to_iso()) == epoch for all 4320: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6879.4 km (altitude ~ 501 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    17 records over 3 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29162000 ms, last 29162000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    31 records over 3 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 27794000 ms, last 27794000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 3.868e-09 m, |dv| = 5.400e-12 m/s (bound 5e-08 m)
+  D: |dr| = 1.863e-09 m, |dv| = 3.859e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the 3-day load, so both gates cover the same span
+  C: signal 7172.7 m, departure 15.7 m (0.2%) -> CLEAN  (15 s wall)
+  D: signal 7281.7 m, departure 15.8 m (0.2%) -> CLEAN  (14 s wall)
+[C]  GRACE-FO 1 (GRACE C), mass 596.546 kg
+  Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
+    fitted Cd = 3.38339 on A_ref = 1.0013468 m^2, B = Cd*A/m = 5.679275e-03 m^2/kg
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (112 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 7 s wall
+[D]  GRACE-FO 2 (GRACE D), mass 597.153 kg
+  Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
+    fitted Cd = 3.40151 on A_ref = 1.0013468 m^2, B = Cd*A/m = 5.703875e-03 m^2/kg
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (113 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 8 s wall
+[ratios]  the four contract metrics, C/D, on 3D RMS
+  metric                               C/D       dev     bar   verdict
+  Cd_fit(C)/Cd_fit(D)              0.99467    -0.53%    10%   HIT
+  RMS_Cd_fit(C)/RMS_Cd_fit(D)      0.93445    -6.55%    20%   HIT
+  RMS_sphere(C)/RMS_sphere(D)      0.97617    -2.38%    20%   HIT
+  RMS_box(C)/RMS_box(D)            1.02515    +2.52%    20%   HIT
+  shared-mass form of the Cd ratio: 0.99569 (-0.43%) -- the per-satellite ratio above divided by the C/D mass ratio 0.998983, which is the whole of the difference between the two forms
+  A non-zero deviation is expected physics, not only noise: the twins fly a 180 deg relative yaw that puts opposite ends of the same tapered bus into the wind, but the box's +/-Y faces are equal-area, so that yaw is invisible to InPlaneTracking and the model gives both twins IDENTICAL geometry. The asymmetry is in the truth and absent from the model.
+[values]  numerator and denominator of each ratio
+  quantity                                 C             D
+  fitted Cd                          3.38339       3.40151
+  mass (kg)                          596.546       597.153
+  B = Cd*A/m (m^2/kg)           5.679275e-03  5.703875e-03
+  3D RMS fitted Cd (m)                  6.37          6.81
+  3D RMS sphere table (m)             226.62        232.15
+  3D RMS box table (IPT) (m)          256.78        250.48
+[breakdown]  1-day arc, propagated - truth, ITRF RIC RMS (m)
+  sat  run                   radial       along     cross          3D
+  C    fitted Cd               0.86        6.30      0.33        6.37
+  C    sphere table            4.39      226.57      0.38      226.62
+  C    box table (IPT)         4.49      256.74      0.17      256.78
+  D    fitted Cd               0.86        6.75      0.33        6.81
+  D    sphere table            4.50      232.10      0.39      232.15
+  D    box table (IPT)         4.36      250.44      0.18      250.48
+  C arc-mean conditions: r 6862.9 km, rho 1.269e-12 kg/m^3
+     shipped tables there: sphere Cd 2.703 -> CdA 2.7071 m^2; box per-face ram 3.012 / side 0.082 / leeward 0.000 -> face-sum CdA 4.2539 m^2
+     fitted CdA 3.3879 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
+  D arc-mean conditions: r 6862.9 km, rho 1.268e-12 kg/m^3
+     shipped tables there: sphere Cd 2.704 -> CdA 2.7072 m^2; box per-face ram 3.012 / side 0.082 / leeward 0.000 -> face-sum CdA 4.2540 m^2
+     fitted CdA 3.4061 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
+
+==============================================================================
+=== window storm_2024 (first loaded day 2024-05-11), 3 days loaded, 1-day arc ===
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/real-world-validation/data/gracefo  (frozen v0.7.2 tree, read in place)
+[convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
+  A_ref = 1.0013468 m^2 = Table 5 front panel 0.9551567 + boom 0.0461901 (boom folded into the ram face)
+  box x 0.7588835 (height) x y 3.6100207 (length) x z 1.3195 (width) m; +Y held on the wind by InPlaneTracking(ecef)
+  identity 1, ram face H*W  = 1.00134678 m^2 vs A_ref 1.0013468 (rel 2.2e-08)
+  identity 2, sides 2L(H+W) = 15.0060149 m^2 vs Table 5 15.0060150 (rel 5.7e-09)
+  mass = dry 569.914 kg + MAS1B tank gas, PER SATELLITE (decision 1, 2026-08-14)
+  Cd fit: tol 0.002, scan ceiling 5.0 (8.0 on storm windows)
+  [pre-registered] tier-2: degree-5 fit to the 3-day along-track residual of a drag-on Cd = 2.3 propagation, CLEAN iff max departure < 10% of max |along-track|. Carried verbatim from v0.7.2 run_gracefo.py:586.
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 3 daily files
+    1 Hz records 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-05-11T00:00:19 -> 2024-05-13T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 3 daily files
+    1 Hz records 259200 (QC-dropped 0); subsampled to 60 s -> 4320 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-05-11T00:00:19 -> 2024-05-13T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 26.4718 kg over 72 records (range 26.4713..26.4724) -> total 596.386 kg
+  D: gas mean 27.0486 kg over 72 records (range 27.0480..27.0494) -> total 596.963 kg
+  C/D mass ratio 0.999034 (-0.097%) -- the Cd ratio below carries this factor exactly, and dividing it out gives the shared-mass form
+[formation]
+  C/D epoch grids aligned: max |dt| = 0.000e+00 s over 4320 samples
+  separation |r_D - r_C|: mean 177.8 km (min 175.9, max 179.7)
+  signed along-track (D - C): -177.8 km -> C LEADS; sign constant over the load: True
+  Handbook sec 3.2.3 puts the roll axis anti-flight for the leader, so C meets the wind with its rear face. Front and Rear panels are both 0.9551567 m^2, so A_ram is IDENTICAL between the twins and the model cannot see the 180 deg relative yaw.
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 4320: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6855.4 km (altitude ~ 477 km)
+  D: from_iso(to_iso()) == epoch for all 4320: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6855.3 km (altitude ~ 477 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    19 records over 3 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29162000 ms, last 29162000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    33 records over 3 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 28244000 ms, last 28244000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 4.755e-09 m, |dv| = 7.355e-12 m/s (bound 5e-08 m)
+  D: |dr| = 4.839e-09 m, |dv| = 3.701e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the 3-day load, so both gates cover the same span
+  C: signal 11427.1 m, departure 45.8 m (0.4%) -> CLEAN  (16 s wall)
+  D: signal 11677.5 m, departure 45.3 m (0.4%) -> CLEAN  (19 s wall)
+[C]  GRACE-FO 1 (GRACE C), mass 596.386 kg
+  Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
+    fitted Cd = 4.04553 on A_ref = 1.0013468 m^2, B = Cd*A/m = 6.792554e-03 m^2/kg
+    24 evals, tol 0.002, bracket width 0.00159, ceiling 8.0  (119 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 6 s wall, sphere table 7 s wall, box table (IPT) 11 s wall
+[D]  GRACE-FO 2 (GRACE D), mass 596.963 kg
+  Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
+    fitted Cd = 4.06829 on A_ref = 1.0013468 m^2, B = Cd*A/m = 6.824162e-03 m^2/kg
+    24 evals, tol 0.002, bracket width 0.00159, ceiling 8.0  (154 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 7 s wall, sphere table 7 s wall, box table (IPT) 11 s wall
+[ratios]  the four contract metrics, C/D, on 3D RMS
+  metric                               C/D       dev     bar   verdict
+  Cd_fit(C)/Cd_fit(D)              0.99441    -0.56%    10%   HIT
+  RMS_Cd_fit(C)/RMS_Cd_fit(D)      0.99076    -0.92%    20%   HIT
+  RMS_sphere(C)/RMS_sphere(D)      0.98638    -1.36%    20%   HIT
+  RMS_box(C)/RMS_box(D)            1.00769    +0.77%    20%   HIT
+  shared-mass form of the Cd ratio: 0.99537 (-0.46%) -- the per-satellite ratio above divided by the C/D mass ratio 0.999034, which is the whole of the difference between the two forms
+  A non-zero deviation is expected physics, not only noise: the twins fly a 180 deg relative yaw that puts opposite ends of the same tapered bus into the wind, but the box's +/-Y faces are equal-area, so that yaw is invisible to InPlaneTracking and the model gives both twins IDENTICAL geometry. The asymmetry is in the truth and absent from the model.
+[values]  numerator and denominator of each ratio
+  quantity                                 C             D
+  fitted Cd                          4.04553       4.06829
+  mass (kg)                          596.386       596.963
+  B = Cd*A/m (m^2/kg)           6.792554e-03  6.824162e-03
+  3D RMS fitted Cd (m)                119.20        120.31
+  3D RMS sphere table (m)            1463.68       1483.89
+  3D RMS box table (IPT) (m)          120.89        119.97
+[breakdown]  1-day arc, propagated - truth, ITRF RIC RMS (m)
+  sat  run                   radial       along     cross          3D
+  C    fitted Cd               7.97      118.93      0.34      119.20
+  C    sphere table           21.90     1463.52      0.42     1463.68
+  C    box table (IPT)         8.05      120.62      0.29      120.89
+  D    fitted Cd               8.02      120.04      0.34      120.31
+  D    sphere table           22.22     1483.72      0.43     1483.89
+  D    box table (IPT)         7.83      119.71      0.29      119.97
+  C arc-mean conditions: r 6858.5 km, rho 3.894e-12 kg/m^3
+     shipped tables there: sphere Cd 2.512 -> CdA 2.5154 m^2; box per-face ram 2.715 / side 0.091 / leeward 0.000 -> face-sum CdA 4.0886 m^2
+     fitted CdA 4.0510 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
+  D arc-mean conditions: r 6858.5 km, rho 3.895e-12 kg/m^3
+     shipped tables there: sphere Cd 2.512 -> CdA 2.5153 m^2; box per-face ram 2.715 / side 0.091 / leeward 0.000 -> face-sum CdA 4.0885 m^2
+     fitted CdA 4.0738 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
+
+==============================================================================
+[summary]  the four contract metrics across every window run
+==============================================================================
+  window                  Cd_fit      RMS_Cd_fit      RMS_sphere         RMS_box
+  quiet_2019            +1.15% H        +0.79% H        -2.09% H        -0.91% H
+  active_2023           -0.53% H        -6.55% H        -2.38% H        +2.52% H
+  storm_2024            -0.56% H        -0.92% H        -1.36% H        +0.77% H
+  bars: Cd ratio within 10% of 1.0 (a failure warrants a bug search); RMS ratios within 20% (a departure past it demands attention, and a bug search if no non-bug explanation is found)
+  12/12 metrics HIT
+  wall time: 1252 s

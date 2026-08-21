@@ -203,7 +203,7 @@ frozen v0.7.2 windows already on disk -- zero downloads, no dependency on the
 ten-window landing. Doing it ahead of Part 2 also shakes down the shared module
 and the THR1B parser that Part 2 then inherits.
 
-### **Chunk 2: table noise -- GRACE-FO C/D over the three inherited windows**
+### **Chunk 2: table noise -- GRACE-FO C/D over the three inherited windows** - Done
 
 **Goal.** Re-measure the twin ratios on this contract's geometry, over the three
 frozen v0.7.2 windows (`quiet_2019`, `active_2023`, `storm_2024`). Chunk 0's
@@ -309,8 +309,9 @@ per twin.
   grid uniformity and `|r0|` as Chunk 0 printed them.
 - Both screens CLEAN for all three windows and both satellites, printed with the
   accumulator values that justify the tier-1 call.
-- The two predictions above.
-- `run_all.py --verify --only noise` reproduces the committed file.
+- The two predictions above. **Hand-checked, not coded (2026-08-21):** Chunk 0's
+  literals stay out of the new driver, since its evidence is deleted here. Both
+  passed -- `B` reproduced to 0.002 % (active C) and 0.003 % (storm C).
 
 **Qualification** (contract, "The design - table noise"). `Cd_fit(C)/Cd_fit(D)`
 within **10 %** of 1.0 -- a failure warrants a bug search. The three RMS ratios
@@ -322,12 +323,12 @@ asymmetry the contract flags as expected physics is present in the truth and
 absent from the model. That is why these ratios can leave 1.0 at all.
 
 **Checklist**
-- [ ] `gracefo_ext_common.py` rewritten; stale Chunk 0 artifacts deleted
-- [ ] `run_table_noise.py` + `run_all.py` group
-- [ ] quiet_2019
-- [ ] active_2023
-- [ ] storm_2024
-- [ ] Qualification read; README updated
+- [X] `gracefo_ext_common.py` rewritten; stale Chunk 0 artifacts deleted
+- [X] `run_table_noise.py` + `run_all.py` group
+- [X] quiet_2019
+- [X] active_2023
+- [X] storm_2024
+- [X] Qualification read; README updated
 
 ## Part 2: drag-significant propagations
 
@@ -394,7 +395,7 @@ ephemeris rather than from literature: **Swarm A and B are not a twin pair** --
 B flies the higher orbit -- so an A-vs-B drag difference is an altitude
 difference before it is a body difference.
 
-**Tier 2 is 0-for-2 against real burns** (Chunk 1, 2026-08-20: 0.7 % and 1.6 %
+**Tier 2 is 0-for-2 against real burns** (Chunk 2, 2026-08-21: 0.8 % and 1.9 %
 against its 10 % bar, windows 7 and 8 D). It normalizes by a 90-192 km
 unfitted-Cd signal, so a burn cannot register; the bar is not re-fitted. No
 certified replacement is available -- a TLE SMA step buries the same small

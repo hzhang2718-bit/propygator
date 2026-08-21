@@ -1,5 +1,3 @@
-**This document needs future work**
-
 # Extended Validation — drag propagations, TLE fitting tests, and table noise
 
 Evidence tree for the study contracted in `docs/extended-validation-updated.md`.
@@ -8,42 +6,32 @@ Evidence tree for the study contracted in `docs/extended-validation-updated.md`.
 `docs/build-plan-extended-validation-updated.md`.
 
 Every external claim propygator makes rests on one satellite (GRACE-FO 1). This
-study widens that base in three parts: **drag propagations** over ~10 stratified
-GRACE-FO windows plus **Swarm A/B** as a limited-information stress case,
-**TLE fitting tests** against the playbook and the r/s gate, and **table noise**
-measured on the GRACE-FO C/D formation twin.
+study widens that base in three parts: **table noise** on the GRACE-FO C/D
+formation twin, **drag propagations** over ten stratified GRACE-FO windows plus
+**Swarm A/B** as a limited-information stress case, and **TLE fitting tests**
+against the playbook and the r/s gate.
 
 ## Layout
 
 ```
 extended-validation/
 ├── README.md          this file
-├── run_all.py         regenerate / --verify orchestrator
+├── run_all.py         regenerate / --verify orchestrator; --list is authoritative
 ├── data/              raw truth + reference docs (gitignored, never committed)
 │   ├── reference/     third-party reference PDFs (see "Reference documents")
-│   ├── tarballs/      TRANSIENT download staging; one tarball at a time,
-│   │                  deleted as soon as its six members are extracted
-│   └── gracefo/       one directory per window, named for the window, so
-│       └── <window>/  --data-root behaves as it does on the frozen tree:
-│                        GNV1B_<date>_<C|D>_04.txt.gz   truth ephemeris
-│                        MAS1B_<date>_<C|D>_04.txt.gz   tank-gas mass
-│                        THR1B_<date>_<C|D>_04.txt.gz   thruster log
-│                      14 days x 3 products x 2 satellites = 84 files/window,
-│                      ~269 MB/window, ~2.6 GB for all ten
-├── gracefo/           the GRACE-FO table-noise, drag and TLE-fitting runs
-│   ├── windows.py     the frozen ten-window list, its CSSI re-read, and this
-│   │                  study's .gz finder                        (Chunk 1)
-│   ├── thr1b.py       the tier-1 thruster parser                (Chunk 1)
-│   ├── fetch_windows.py   download -> extract -> gzip -> screen (Chunk 1)
-│   ├── run_screen.py  both maneuver gates -> results_screen.txt (Chunk 1)
-│   ├── mas1b.py       the MAS1B mass parser
-│   └── gracefo_ext_common.py   leg-wide geometry, fitter, force set
+│   ├── tarballs/      TRANSIENT download staging, deleted after extraction
+│   └── gracefo/<window>/   GNV1B / MAS1B / THR1B, both satellites, gzipped
+│                          84 files per window, ~269 MB, ~2.6 GB for all ten
+├── gracefo/
+│   ├── windows.py            frozen ten-window list, CSSI re-read, .gz finder
+│   ├── thr1b.py              tier-1 thruster parser
+│   ├── mas1b.py              tank-gas mass parser
+│   ├── gracefo_ext_common.py leg geometry, mass, force set, scalar-Cd fitter
+│   ├── fetch_windows.py      download → extract → gzip → screen
+│   ├── run_screen.py         both maneuver gates  → results_screen.txt
+│   └── run_table_noise.py    the twin ratios      → results_table_noise.txt
 └── swarm/             the Swarm A/B leg (its own reader, config, drivers)
 ```
-
-**The A/m convention** and **Findings at a glance / Chunk 0** below are
-**retired-design text** (the `T` framing, Legs, Checkpoints, the superseded
-`A_ref`); Chunk 2 rewrites them. Everything else on this page is current.
 
 ## Running
 
@@ -53,135 +41,112 @@ here needs the `pymsis`/`scipy` generation venv: the table figures are `.npz`
 lookups, not generator runs.
 
 ```
-conda run -n propygator python run_all.py --list
-conda run -n propygator python run_all.py --only twin
-conda run -n propygator python run_all.py --verify --only twin
+conda run --no-capture-output -n propygator python run_all.py --list
+conda run --no-capture-output -n propygator python run_all.py --only noise
+conda run --no-capture-output -n propygator python run_all.py --verify --only noise
 ```
 
-**Per-group `--verify` is the documented default.** A whole-study regenerate is
-a multi-hour, deliberately scheduled act, not a pre-commit check.
+Use `--no-capture-output`; without it `conda run` buffers everything to the end
+and a long run looks hung.
 
-### Landing the truth data (Chunk 1, maintainer's step)
+**Per-group `--verify` is the documented default.** A whole-study regenerate
+re-runs Part 2 and is a scheduled multi-hour act, not a pre-commit check.
+`--only <group>` is what a normal session runs; `--parse-only` on a driver is
+the cheap JVM-free check.
 
-All commands on this page run from the study root (`experiments/extended-validation/`).
+## Conventions
+
+One A/m convention covers every non-box run — the `Cd = 2.3` run, the fitted-Cd
+run and the sphere-table run alike.
+
+| | value | source |
+|---|---|---|
+| `A_ref` | **1.0013468 m²** | L1 Handbook Table 5: front panel 0.9551567 + boom 0.0461901, boom folded into the ram face |
+| box | **0.7588835 × 3.6100207 × 1.3195 m** (x = height, y = length, z = width) | width read off Figure 2; height fitted so `H·W` = `A_ref`; length fitted so `2L(H+W)` = Table 5's published 15.0060150 m² |
+| mass | **dry 569.914 kg + MAS1B tank gas, per satellite** | Handbook Table 4 + JPL press kit + MAS1B |
+| `CD_FIT_TOL` | **0.002** | the fit's quantization rung, ~20× below the twin deviations measured |
+
+Both geometry identities are asserted at runtime, not just printed: ram face
+`H·W` = 1.00134678 against `A_ref` 1.0013468, and sides `2L(H+W)` = 15.0060149
+against 15.0060150. The box is flown `InPlaneTracking(velocity_reference="ecef")`
+with +Y on the wind, so every face-flow angle is constant (ram 0, leeward π,
+four sides π/2).
+
+**The length is not a physical dimension.** It preserves the *total* side area,
+which is the only side quantity drag sees on a wind-aligned box; it does not
+preserve the nadir/zenith vs slant split.
+
+**This is the repository's third `A_ref`** (v0.7.2 used 1.027 m²; the retired
+Chunk 0 build used 0.9551567 m²). A fitted Cd means nothing without its `A_ref`
+and mass, so **never compare a Cd across two conventions** — every driver prints
+the convention-free `B = Cd·A/m` beside every fitted Cd, and that is the number
+that travels.
+
+## The frozen-evidence rule
+
+`experiments/real-world-validation/` is **imported, never edited**. This tree
+imports exactly two modules from it — `common.py` and `gracefo/gnv1b.py` — both
+read-only. Its windows are read in place through `--data-root`, so nothing there
+is extracted, compressed, moved or deleted; `run_all.py` records that path in the
+group definition so the provenance is visible.
+
+**No `src/` change on this branch.** A contradiction with a binding contract is a
+bug report exiting to the normal fix path, never a silent amendment.
+
+## Landing the truth data (maintainer's step)
+
+All commands run from the study root.
 
 ```
 conda run -n propygator python gracefo/fetch_windows.py --all --dry-run  # URLs + budget
 conda run -n propygator python gracefo/fetch_windows.py --all            # ~1.5-3 h
 ```
 
-One day at a time: fetch, extract the six kept members, gzip them, run the
-tier-1 THR1B screen when the window's fourteenth day lands, delete the tarball.
-Idempotent — an interrupted run resumes by being re-run, and a partial transfer
-resumes mid-file. Peak disk is the retained tree plus one 148 MB tarball.
-
-Then the committed screening evidence, both gates over all ten windows:
+One day at a time: fetch, extract the six kept members, gzip, screen when the
+window's fourteenth day lands, delete the tarball. Idempotent — an interrupted
+run resumes by being re-run. Then the committed screening evidence:
 
 ```
 conda run -n propygator python run_all.py --only screen              # ~1-1.5 h
 conda run -n propygator python gracefo/run_screen.py --parse-only    # tier 1, no JVM
 ```
 
-**`results_screen.txt` must be generated after Chunk 2's geometry rewrite.** The
-tier-2 propagation reads `A_REF_M2` from `gracefo_ext_common.py`, which Chunk 2
-moves from 0.9551567 to 1.0013468 m², so generating it earlier guarantees a red
-`--verify` the moment Chunk 2 lands. The resolved value is printed in the
-results header so any file says which geometry produced it.
+### Data gaps and burns in the landed windows
 
-### Data gaps and burns in the landed windows (2026-08-20)
+Some daily products legitimately carry no records; both parsers record and
+report them rather than raising. Neither case is a truncated download — every
+file declares `num_records`, cross-checked against the records actually read.
 
-**Zero-record days.** Some daily products legitimately carry no records; both
-parsers record and report them rather than raising. Neither case is a truncated
-download — every file declares `num_records` in its header, and both parsers
-cross-check it against the records actually read.
-
-- **THR1B, C only** — one day in `storm_2024_08`, two in `storm_2025_05`, one in
-  `moderate_2025_07`. C's thruster-activation rate fell from ~450/day in
-  2019–2022 to 1–5/day by 2024–2025, so a day with none is ordinary. All are
-  interior, bracketed by days reading an identical *cumulative*
-  `accum_dur_orb_ctrl` — a burn inside a gap would have raised the next reading.
-  None did: C is flat at 29574000 across windows 6–8, stepping to 29712000
-  before window 9, outside every window. A zero-record day at a window **edge**
-  would be a real hole and is escalated; none has occurred.
-- **MAS1B, both satellites** — 2024-08-23 in `storm_2024_08`, and seven
-  consecutive days (2025-07-25…31) in `moderate_2025_07`. MAS1B is periodic, so
-  these are telemetry outages, not quiet days. The window mass is a mean over a
-  nearly constant series; the missing days can move it by at most 0.007 kg
-  (0.001 % of total mass), far below the fit's own resolution, and that bound is
-  printed beside the mass.
+- **THR1B, C only** — four interior days across `storm_2024_08`, `storm_2025_05`
+  and `moderate_2025_07`. C's activation rate fell from ~450/day in 2019–2022 to
+  1–5/day by 2024–2025, so a day with none is ordinary. All are bracketed by an
+  unchanged *cumulative* `accum_dur_orb_ctrl`, so a burn inside a gap would have
+  raised the next reading. A zero-record day at a window **edge** would be a real
+  hole and is escalated; none has occurred.
+- **MAS1B, both satellites** — 2024-08-23, and seven consecutive days
+  (2025-07-25…31) in `moderate_2025_07`. MAS1B is periodic, so these are
+  telemetry outages, not quiet days. The missing days can move the window mean by
+  at most 0.0102 kg (0.0017 % of total mass), far below the fit's own resolution,
+  and that bound prints beside the mass on every affected window.
 
 **Burns on GRACE-FO D.** `intense_2024_11` (2024-12-04, +288 s) and
 `storm_2025_05` (2025-06-04, +214 s) carry real orbit-maintenance burns on D; C
-is clean in both. The screen prints `REVIEW -- burn on D` and leaves the
-disposition to the maintainer. Recorded call: **keep both windows** — every run
-is on C, and D is read on the ten windows only as Chunk 14's cross-tag
-discriminator, which a burn makes easier rather than harder.
+is clean in both. Recorded call: **keep both windows** — every Part 2 run is on
+C, and D is read on the ten windows only as Chunk 14's cross-tag discriminator,
+which a burn makes easier rather than harder.
 
-**Tier 2 missed both** (2026-08-20) — 0.7 % and 1.6 % departure against its 10 %
-bar, short by 14x and 6.3x. These are the study's only known-positive maneuvers,
-so this is the one calibration the gate will ever get, and it fails it. The bar
-is **not** re-fitted: the rule normalizes by the along-track error of an
-*unfitted* Cd = 2.3 propagation, which over 14 days at 474–483 km through solar
-max reaches 90–192 km, so a real ~700–850 m burn signature cannot register.
-v0.7.2 set the same 10 % against a 186.6 m signal — the rule did not change, its
-denominator moved three orders of magnitude. The burn *is* visible in the twin
-difference (departure 692.1 → 1335.1 m in window 7, 600.1 → 1443.8 m in
-window 8, ~2x on the satellite that fired), but that is a diagnostic, not a
-gate: two points are not a calibration, and it does not transfer to Swarm, whose
-A/B pair differs by altitude. Levels here are pre-Chunk-2 geometry (`A_ref`
-0.9551567) and are superseded when `results_screen.txt` is regenerated; the
-ratio should survive, since the geometry scales both twins alike.
-
-## The frozen-evidence rule
-
-`experiments/real-world-validation/` is **imported, never edited**. This tree
-imports exactly two modules from it — `common.py` and `gracefo/gnv1b.py` — both
-read-only. `find_window_files` and `parse_gnv1b` take arbitrary `Path`s, so the
-Chunk 0 windows are read out of the frozen tree via `--data-root` without an
-edit; `run_all.py` records that path in the group definition so the provenance
-is visible. GRACE lands as a **new module here**, never as an additive change to
-`gnv1b.py`'s `_SAT_NAMES`.
-
-**No `src/` change on this branch.** A contradiction with a binding contract is a
-bug report exiting to the normal fix path, never a silent amendment.
-
-## The A/m convention — this study differs from v0.7.2 deliberately
-
-`T = Cd_table / Cd_fitted` scales **exactly** as `A_ref` and as `1/m`
-(contract §2.2), so both constants are part of the measurement rather than
-bookkeeping. This study uses more authoritative figures than v0.7.2 did:
-
-| | v0.7.2 | this study | source |
-|---|---|---|---|
-| `A_ref` | 1.027 m² (press-kit envelope) | **0.9551567 m²** | L1 Handbook Table 5, Front panel |
-| mass | 600.0 kg (round launch mass) | **dry 569.914 + MAS1B tank gas** | Handbook Table 4 + JPL press kit + MAS1B |
-| box height | 0.780 m (press-kit envelope) | **0.72388 m** | fitted so the ram face reproduces Table 5 |
-
-Consequences, all worked out before the first run:
-
-- **Levels move 5–7 %; ratios move under 1 %.** Every headline claim in the
-  contract is a ratio of extremes precisely so that `T → cT` invariance holds.
-- **A1 / Checkpoint A is untouched** — both twins share the convention, so it
-  cancels exactly.
-- **Legs C, C′, D and E are untouched** — r, s and forecast RMS never involve an
-  A/m convention.
-- **The v0.7.2 evidence stays frozen.** Its numbers are quoted as a *continuity
-  row* and are never recomputed and never divided into a number produced here.
-  Every driver prints the conversion beside them.
-
-`A_ref` carries a bracket **[0.9552, 1.027] m²** with the point value at the
-**lower** bound. The two sources reconcile through the boom, which Table 5
-itemizes separately at 0.0461901 m²: `0.9552 + 0.0462 = 1.0014 m²` sits within
-2.5 % of the envelope figure. `BoxFaceCd` requires a convex box and cannot
-represent a boom, so the point value is the body panel alone.
-
-**Known level systematic on the box, stated rather than tuned away (~6.5 %).**
-Flattening the trapezoid loses slant-face area (−10.2 % of the non-ram faces,
-worth ~−2.9 % of box CdA) and the boom is omitted (~−3.6 %). Both under-predict
-drag, so they compound. Both are window-independent, so they cancel from every
-ratio-of-extremes claim (B2, B5, A3, B3) and shift only the level, which this
-study withholds. The one claim they touch is **B1**'s sign test on `T_box` near
-1 — carry the correction explicitly on that row.
+**Tier 2 missed both** — 0.8 % and 1.9 % departure against its 10 % bar. These
+are the study's only known-positive maneuvers, so this is the one calibration
+that gate will ever get, and it fails it. The bar is **not** re-fitted: the rule
+normalizes by an *unfitted* `Cd = 2.3` along-track error, which over 14 days
+reaches 5–166 km across the twenty satellite-windows, so a burn's signature
+cannot register against it. v0.7.2 set the same 10 % against a 186.6 m signal —
+the rule did not change, its denominator moved three orders of magnitude. The
+burn *is* visible in the twin contrast (departure 625 m on clean C vs 1298 m on
+burned D in `intense_2024_11`; 551 m vs 1425 m in `storm_2025_05`, so ~2.1× and
+~2.6× on the satellite that fired), but two points are not a calibration and it
+does not transfer to Swarm, whose A/B pair differs by altitude. Weigh this in the
+Swarm gate decision: Swarm has no THR1B analogue and is screened by tier 2 alone.
 
 ## Data access
 
@@ -191,27 +156,17 @@ study withholds. The one claim they touch is **B1**'s sign test on `T_box` near
   which is what makes `fetch_windows.py` scriptable without Earthdata auth. The
   `ACX` and `LRI` variants hold only accelerometer and laser-ranging products;
   GNV1B, MAS1B and THR1B are all in `noLRI`, so there is **no lighter route to
-  THR1B and no way to screen before downloading.** Each tarball carries **both**
-  satellites, so GRACE-FO 2 costs zero extra downloads.
-  Verified 2026-08-17: every day of all ten windows is served (archive currently
-  runs through 2026-07-30), and **no checksums are published** — hence
-  `fetch_windows.py`'s functional integrity check (Content-Length match, tarball
-  opens, all six members present and non-empty).
-  Note `low_2019_12` straddles two yearly directories (2019-12-23 → 2020-01-05),
-  so the URL year comes from each **day**, never from the window's `t0`.
-- **Measured budget** (one delivered tarball, 2019-11-14): **148 MB/day in,
-  19.23 MB/day retained** gzipped for both satellites — 8× smaller. Ten windows
-  = 140 days = **~20.2 GB downloaded, ~2.6 GB retained.** Sustained ISDC
-  throughput measured at **2.1–3.6 MB/s**, so the full pull is **~1.5–3 h** plus
-  ~21 min of extract/gzip CPU. Single-threaded and resumable (HTTP Range);
-  re-running skips days already extracted.
-- **Parse cost, measured:** **0.6 s/day/satellite from the extracted `.gz`**
-  against 4.7 s from a tarball — the tarball cost is `tarfile.getmembers()`
-  scanning 148 MB, which the extracted tree skips entirely. So the build plan's
-  conditional `.npy` cache (Chunk 3, "if it turns out to cost minutes rather
-  than seconds") is **not needed**: a 14-day two-satellite load is ~17 s.
-- **Catalog TLEs** — per-anchor Space-Track `gp_history` pulls. Close-formation
-  pairs are a cross-tagging hazard; object identity is checked on every pull.
+  THR1B and no way to screen before downloading.** Each tarball carries both
+  satellites. No checksums are published, hence `fetch_windows.py`'s functional
+  integrity check. Note `low_2019_12` straddles two yearly directories, so the
+  URL year comes from each **day**, never from the window's `t0`.
+- **Budget, measured:** 148 MB/day in, **19.23 MB/day retained** gzipped for both
+  satellites. Ten windows = ~20.2 GB downloaded, **~2.6 GB retained**, ~1.5–3 h.
+- **Parse cost, measured:** 0.6 s/day/satellite from the extracted `.gz` against
+  4.7 s from a tarball, so a 14-day two-satellite load is ~17 s. The build plan's
+  conditional `.npy` cache is therefore **not needed**.
+- **Catalog TLEs** — per-anchor Space-Track `gp_history` pulls; object identity
+  checked on every pull, since close-formation pairs are a cross-tagging hazard.
 - **Raw truth files are never committed** (`data/` gitignored).
 
 ## Reference documents
@@ -219,11 +174,10 @@ study withholds. The one claim they touch is **B1**'s sign test on `T_box` near
 Not committed — `data/reference/` is gitignored, consistent with how this repo
 treats orekit-data and raw truth. Re-fetch:
 
-- **GRACE-FO Level-1 Data Product User Handbook**, dated 2019-09-11 —
+- **GRACE-FO Level-1 Data Product User Handbook**, 2019-09-11 —
   <https://isdc-data.gfz.de/grace-fo/DOCUMENTS/Level-1/>
   Table 4 (per-satellite launch mass), Table 5 (faceted surface model),
-  §3.2.3 (Science Reference Frame + the in-flight attitude convention),
-  §4.2.17 (MAS1B format).
+  §3.2.3 (Science Reference Frame + in-flight attitude), §4.2.17 (MAS1B format).
 - **JPL GRACE-FO Launch Press Kit**, "Spacecraft and Instruments" —
   <https://www.jpl.nasa.gov/news/press_kits/grace-fo/mission/spacecraft/>
   Dimensioned envelope; propellant load.
@@ -232,54 +186,34 @@ Values extracted from these live as cited literals in `gracefo/gracefo_ext_commo
 
 ## Findings at a glance
 
-Filled in per chunk. Every chunk that produces a number resolves its
-pre-registered predictions explicitly as **hit or miss**; a **withheld** claim is
-written down as withheld.
+Every part that produces a number resolves its pre-registered predictions
+explicitly as **hit or miss**; a miss is written down as a miss.
 
-| Chunk | Group | Results file | Headline |
+| Part | Group | Results file | Headline |
 |---|---|---|---|
-| 0 | `twin` | `gracefo/results_twin.txt` | **A1 = −0.88 % / +0.41 % / +0.46 %** (quiet / active / storm) — a **≤ 0.88 %** floor against a Checkpoint A tolerance of 10 %. All criteria met in all three windows; the GO / INVESTIGATE call is the maintainer's. |
+| 0 — maneuver screening | `screen` | `gracefo/results_screen.txt` | **10/10 windows CLEAN on C**, both gates. Two carry a real burn on D (`intense_2024_11`, `storm_2025_05`) and are kept — see the failure rule above. |
+| 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
+| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | pending | — |
+| 3 — TLE fitting | `tle_01..10`, `tle_summary` | pending | — |
 
-### Chunk 0 — GRACE-FO 2, the noise floor, Checkpoint A
+### Part 1 — table noise, GRACE-FO C/D over the three inherited windows
 
-Zero downloads. Both satellites over the three inherited windows: parse report,
-MAS1B masses, measured formation geometry, t₀ round-trip, maneuver screen,
-drag-off/drag-on pair, and the Run-3 scalar-Cd fit per satellite. The driver runs
-all three windows in one process and closes with a computed `[A1 summary]` block
-— **read the numbers there, not here.**
+The four contract metrics, C/D, on 3D RMS over a 1-day arc:
 
-**M1, the measurement-noise floor — the first error bar this method has had.**
-`T(C,w)/T(D,w)` deviates from 1 by at most **0.88 %**, and its window-to-window
-spread (**1.35 %**) sits far below the spread in `T` itself (**131 %**), so **A1
-is a hit on both halves.** The mandatory three-term label applies: *"noise floor
-+ fore/aft asymmetry + any true A/m difference between the twins."* Term 3 is
-measured from MAS1B at 0.001 / 0.102 / 0.097 %, so it accounts for essentially
-none of the deviation. **No scaling with drag strength is claimed** — the
-deviation is not monotone in it (0.88 / 0.41 / 0.46 % against drag-off
-along-track of 44 / 1058 / 3812 m). It does change sign, which a fixed geometric
-asymmetry would not.
+| window | `Cd_fit` | `RMS_Cd_fit` | `RMS_sphere` | `RMS_box` |
+|---|---|---|---|---|
+| `quiet_2019` | +1.15 % | +0.79 % | −2.09 % | −0.91 % |
+| `active_2023` | −0.53 % | −6.55 % | −2.38 % | +2.52 % |
+| `storm_2024` | −0.56 % | −0.92 % | −1.36 % | +0.77 % |
 
-**Fit resolution is part of the measurement.** The scalar-Cd fit terminates at
-`CD_FIT_TOL = 0.002`, a golden-section lattice rung of 0.025–0.045 % in Cd —
-about 20× below A1. At the v0.7.2 tolerance of 0.02 the rung is ~0.3 %, the same
-size as A1 itself, and every deviation above was quantized rather than measured
-(the storm window read 0.17 % instead of 0.46 %). **Any later chunk that
-differences two fits inherits this constraint** — Chunk 2's sub-arc floor most of
-all.
+Both maneuver screens CLEAN on all six satellite-windows. The ratios are able to
+leave 1.0 at all because the twins fly a 180° relative yaw that puts opposite
+ends of the same tapered bus into the wind, while the model's box has
+equal-area ±Y faces — so that asymmetry is present in the truth and **absent
+from the model**.
 
-**Wiring cross-check against frozen v0.7.2.** The ballistic coefficient `B` is
-convention-free, so it must reproduce despite the changed `A_ref` and mass:
-measured **−0.02 / +0.08 / −0.11 %**, i.e. agreement within the fits' own
-resolution — the frozen side is still quantized at ~0.3 % and cannot be
-tightened, so no finer claim is available. The Run-3 along-track residuals also
-land on the frozen values (1.87 vs 1.86 m; 6.30 vs 6.36 m; 118.93 vs 119.02 m),
-and `T_sphere` bracketed up to the press-kit area reproduces v0.7.2's 1.4730 to
-0.05 %, the residual being the mass.
-
-**Attitude convention, resolved from the primary source and from the data.** The
-Handbook (§3.2.3) puts the Roll axes anti-flight and in-flight for the leading
-and trailing satellites, so the twins differ by a **180° yaw about the
-nadir-aligned axis** — both keep the wide face nadir and only the ±X ends swap.
-Front and Rear panels are both 0.9551567 m², so **A_ram is identical between the
-twins**. Which twin leads is measured per window rather than taken from
-literature: **C leads in all three**, sign constant.
+The measured claim is the modest one the contract asks for: two near-identical
+bodies flying through the same atmosphere under the same model produce
+consistent drag results. The four ratios do not support a stronger statement,
+and none is made here — in particular this part sets no error bar on a fitted
+Cd, and the fitted Cd levels are not compared across A/m conventions.

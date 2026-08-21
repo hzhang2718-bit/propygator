@@ -1,0 +1,431 @@
+==============================================================================
+Extended validation -- Chunk 1: maneuver screening, ten windows
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/extended-validation/data/gracefo
+[convention] A_ref = 1.0013468 m^2, Cd = 2.3, mass = MAS1B dry + tank gas, PER SATELLITE
+[pre-registered] tier-2: degree-5 fit to the 14-day along-track residual, CLEAN iff max departure < 10% of max |along-track|.
+                 carried verbatim from v0.7.2 run_gracefo.py:586, whose reference reading was 186.6 m signal / 6.7 m departure (3.6%).
+                 Fixed before screening began; not revisited after seeing a number.
+
+[pre-flight] frozen window table vs CSSI (JVM-free)
+  source: <orekit-data>/CSSI-Space-Weather-Data/SpaceWeather-All-v1.2.txt  (UPDATED 2026 May 10 15:40:00.00)
+  25103 daily records; OBSERVED block ends 2026-05-09
+  flux convention: obs (NRLMSISE-00 is built on the observed series, which is what Orekit's CssiSpaceWeatherData feeds it)
+  table check: 0 mismatching cell(s) across 10 windows x 7 fields -> CLEAN
+  window                f107     lo     hi   flat   ctr81    Ap   ap3    Kp  pred
+  low_2019_12           71.9   70.5   72.7  1.031    71.3     8    18   3.3     0
+  low_2021_04           77.3   74.6   82.9  1.111    75.0    28    48   5.0     0
+  low_2021_06           83.1   76.4   94.1  1.232    79.3    13    27   4.0     0
+  moderate_2022_04     120.2  109.0  133.0  1.220   129.8    15    32   4.3     0
+  intense_2024_06      187.4  167.3  203.3  1.215   191.3    17    39   4.7     0
+  storm_2024_08        242.5  224.9  281.5  1.252   218.8   127   207   8.0     0
+  intense_2024_11      198.6  174.2  225.0  1.292   200.8    11    32   4.3     0
+  storm_2025_05        137.4  115.0  164.2  1.428   134.7    98   179   7.7     0
+  moderate_2025_07     147.8  142.7  156.6  1.097   145.8    27    39   4.7     0
+  storm_2026_01        166.0  116.6  231.8  1.988   145.2   144   300   8.7     0
+  days on daily-PREDICTED rows: 0 (must be 0 -- predicted rows carry a flat placeholder ap/Kp, so a storm there would contain no storm in the model)
+
+==============================================================================
+=== window 01  low_2019_12  (low, 2019-12-23 .. 2020-01-05) ===
+==============================================================================
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2019-12-23T00:00:19 -> 2020-01-05T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2019-12-23T00:00:19 -> 2020-01-05T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 30.4952 kg over 336 records (range 30.4896..30.5005) -> total 600.409 kg
+  D: gas mean 30.5019 kg over 336 records (range 30.4959..30.5071) -> total 600.416 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6874.6 km (altitude ~ 497 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6874.5 km (altitude ~ 496 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    6734 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 3500000 ms, last 3500000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    6305 records over 14 daily files; qualflg seen 00001100,01001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 2092000 ms, last 2092000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 7.456e-09 m, |dv| = 3.311e-12 m/s (bound 5e-08 m)
+  D: |dr| = 7.465e-09 m, |dv| = 4.709e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 5412.8 m, departure 49.7 m (0.9%) -> CLEAN  (93 s wall)
+  D: signal 5480.2 m, departure 50.1 m (0.9%) -> CLEAN  (87 s wall)
+
+==============================================================================
+=== window 02  low_2021_04  (low, 2021-04-15 .. 2021-04-28) ===
+==============================================================================
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2021-04-15T00:00:19 -> 2021-04-28T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2021-04-15T00:00:19 -> 2021-04-28T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 29.9320 kg over 336 records (range 29.9244..29.9415) -> total 599.846 kg
+  D: gas mean 29.9780 kg over 336 records (range 29.9711..29.9863) -> total 599.892 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6887.3 km (altitude ~ 509 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6887.3 km (altitude ~ 509 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    6874 records over 14 daily files; qualflg seen 00001100,01001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 3500000 ms, last 3500000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    6741 records over 14 daily files; qualflg seen 00001100,01001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 2102000 ms, last 2102000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 1.397e-09 m, |dv| = 5.468e-12 m/s (bound 5e-08 m)
+  D: |dr| = 2.134e-09 m, |dv| = 9.101e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 5170.9 m, departure 125.7 m (2.4%) -> CLEAN  (87 s wall)
+  D: signal 5114.6 m, departure 125.5 m (2.5%) -> CLEAN  (87 s wall)
+
+==============================================================================
+=== window 03  low_2021_06  (low, 2021-06-17 .. 2021-06-30) ===
+==============================================================================
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2021-06-17T00:00:19 -> 2021-06-30T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2021-06-17T00:00:19 -> 2021-06-30T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 29.8507 kg over 336 records (range 29.8427..29.8610) -> total 599.765 kg
+  D: gas mean 29.9097 kg over 336 records (range 29.9031..29.9178) -> total 599.824 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6880.2 km (altitude ~ 502 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6880.3 km (altitude ~ 502 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    5659 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 3500000 ms, last 3500000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    5376 records over 14 daily files; qualflg seen 00001100,01001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 2102000 ms, last 2102000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 2.650e-09 m, |dv| = 6.432e-12 m/s (bound 5e-08 m)
+  D: |dr| = 4.180e-09 m, |dv| = 2.878e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 4520.5 m, departure 48.3 m (1.1%) -> CLEAN  (86 s wall)
+  D: signal 4659.5 m, departure 48.4 m (1.0%) -> CLEAN  (71 s wall)
+
+==============================================================================
+=== window 04  moderate_2022_04  (moderate, 2022-04-29 .. 2022-05-12) ===
+==============================================================================
+[note] slid -1 d from 2022-04-30 at the 13->14 day extension (F10.7 flatness 1.372 -> 1.220 against a 1.35 cap)
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2022-04-29T00:00:19 -> 2022-05-12T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2022-04-29T00:00:19 -> 2022-05-12T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 29.1194 kg over 336 records (range 29.1097..29.1295) -> total 599.033 kg
+  D: gas mean 29.3042 kg over 336 records (range 29.2970..29.3116) -> total 599.218 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6856.6 km (altitude ~ 478 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6856.7 km (altitude ~ 479 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    6263 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 7142000 ms, last 7142000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    5532 records over 14 daily files; qualflg seen 00001100,01001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 5682000 ms, last 5682000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 1.122e-08 m, |dv| = 8.841e-12 m/s (bound 5e-08 m)
+  D: |dr| = 1.493e-08 m, |dv| = 8.236e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 56608.3 m, departure 206.9 m (0.4%) -> CLEAN  (102 s wall)
+  D: signal 56706.9 m, departure 207.4 m (0.4%) -> CLEAN  (87 s wall)
+
+==============================================================================
+=== window 05  intense_2024_06  (intense, 2024-06-14 .. 2024-06-27) ===
+==============================================================================
+[note] 'intense' exists only in 2024, so the band is confounded with mission epoch and altitude
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-06-14T00:00:19 -> 2024-06-27T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-06-14T00:00:19 -> 2024-06-27T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 26.4252 kg over 336 records (range 26.4204..26.4300) -> total 596.339 kg
+  D: gas mean 27.0005 kg over 336 records (range 26.9959..27.0052) -> total 596.914 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6839.4 km (altitude ~ 461 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6839.7 km (altitude ~ 462 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    65 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29162000 ms, last 29162000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: CLEAN
+    123 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 28376000 ms, last 28376000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 5.684e-09 m, |dv| = 5.303e-12 m/s (bound 5e-08 m)
+  D: |dr| = 7.509e-09 m, |dv| = 4.570e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 5027.3 m, departure 181.8 m (3.6%) -> CLEAN  (1469 s wall)
+  D: signal 5774.4 m, departure 185.4 m (3.2%) -> CLEAN  (183 s wall)
+
+==============================================================================
+=== window 06  storm_2024_08  (storm, 2024-08-11 .. 2024-08-24) ===
+==============================================================================
+[note] storm at day 1: storm-contaminated fit arc, calm forecast
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-08-11T00:00:19 -> 2024-08-24T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-08-11T00:00:19 -> 2024-08-24T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 26.3472 kg over 312 records (range 26.3280..26.4703) -> total 596.261 kg
+     1 day(s) declare num_records: 0 (MAS1B_2024-08-23_C_04.txt.gz) -- telemetry outage, not a truncated file (header cross-checked)
+     the mean is over the 312 records that exist; the missing days can move it by at most 0.0102 kg (0.0017% of total mass), against a CD_FIT_TOL resolution of ~0.05-0.1% in Cd
+  D: gas mean 26.9194 kg over 312 records (range 26.9125..26.9242) -> total 596.833 kg
+     1 day(s) declare num_records: 0 (MAS1B_2024-08-23_D_04.txt.gz) -- telemetry outage, not a truncated file (header cross-checked)
+     the mean is over the 312 records that exist; the missing days can move it by at most 0.0008 kg (0.0001% of total mass), against a CD_FIT_TOL resolution of ~0.05-0.1% in Cd
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6859.6 km (altitude ~ 481 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6859.4 km (altitude ~ 481 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    34 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29574000 ms, last 29574000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+    1 day(s) declare num_records: 0 (THR1B_2024-08-14_C_04.txt.gz); 1 interior, bracketed by an unchanged cumulative accumulator, so the gate reads through them
+  [screen tier-1 THR1B] sat D: CLEAN
+    96 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 28876000 ms, last 28876000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 1.157e-08 m, |dv| = 1.411e-11 m/s (bound 5e-08 m)
+  D: |dr| = 1.504e-08 m, |dv| = 1.236e-11 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 159671.9 m, departure 722.5 m (0.5%) -> CLEAN  (113 s wall)
+  D: signal 165650.9 m, departure 747.6 m (0.5%) -> CLEAN  (108 s wall)
+
+==============================================================================
+=== window 07  intense_2024_11  (intense, 2024-11-23 .. 2024-12-06) ===
+==============================================================================
+[note] 'intense' exists only in 2024 -- see window 5
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-11-23T00:00:19 -> 2024-12-06T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2024-11-23T00:00:19 -> 2024-12-06T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 26.2157 kg over 336 records (range 26.1993..26.2227) -> total 596.130 kg
+  D: gas mean 26.7872 kg over 336 records (range 26.7327..26.8052) -> total 596.701 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6861.6 km (altitude ~ 483 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6861.4 km (altitude ~ 483 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    105 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29574000 ms, last 29574000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+  [screen tier-1 THR1B] sat D: BURN
+    998 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29044000 ms, last 29332000 ms, moved 288000 ms, 71 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 144000 / 144000 ms over 1 firing record(s)
+    BURN DETECTED -- first firing in THR1B_2024-12-04_D_04.txt.gz at gps_time 786559026; accumulator values (29044000, 29046000, 29052000, 29058000, 29062000, 29064000)
+    The build plan's failure rule applies -- slide, replace, or record and keep. Which one is the maintainer's call, not this screen's: it reports the burn and stops there.
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 5.783e-09 m, |dv| = 3.805e-12 m/s (bound 5e-08 m)
+  D: |dr| = 5.783e-09 m, |dv| = 5.084e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 163849.6 m, departure 625.2 m (0.4%) -> CLEAN  (92 s wall)
+  D: signal 158159.8 m, departure 1297.9 m (0.8%) -> CLEAN  (86 s wall)
+     TIER-2 TRUE-POSITIVE CHECK -- tier 1 reports a burn on D, and tier 2 MISSED it (0.8% departure against the 10% bar). Swarm is screened by tier 2 alone, so this is the only calibration of that gate against a maneuver known to be real.
+
+==============================================================================
+=== window 08  storm_2025_05  (storm, 2025-05-26 .. 2025-06-08) ===
+==============================================================================
+[note] storm across days 3-8: nonstationarity, the 's' half of the gate
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2025-05-26T00:00:19 -> 2025-06-08T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2025-05-26T00:00:19 -> 2025-06-08T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 26.0190 kg over 336 records (range 26.0123..26.0241) -> total 595.933 kg
+  D: gas mean 26.4349 kg over 336 records (range 26.3955..26.4567) -> total 596.349 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6852.1 km (altitude ~ 474 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6852.3 km (altitude ~ 474 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    26 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29574000 ms, last 29574000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+    2 day(s) declare num_records: 0 (THR1B_2025-06-05_C_04.txt.gz, THR1B_2025-06-07_C_04.txt.gz); 2 interior, bracketed by an unchanged cumulative accumulator, so the gate reads through them
+  [screen tier-1 THR1B] sat D: BURN
+    688 records over 14 daily files; qualflg seen 00001100,01001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 30366000 ms, last 30580000 ms, moved 214000 ms, 21 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 107000 / 107000 ms over 1 firing record(s)
+    BURN DETECTED -- first firing in THR1B_2025-06-04_D_04.txt.gz at gps_time 802278564; accumulator values (30366000, 30368000, 30474000, 30480000, 30486000, 30492000)
+    The build plan's failure rule applies -- slide, replace, or record and keep. Which one is the maintainer's call, not this screen's: it reports the burn and stops there.
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 9.964e-10 m, |dv| = 1.830e-12 m/s (bound 5e-08 m)
+  D: |dr| = 1.317e-09 m, |dv| = 1.863e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 90126.6 m, departure 550.5 m (0.6%) -> CLEAN  (84 s wall)
+  D: signal 76825.8 m, departure 1425.1 m (1.9%) -> CLEAN  (59 s wall)
+     TIER-2 TRUE-POSITIVE CHECK -- tier 1 reports a burn on D, and tier 2 MISSED it (1.9% departure against the 10% bar). Swarm is screened by tier 2 alone, so this is the only calibration of that gate against a maneuver known to be real.
+
+==============================================================================
+=== window 09  moderate_2025_07  (moderate, 2025-07-23 .. 2025-08-05) ===
+==============================================================================
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2025-07-23T00:00:19 -> 2025-08-05T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2025-07-23T00:00:19 -> 2025-08-05T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 25.8995 kg over 168 records (range 25.8954..25.9092) -> total 595.813 kg
+     7 day(s) declare num_records: 0 (MAS1B_2025-07-25_C_04.txt.gz, MAS1B_2025-07-26_C_04.txt.gz, MAS1B_2025-07-27_C_04.txt.gz, MAS1B_2025-07-28_C_04.txt.gz, MAS1B_2025-07-29_C_04.txt.gz, MAS1B_2025-07-30_C_04.txt.gz, MAS1B_2025-07-31_C_04.txt.gz) -- telemetry outage, not a truncated file (header cross-checked)
+     the mean is over the 168 records that exist; the missing days can move it by at most 0.0069 kg (0.0012% of total mass), against a CD_FIT_TOL resolution of ~0.05-0.1% in Cd
+  D: gas mean 26.3561 kg over 168 records (range 26.3531..26.3617) -> total 596.270 kg
+     7 day(s) declare num_records: 0 (MAS1B_2025-07-25_D_04.txt.gz, MAS1B_2025-07-26_D_04.txt.gz, MAS1B_2025-07-27_D_04.txt.gz, MAS1B_2025-07-28_D_04.txt.gz, MAS1B_2025-07-29_D_04.txt.gz, MAS1B_2025-07-30_D_04.txt.gz, MAS1B_2025-07-31_D_04.txt.gz) -- telemetry outage, not a truncated file (header cross-checked)
+     the mean is over the 168 records that exist; the missing days can move it by at most 0.0043 kg (0.0007% of total mass), against a CD_FIT_TOL resolution of ~0.05-0.1% in Cd
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6847.9 km (altitude ~ 470 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6847.8 km (altitude ~ 470 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    27 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29712000 ms, last 29712000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+    1 day(s) declare num_records: 0 (THR1B_2025-08-04_C_04.txt.gz); 1 interior, bracketed by an unchanged cumulative accumulator, so the gate reads through them
+  [screen tier-1 THR1B] sat D: CLEAN
+    66 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 30728000 ms, last 30728000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 2.328e-09 m, |dv| = 2.730e-12 m/s (bound 5e-08 m)
+  D: |dr| = 9.313e-10 m, |dv| = 1.705e-13 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 92834.8 m, departure 295.9 m (0.3%) -> CLEAN  (96 s wall)
+  D: signal 96680.5 m, departure 296.3 m (0.3%) -> CLEAN  (90 s wall)
+
+==============================================================================
+=== window 10  storm_2026_01  (storm, 2026-01-13 .. 2026-01-26) ===
+==============================================================================
+[note] storm onset at the day-6 boundary: the contract's mandated fit-right-before-onset case, clean arc and forecast opening at onset
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2026-01-13T00:00:19 -> 2026-01-26T23:59:19 TAI
+  D = GRACE-FO 2 (GRACE D) (NORAD 43477), platform 'GRACE D' v04, 14 daily files
+    1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+    seam gaps > 1.5 s: 0 (max gap 1.0 s)
+    span: 2026-01-13T00:00:19 -> 2026-01-26T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 25.9302 kg over 336 records (range 25.9200..25.9382) -> total 595.844 kg
+  D: gas mean 26.1547 kg over 336 records (range 26.1476..26.1602) -> total 596.069 kg
+[parser checks]
+  C: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6834.6 km (altitude ~ 457 km)
+  D: from_iso(to_iso()) == epoch for all 20160: True; max |dt - 60 s| = 0.000e+00 s
+     |r0| = 6834.9 km (altitude ~ 457 km)
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    28 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 29986000 ms, last 29986000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+    2 day(s) declare num_records: 0 (THR1B_2026-01-14_C_04.txt.gz, THR1B_2026-01-16_C_04.txt.gz); 2 interior, bracketed by an unchanged cumulative accumulator, so the gate reads through them
+  [screen tier-1 THR1B] sat D: CLEAN
+    93 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 31330000 ms, last 31330000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  C: |dr| = 5.510e-09 m, |dv| = 8.676e-12 m/s (bound 5e-08 m)
+  D: |dr| = 5.101e-09 m, |dv| = 8.330e-12 m/s (bound 5e-08 m)
+[screen tier-2 deg-5]  drag-on Cd = 2.3 over the full 14-day load
+  C: signal 53554.1 m, departure 1494.5 m (2.8%) -> CLEAN  (78 s wall)
+  D: signal 56048.0 m, departure 1502.7 m (2.7%) -> CLEAN  (77 s wall)
+
+==============================================================================
+[summary]
+==============================================================================
+  window             band        tier1 C   tier1 D   tier2 C   tier2 D  verdict
+  low_2019_12        low           CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  low_2021_04        low           CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  low_2021_06        low           CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  moderate_2022_04   moderate      CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  intense_2024_06    intense       CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  storm_2024_08      storm         CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  intense_2024_11    intense       CLEAN      BURN     CLEAN     CLEAN  REVIEW -- burn on D
+  storm_2025_05      storm         CLEAN      BURN     CLEAN     CLEAN  REVIEW -- burn on D
+  moderate_2025_07   moderate      CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+  storm_2026_01      storm         CLEAN     CLEAN     CLEAN     CLEAN  CLEAN
+
+  8/10 window(s) CLEAN on tier1 and tier2 for both satellites
+  A window that is not CLEAN is retired or slid per the build plan's failure rule -- level-band windows slide by the fewest whole days that clears the burn by >= 1 day (up to +/-10 d, staying in band), storm windows are never slid but replaced from the census. Every retirement is recorded.
+  Where the only flag is on D, applying that rule is a judgement the maintainer records rather than one this script makes. The contract runs every window on C ('all the runs will be conducted on GRACE-FO C'); D is read on the ten windows only as Chunk 14's cross-tag discriminator, which a burn makes easier rather than harder, and the table-noise part that does need it runs on the three frozen v0.7.2 windows.
+  wall time: 3519 s

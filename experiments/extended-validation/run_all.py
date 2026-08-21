@@ -1,5 +1,3 @@
-# Needs future work
-
 """Orchestrator for the extended-validation study (reference-only).
 
 Regenerates every committed results file from its driver invocations -- the
@@ -8,18 +6,15 @@ everything into a scratch directory and diffs each output against the committed
 evidence with wall-clock timing lines masked.
 
     conda run -n propygator python run_all.py --list
-    conda run -n propygator python run_all.py --only twin
-    conda run -n propygator python run_all.py --verify --only twin
+    conda run -n propygator python run_all.py --only noise
+    conda run -n propygator python run_all.py --verify --only noise
 
-Groups are registered by the chunk that creates them (build plan: "the
-orchestrator is built incrementally, from Chunk 0" -- the last study added
-run_all.py late and paid for it in a reorganization).
-
-    twin        gracefo/results_twin.txt        Chunk 0
-    screen      gracefo/results_screen.txt      Chunk 1
+``--list`` is the authoritative group listing; groups are registered below by
+the chunk that creates them, so a group routinely exists here before its
+evidence does.
 
 PER-GROUP --verify IS THE DOCUMENTED DEFAULT. A whole-study regenerate is a
-multi-hour, deliberately scheduled act (contract sec 9), not a pre-commit check.
+multi-hour, deliberately scheduled act, not a pre-commit check.
 
 Each invocation is a separate process (one JVM per process). Runs in the
 propygator conda env; drivers' stderr (fit progress) passes through. Output
@@ -40,29 +35,26 @@ from pathlib import Path
 
 STUDY = Path(__file__).resolve().parent
 
-# The Chunk 0 windows live in the FROZEN v0.7.2 truth tree. find_window_files and
-# parse_gnv1b both take arbitrary Paths, so this is a READ of that tree, never an
-# edit (contract sec 9). Recorded here rather than defaulted inside the driver so
-# the provenance is visible in the orchestrator.
+# The table-noise windows live in the FROZEN v0.7.2 truth tree. Its parsers and
+# file finder all take arbitrary Paths, so this is a READ of that tree, never an
+# edit (contract, "The earlier experiment is frozen"). Stated here rather than
+# left to the driver's default so the provenance is visible in the orchestrator.
 _FROZEN_ROOT = "--data-root=../../real-world-validation/data/gracefo"
 
 # group -> (results file relative to STUDY, [(script relative to STUDY, [args])])
+#
+# Each group is ONE invocation covering every window it owns, because each
+# driver closes with a cross-window summary block that is part of the chunk's
+# deliverable: computing it in a process that has seen every window beats
+# transcribing it afterwards, and it saves the extra JVM boots.
 GROUPS: dict[str, tuple[str, list[tuple[str, list[str]]]]] = {
-    "twin": (
-        "gracefo/results_twin.txt",
-        # ONE invocation covering every window, not three. The cross-window A1
-        # block is the chunk's deliverable (M1), so it has to be computed in a
-        # process that has seen all three windows rather than transcribed
-        # afterwards. Costs nothing and saves two JVM boots.
-        [("gracefo/run_twin_checkout.py", [_FROZEN_ROOT])],
+    "noise": (  # Chunk 2 -- three inherited windows, both satellites
+        "gracefo/results_table_noise.txt",
+        [("gracefo/run_table_noise.py", [_FROZEN_ROOT])],
     ),
-    "screen": (
+    "screen": (  # Chunk 1 -- both maneuver gates over the ten frozen windows
         "gracefo/results_screen.txt",
-        # ONE invocation covering all ten windows. The cross-window verdict
-        # table is the chunk's deliverable, so it is computed in a process that
-        # has seen every window rather than transcribed afterwards. --data-root
-        # is left at the driver's default, THIS study's own truth tree
-        # (data/gracefo), which is what distinguishes it from the twin group.
+        # --data-root left at the driver's default, THIS study's own truth tree.
         [("gracefo/run_screen.py", [])],
     ),
 }
@@ -184,12 +176,19 @@ def main() -> None:
 
     out_root = args.out_dir
     if out_root is None:
-        out_root = Path(tempfile.mkdtemp(prefix="extval-verify-")) if args.verify else STUDY
+        # mkdtemp CREATES the directory, so it is called only when verifying --
+        # a plain regenerate writes in place and must not leave a stray temp dir.
+        out_root = (
+            Path(tempfile.mkdtemp(prefix="extval-verify-")) if args.verify else STUDY
+        )
     out_root = out_root.resolve()
     if args.verify and out_root == STUDY:
         raise SystemExit("--verify must not overwrite the committed files")
 
-    print(f"[run_all] groups: {', '.join(names)}; output root: {out_root}", file=sys.stderr)
+    print(
+        f"[run_all] groups: {', '.join(names)}; output root: {out_root}",
+        file=sys.stderr,
+    )
     total_diff = 0
     for name in names:
         fresh = _run_group(name, out_root)

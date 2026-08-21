@@ -32,13 +32,6 @@ there; and on a storm window a real onset is itself a slope kink, so a tier-2
 departure on windows 6, 8 and 10 documents the storm rather than a burn. Tier 1
 is the gate that is trusted on those.
 
-A_REF CAVEAT -- READ BEFORE REGENERATING. The tier-2 propagation is configured
-from ``gracefo_ext_common.py``, whose geometry Chunk 2 rewrites (``A_REF_M2``
-0.9551567 -> 1.0013468 m^2). The committed results file must therefore be
-generated AFTER that rewrite, or ``run_all.py --verify --only screen`` will red
-the moment Chunk 2 lands. The resolved value is printed in the header so any
-results file says which geometry produced it.
-
 Runs every window in one process and closes with a computed ``[summary]``
 block -- the cross-window verdict is the chunk's deliverable, so it is computed
 here rather than transcribed into a README afterwards. ``--window`` may be
