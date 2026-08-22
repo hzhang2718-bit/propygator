@@ -185,6 +185,10 @@ because GRACE-FO C's mass changes over time due to propellant use.
 > anomalies and bad truth days. Swarm has no THR1B analogue, so
 > Part B's screen remains the polynomial alone.
 >
+> Amendment (2026-08-21): tier 2 missed both known-real burns in
+> Chunk 2 (0.8 % / 1.9 % against its 10 % bar), so it stays as Swarm's
+> screen but a CLEAN is weak evidence, not a quiet window.
+>
 > Known limit of that gate (2026-08-19): THR1B `qualflg` bit 0 (on-time
 > not calculated) and bit 1 (unaccounted thrusts) invalidate the columns
 > it reads -- under bit 0 a zero on-time means unknown, not quiet -- and
@@ -299,6 +303,10 @@ scaling with `|r|` (one ulp at GRACE-FO's radius is 9.3e-10 m); 240
 epochs measured across window 1 span 0 to 27 ulps, i.e. up to 2.5e-8 m.
 The bound is therefore **5e-8 m** (build plan, 2026-08-18); a tighter
 one rejects valid epochs.
+
+Amendment (2026-08-21): Swarm truth covers the first 8 days of each
+window only (`LOAD_DAYS`), since Part B propagates one 7-day arc and
+nothing in this study reads a later Swarm day.
 
 > Only Swarm A and B will be used for these tests. Swarm A
 > and C are very similar, and this section aims for variety.

@@ -59,6 +59,57 @@ GROUPS: dict[str, tuple[str, list[tuple[str, list[str]]]]] = {
     ),
 }
 
+# --- Part 2 (Chunks 3-13) -----------------------------------------------------
+# One group per window per leg. `--only drag_04` is a complete unit of work, and
+# per-window separability is the ONLY mitigation that matters for a part whose
+# 7-day Cd fits are ~80 % of the study's compute (contract, stated twice).
+# Registered by the chunk that CREATES them, so these exist here before their
+# evidence does; --verify says so rather than running for hours to find out.
+_TABLE_ORDER = (
+    "low_2019_12",
+    "low_2021_04",
+    "low_2021_06",
+    "moderate_2022_04",
+    "intense_2024_06",
+    "storm_2024_08",
+    "intense_2024_11",
+    "storm_2025_05",
+    "moderate_2025_07",
+    "storm_2026_01",
+)
+for _i, _name in enumerate(_TABLE_ORDER, start=1):
+    GROUPS[f"drag_{_i:02d}"] = (
+        f"gracefo/results_drag/window_{_i:02d}_{_name}.txt",
+        [("gracefo/run_drag_window.py", [_name])],
+    )
+    GROUPS[f"swarm_{_i:02d}"] = (
+        f"swarm/results_drag/window_{_i:02d}_{_name}.txt",
+        [("swarm/run_drag_window.py", [_name])],
+    )
+GROUPS["drag_summary"] = (
+    "results_drag_summary.txt",
+    [("summarize_drag.py", [])],
+)
+
+# Twenty bare names in --only is unusable, so a few aliases expand to them.
+ALIASES: dict[str, list[str]] = {
+    "drag": [f"drag_{i:02d}" for i in range(1, 11)],
+    "swarm": [f"swarm_{i:02d}" for i in range(1, 11)],
+    "part2": [f"drag_{i:02d}" for i in range(1, 11)]
+    + [f"swarm_{i:02d}" for i in range(1, 11)]
+    + ["drag_summary"],
+}
+
+
+def _expand(names: list[str]) -> list[str]:
+    """Expand any aliases, preserving order and dropping duplicates."""
+    out: list[str] = []
+    for name in names:
+        for expanded in ALIASES.get(name, [name]):
+            if expanded not in out:
+                out.append(expanded)
+    return out
+
 # Wall-clock timing text masked before any diff (everything else in the evidence
 # is deterministic given the same code, truth files, and orekit-data).
 _TIME_PATTERNS = [
@@ -153,10 +204,13 @@ def main() -> None:
 
     if args.list:
         for name, (rel_out, invocations) in GROUPS.items():
-            print(f"{name:<11} -> {rel_out}  ({len(invocations)} invocations)")
+            print(f"{name:<14} -> {rel_out}  ({len(invocations)} invocations)")
+        print()
+        for alias, expansion in ALIASES.items():
+            print(f"{alias:<14} => {', '.join(expansion)}")
         return
 
-    names = list(GROUPS) if args.only is None else args.only.split(",")
+    names = _expand(list(GROUPS) if args.only is None else args.only.split(","))
     for name in names:
         if name not in GROUPS:
             raise SystemExit(f"unknown group {name!r}; choose from {', '.join(GROUPS)}")

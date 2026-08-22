@@ -17,11 +17,14 @@ against the playbook and the r/s gate.
 extended-validation/
 ├── README.md          this file
 ├── run_all.py         regenerate / --verify orchestrator; --list is authoritative
+├── drag_common.py     Part 2 primitives shared by both legs (the per-day rule)
+├── summarize_drag.py  cross-window text parse → results_drag_summary.txt
 ├── data/              raw truth + reference docs (gitignored, never committed)
 │   ├── reference/     third-party reference PDFs (see "Reference documents")
 │   ├── tarballs/      TRANSIENT download staging, deleted after extraction
-│   └── gracefo/<window>/   GNV1B / MAS1B / THR1B, both satellites, gzipped
-│                          84 files per window, ~269 MB, ~2.6 GB for all ten
+│   ├── gracefo/<window>/   GNV1B / MAS1B / THR1B, both satellites, gzipped
+│   │                      84 files per window, ~269 MB, ~2.6 GB for all ten
+│   └── swarm/<window>/     SP3 .ZIP, A and B, 8 days — the arc's span
 ├── gracefo/
 │   ├── windows.py            frozen ten-window list, CSSI re-read, .gz finder
 │   ├── thr1b.py              tier-1 thruster parser
@@ -29,9 +32,28 @@ extended-validation/
 │   ├── gracefo_ext_common.py leg geometry, mass, force set, scalar-Cd fitter
 │   ├── fetch_windows.py      download → extract → gzip → screen
 │   ├── run_screen.py         both maneuver gates  → results_screen.txt
-│   └── run_table_noise.py    the twin ratios      → results_table_noise.txt
-└── swarm/             the Swarm A/B leg (its own reader, config, drivers)
+│   ├── run_table_noise.py    the twin ratios      → results_table_noise.txt
+│   ├── run_drag_window.py    Part 2, one window   → results_drag/window_NN_*.txt
+│   └── results_drag/         one file per window (group `drag_NN`)
+└── swarm/             the Swarm A/B leg — see swarm/README.md
+    ├── swarm_sp3.py          SP3 reader (ZIP + concat over the frozen parser)
+    ├── swarm_common.py       ESTIMATED geometry and mass
+    ├── run_drag_window.py    Part 2, one window, both satellites
+    └── results_drag/         one file per window (group `swarm_NN`)
 ```
+
+**Why `swarm/` has its own README and `gracefo/` does not.** This file *is* the
+GRACE-FO leg's documentation — the A/m convention, the geometry, the truth
+provenance and the findings all live here. The Swarm leg carries facts with no
+home in it: the contract requires the delivered SP3 format recorded, and every
+Swarm number rests on estimated mass and geometry that must be read with the
+row. Splitting those out beats growing a second convention table here that would
+drift from the first.
+
+**Group names.** `--only drag_04` is one complete window; the aliases `drag`,
+`swarm` and `part2` expand to the twenty window groups plus the summary, because
+twenty bare names in `--only` is unusable. `run_all.py --list` prints every
+group with its output path and every alias with its expansion.
 
 ## Running
 
@@ -165,6 +187,14 @@ Swarm gate decision: Swarm has no THR1B analogue and is screened by tier 2 alone
 - **Parse cost, measured:** 0.6 s/day/satellite from the extracted `.gz` against
   4.7 s from a tarball, so a 14-day two-satellite load is ~17 s. The build plan's
   conditional `.npy` cache is therefore **not needed**.
+- **Swarm SP3 — ESA, POD/RN modules.**
+  <https://swarm-diss.eo.esa.int/#swarm/Level2daily/Entire_mission_data> serves
+  daily `SW_OPER_SP3<A|B>COM_2__*.ZIP`. **SP3-d on GPS time in IGS14**, 10 s
+  grid, V-records present and Earth-fixed — all four resolved against a
+  delivered file, not documentation, per the contract's step 1. Files are cut on
+  **GPS** days and named in **UTC**, so a file is found by its *second*
+  timestamp. 8 days per window per satellite, which is what a 7-day arc needs
+  with its `t0 + 7 d` endpoint sample. Full record in `swarm/README.md`.
 - **Catalog TLEs** — per-anchor Space-Track `gp_history` pulls; object identity
   checked on every pull, since close-formation pairs are a cross-tagging hazard.
 - **Raw truth files are never committed** (`data/` gitignored).
@@ -195,6 +225,40 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
 | 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | pending | — |
 | 3 — TLE fitting | `tle_01..10`, `tle_summary` | pending | — |
+
+### Part 2 — drag propagations, per window
+
+Five configurations, five propagations, one 7-day arc from each window's t0;
+day 1 / day 3 / day 7 read off those five trajectories, never re-propagated.
+**This part has no benchmark** — the contract states an expectation, not a
+requirement, so no row below is scored and no driver flags a verdict. What
+warrants a bug search is an *inversion*: a table run losing badly where drag is
+strong.
+
+| # | window | band | GRACE-FO C | Swarm A/B |
+|---|---|---|---|---|
+| 1 | `low_2019_12` | low | pending | pending |
+| 2 | `low_2021_04` | low | pending | pending |
+| 3 | `low_2021_06` | low | pending | pending |
+| 4 | `moderate_2022_04` | moderate | pending | pending |
+| 5 | `intense_2024_06` | intense | pending | pending |
+| 6 | `storm_2024_08` | storm | pending | pending |
+| 7 | `intense_2024_11` | intense | pending | pending |
+| 8 | `storm_2025_05` | storm | pending | pending |
+| 9 | `moderate_2025_07` | moderate | pending | pending |
+| 10 | `storm_2026_01` | storm | pending | pending |
+
+**Every RMS is per-day**: day N is the RMS over [N−1 d, N d] alone, never
+accumulated from t0. A 0–N d window is dominated by its early, still
+well-fitted portion and understates the error at the horizon actually read.
+Day 1 is the one value both conventions share, which is what keeps the frozen
+v0.7.2 "removed fraction" comparison valid — and why only the day-1 column may
+be read against it.
+
+The **Swarm leg rests on estimated mass and geometry**, and its only maneuver
+gate is the degree-5 polynomial that missed both known-real burns in Chunk 2.
+Both limits are recorded on every Swarm row rather than worked around; see
+`swarm/README.md`.
 
 ### Part 1 — table noise, GRACE-FO C/D over the three inherited windows
 

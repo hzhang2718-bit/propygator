@@ -138,6 +138,32 @@ def window_mass_kg(gas_mass_kg: float) -> float:
 # relative yaw at all. Which twin leads is measured per window from the two
 # ephemerides rather than taken from literature.
 
+# --- Part 2 arc geometry (Chunk 3) --------------------------------------------
+# NAME COLLISION WITH PART 1, introduced here and left alone: run_table_noise.py
+# carries its own LOAD_DAYS = 3 / ARC_DAYS = 1.0 as module locals. Never add
+# either name to that file's import list -- its locals shadow these today, and a
+# reorder would silently turn Part 1's 1-day arc into a 7-day one and change
+# committed evidence with nothing raising.
+#
+# ONE 7-day propagation per configuration, read at several days -- never one run
+# per day (contract, "The design - drag-significant propagations": five
+# propagations per window per body, not fifteen).
+ARC_DAYS = 7.0
+# 8 days loaded, not 7, so the t0 + 7 d ENDPOINT sample exists: daily truth files
+# cover [day, day+1), so the last sample of the seventh file sits one step short
+# of t0 + 7 d. Chunk 1 already landed 14 days for GRACE-FO, so this costs parse
+# time only; the Swarm leg is delivered at 8 days exactly (contract amendment
+# 2026-08-21).
+LOAD_DAYS = 8
+# NAMED `READ_DAYS`, NOT `READ_HORIZONS_D`. These index INDIVIDUAL days, not
+# cumulative horizons: day N is the RMS over [N-1 d, N d] ALONE. The old name
+# invites the accumulate-from-t0 read the contract forbids, because a 0-N d
+# window is dominated by its early, still well-fitted portion and understates
+# the error at the horizon actually being read. There is no 0-1 / 0-3 / 0-7 d
+# row anywhere in this study. Day 1 is the one value both conventions share,
+# which is what keeps the frozen v0.7.2 comparison valid.
+READ_DAYS = (1, 3, 7)
+
 # --- inherited, unchanged from v0.7.2 -----------------------------------------
 # Transcribed from real-world-validation/gracefo/gracefo_common.py with the
 # lines cited, so a diff against that file is a one-line check.

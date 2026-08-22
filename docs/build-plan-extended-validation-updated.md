@@ -103,6 +103,10 @@ epoch. The Swarm list cannot be finalised before the contract's 4-step format
 resolution settles, because Part B may be dropped outright; sequence it as
 format inspection -> Swarm window list.
 
+Truth is landed for the first 8 days only (contract amendment 2026-08-21) --
+8 SP3 files per satellite, since the GPS-cut files are named for the day before
+the one they hold.
+
 ### **Chunk 1: Data download, extraction, and maneuver screening** - Done, results.txt generation **skipped**
 
 **Goal.** Land each window's 14 days, keep only what the study reads, and gate
@@ -349,11 +353,15 @@ evidence; it is verified on a smoke arc and on JVM-free identities.
 
 **Create.**
 - `gracefo/run_drag_window.py` -- the per-window driver. `<window>` positional;
-  `--sat C|D` (default `C`), `--data-root`, `--parse-only`, `--only-config` (a
-  debugging resume, never a route to committed evidence), and `--emit-fixture`
-  for Deliverable 4's pinned-test literals -- carried from birth so Part 4 does
-  not retrofit it.
-- `swarm/swarm_common.py`, `swarm/<reader>.py`, `swarm/run_drag_window.py`,
+  `--data-root`, `--parse-only`, `--smoke` (the Verify arc below; prints its own
+  NOT-EVIDENCE banner), and `--emit-fixture` for Deliverable 4's pinned-test
+  literals -- carried from birth so Part 4 does not retrofit it.
+  **`--sat` and `--only-config` dropped** (2026-08-21, maintainer): every Part 2
+  run is on C, and a whole window is <= 30 min, so a partial-config resume costs
+  more in mis-read output than it saves in re-runs.
+- `swarm/swarm_common.py`, `swarm/swarm_sp3.py` (the gate resolved to SP3-d on
+  GPS time -- contract step 2, so a thin wrapper over the frozen
+  `lageos/sp3.py`), `swarm/run_drag_window.py`,
   `swarm/README.md` -- conditional on the gate below. Box 5.0 (length, +Y on the
   wind) x 1.0 (height) x 1.0 (width) m, mass 419.0 kg, `A_ref` 1.0 m^2, every one
   of them an estimate and labelled as one in the header.
@@ -399,15 +407,18 @@ difference before it is a body difference.
 against its 10 % bar, windows 7 and 8 D). It normalizes by a 90-192 km
 unfitted-Cd signal, so a burn cannot register; the bar is not re-fitted. No
 certified replacement is available -- a TLE SMA step buries the same small
-signature in the same storm-variable decay. **Swarm therefore has no maneuver
-gate**, prospective or retrospective: nothing in this study emits the
-along-track series a burn's slope break is visible in, only per-day RMS. A
-divergence is found, if at all, by the maintainer noticing an incoherent daily
-progression and investigating from there. Weigh this in the step-4 drop decision.
+signature in the same storm-variable decay. **Swarm keeps the polynomial as its
+screen, but it is not a reliable one** (contract amendment 2026-08-21): it runs
+and its verdict is recorded, on 8 days rather than 14, and a CLEAN is weak
+evidence rather than a quiet window. An undetected Swarm maneuver therefore
+stays a live risk on every Part B row. Weigh this in the step-4 drop decision.
 
 If the gate fails, Part B is dropped:
 each window chunk loses its `swarm_NN` group, the drop is recorded in the README,
 and nothing else in the study moves.
+
+The Swarm SP3 files are downloaded from POD/RN modules from:
+https://swarm-diss.eo.esa.int/#swarm/Level2daily/Entire_mission_data
 
 **Layout.** One results file per window per leg, in named folders so twenty files
 stay legible:
@@ -429,18 +440,21 @@ its own twice-stated per-window separability requirement;
   `2L(H+W)` = 15.0060150 to 8 figures; Swarm ram `1.0 * 1.0` = 1.0 m^2. Axis check
   PASS for both boxes (the wired +Y-on-wind mapping gives the smallest face-sum
   `Sigma Cd_i*A_i`). Table lookups finite at window-mean conditions.
-- **Smoke arc, explicitly not evidence:** 0.5 d, drag-off and Cd = 2.3 only, on
-  window 1, both legs -- proves driver, reader, RIC read and output shape end to
-  end in ~2 min.
+- **Smoke arc, explicitly not evidence:** drag-off and Cd = 2.3 only, on window 1,
+  both legs -- proves driver, reader, RIC read and output shape end to end in
+  ~2 min. Run at **1.0 d, not the 0.5 d first written here** (2026-08-21): a
+  half-day arc cannot produce a single per-day row, so it would leave the day
+  slice, the RIC read and the day table -- the output shape this run exists to
+  prove -- unexercised.
 - The Swarm reader's checks above.
 - `run_all.py --list` shows the 20 groups plus the summary, and the aliases
   expand.
 
 **Checklist**
-- [ ] Swarm gate resolved (format inspected, or Part B dropped and recorded)
-- [ ] `run_drag_window.py` + smoke arc
-- [ ] `swarm/` leg, reader checks, smoke arc
-- [ ] `summarize_drag.py`, `run_all.py` groups + aliases, README
+- [X] Swarm gate resolved (format inspected, or Part B dropped and recorded)
+- [X] `run_drag_window.py` + smoke arc
+- [X] `swarm/` leg, reader checks, smoke arc
+- [X] `summarize_drag.py`, `run_all.py` groups + aliases, README
 
 ### Chunks 4-13 -- one window each, in table order
 
@@ -706,7 +720,9 @@ smoke arc.
 - `gracefo/catalog_tles.py` -- the pulled two-line sets keyed by window, with
   epoch and staleness. Frozen literals; no runtime network (reproducibility rule).
 - `gracefo/run_tle_window.py` -- `<window>` positional, `--data-root`,
-  `--only-config`, `--parse-only`, `--emit-fixture` for Deliverable 4.
+  `--parse-only`, `--emit-fixture` for Deliverable 4. **`--only-config`
+  dropped** (2026-08-21, maintainer), as in Chunk 3 -- a TLE window is 5-10 min,
+  so a partial-config resume saves even less here than it does there.
 - `summarize_tle.py` -> `results_tle_summary.txt` -- JVM-free text parse of the
   committed per-window files; runs against partial evidence and prints `N/10`.
 
