@@ -113,7 +113,9 @@ def _expand(names: list[str]) -> list[str]:
 # Wall-clock timing text masked before any diff (everything else in the evidence
 # is deterministic given the same code, truth files, and orekit-data).
 _TIME_PATTERNS = [
-    (re.compile(r"\b\d+(?:\.\d+)? s wall\b"), "<T> s wall"),
+    # Leading run of spaces is collapsed with the number: drag_common.py prints
+    # this field right-aligned, so the padding carries the digit count too.
+    (re.compile(r"( ?) *\b\d+(?:\.\d+)? s wall\b"), r"\1<T> s wall"),
     (re.compile(r"wall time: \d+(?:\.\d+)? s"), "wall time: <T> s"),
 ]
 

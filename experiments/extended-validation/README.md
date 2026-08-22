@@ -223,7 +223,7 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 |---|---|---|---|
 | 0 — maneuver screening | `screen` | `gracefo/results_screen.txt` | **10/10 windows CLEAN on C**, both gates. Two carry a real burn on D (`intense_2024_11`, `storm_2025_05`) and are kept — see the failure rule above. |
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
-| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | pending | — |
+| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **1/10 windows.** Window 1 (low) reproduces the frozen quiet pattern on GRACE-FO C, box table included: it loses where drag is weak, which is the predicted sign and not an inversion. |
 | 3 — TLE fitting | `tle_01..10`, `tle_summary` | pending | — |
 
 ### Part 2 — drag propagations, per window
@@ -235,9 +235,13 @@ requirement, so no row below is scored and no driver flags a verdict. What
 warrants a bug search is an *inversion*: a table run losing badly where drag is
 strong.
 
+Each cell carries the **day-1** removed fraction of the drag-off signal for
+`Cd = 2.3` / sphere table / box table, then the in-arc fitted Cd with its
+convention-free `B = Cd·A/m`. Full per-day tables are in the per-window files.
+
 | # | window | band | GRACE-FO C | Swarm A/B |
 |---|---|---|---|---|
-| 1 | `low_2019_12` | low | pending | pending |
+| 1 | `low_2019_12` | low | **82 / 49 / −36 %**; Cd 1.797, B 3.00e−3 | A **70 / 39 / −71 %**, Cd 1.737, B 4.15e−3<br>B **62 / 23 / −105 %**, Cd 1.597, B 3.81e−3 |
 | 2 | `low_2021_04` | low | pending | pending |
 | 3 | `low_2021_06` | low | pending | pending |
 | 4 | `moderate_2022_04` | moderate | pending | pending |
@@ -258,7 +262,13 @@ be read against it.
 The **Swarm leg rests on estimated mass and geometry**, and its only maneuver
 gate is the degree-5 polynomial that missed both known-real burns in Chunk 2.
 Both limits are recorded on every Swarm row rather than worked around; see
-`swarm/README.md`.
+`swarm/README.md`. A and B are not a twin pair (435 km against 503 km), so the
+gap between their figures is an altitude difference before it is a body one.
+Swarm rows share the GRACE-FO t0 unless the row says otherwise.
+
+Window 1 tracks the frozen quiet row (86 / 53 / −24 %) on GRACE-FO C, box table
+included: a table losing where drag is weak is the predicted sign, not the
+inversion that would warrant a bug search.
 
 ### Part 1 — table noise, GRACE-FO C/D over the three inherited windows
 

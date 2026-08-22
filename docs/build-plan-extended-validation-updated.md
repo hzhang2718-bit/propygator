@@ -557,9 +557,9 @@ read into the summary.
 First full run of the apparatus: read the output shape critically here, before
 the other nine inherit it.
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
 ### **Chunk 5: window 2 -- `low_2021_04`** (low, t0 2021-04-15, ceiling 5.0)
 

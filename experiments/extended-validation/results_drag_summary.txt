@@ -1,0 +1,71 @@
+==============================================================================
+Extended validation -- Part 2 drag propagations, cross-window summary
+==============================================================================
+  A text parse of the committed per-window files. Part 2 has NO benchmark, so nothing here is scored and no verdict column exists.
+  Every RMS is a PER-DAY value: day N is the RMS over [N-1 d, N d] alone, never accumulated from t0.
+
+==============================================================================
+[gracefo]  1/10 windows
+==============================================================================
+  3D RMS (m) by configuration and day
+  window            band      sat  config                   day 1       day 3       day 7
+  low_2019_12       low       C    drag off                  47.1       648.0      4163.5
+  low_2019_12       low       C    Cd = 2.3                   8.6       155.2      1165.8
+  low_2019_12       low       C    Cd fit (in-arc)            3.8        21.5         9.2
+  low_2019_12       low       C    sphere table              24.2       380.1      2655.1
+  low_2019_12       low       C    box table                 64.1       954.6      6457.0
+
+  removed fraction of the drag-off signal (%), per day -- context only, no verdict
+  window            band      sat  config                   day 1       day 3       day 7
+  low_2019_12       low       C    Cd = 2.3                   82%         76%         72%
+  low_2019_12       low       C    sphere table               49%         41%         36%
+  low_2019_12       low       C    box table                 -36%        -47%        -55%
+
+  fitted Cd, with the convention-free B = Cd*A/m beside it
+  window            sat          Cd      B (m^2/kg)   mass (kg)   ceiling
+  low_2019_12       C        1.7973    2.997516e-03     600.409       5.0
+
+==============================================================================
+[swarm]  1/10 windows
+==============================================================================
+  3D RMS (m) by configuration and day
+  window            band      sat  config                   day 1       day 3       day 7
+  low_2019_12       low       A    drag off                 160.7      2270.2     14597.4
+  low_2019_12       low       A    Cd = 2.3                  48.4       669.4      4738.1
+  low_2019_12       low       A    Cd fit (in-arc)            3.4        51.2        16.7
+  low_2019_12       low       A    sphere table              98.3      1370.1      9344.2
+  low_2019_12       low       A    box table                274.5      3839.3     25550.1
+  low_2019_12       low       B    drag off                  49.1       687.7      4383.2
+  low_2019_12       low       B    Cd = 2.3                  18.6       272.9      1944.7
+  low_2019_12       low       B    Cd fit (in-arc)            2.9        22.6        20.8
+  low_2019_12       low       B    sphere table              37.9       548.8      3761.3
+  low_2019_12       low       B    box table                100.7      1422.3      9483.6
+
+  removed fraction of the drag-off signal (%), per day -- context only, no verdict
+  window            band      sat  config                   day 1       day 3       day 7
+  low_2019_12       low       A    Cd = 2.3                   70%         71%         68%
+  low_2019_12       low       A    sphere table               39%         40%         36%
+  low_2019_12       low       A    box table                 -71%        -69%        -75%
+  low_2019_12       low       B    Cd = 2.3                   62%         60%         56%
+  low_2019_12       low       B    sphere table               23%         20%         14%
+  low_2019_12       low       B    box table                -105%       -107%       -116%
+
+  fitted Cd, with the convention-free B = Cd*A/m beside it
+  window            sat          Cd      B (m^2/kg)   mass (kg)   ceiling
+  low_2019_12       A        1.7373    4.146196e-03     419.000       5.0
+  low_2019_12       B        1.5966    3.810545e-03     419.000       5.0
+
+  degree-5 maneuver screen -- the ONLY gate on this leg, and a CLEAN is weak evidence rather than a quiet window
+  window            sat      signal (m)   departure (m)      call
+  low_2019_12       A            7107.2            21.4     CLEAN
+  low_2019_12       B            2959.7            32.4     CLEAN
+
+==============================================================================
+[context]  the frozen v0.7.2 removed-fraction reading, for comparison
+==============================================================================
+  removed                quiet    active     storm
+  Cd = 2.3                 86%       67%       56%
+  sphere table             53%       80%       63%
+  box table               -24%       79%       96%
+  Those figures were built from 1-day results, so it is the DAY-1 column above that compares to them. Day 1 is identical under both RMS conventions, which is what makes the comparison survive the per-day rule exactly; reading day 3 or day 7 against them would not be like-for-like.
+  The contract expects a bounded loss where drag is weak alongside a large gain where drag is strong. An INVERSION -- a table run losing badly where drag is strong -- is what warrants a bug search, and is written into the findings as what it is.

@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Build preferences
+
+### Evidence and Claims
+- Every number in a README, contract, or analysis doc must be traceable to a committed artifact or logged run. Never carry numbers from a scratchpad probe into a document.
+- Do not state a quantitative claim (window counts, noise floors, arc lengths, runtimes) without measuring it first — measure the file seams, run the check, read the log.
+- Frozen evidence (e.g., v0.7.2 outputs) is NEVER recomputed with revised parameters. Flag the conflict instead.
+- Committed evidence from earlier builds should be changed with care to avoid regression. Flag instead of changing silently.
+
+### Scope Discipline
+- Plan-first: when I ask for a plan, contract, or build-plan section, produce ONLY the document. Do not begin implementing parser/pipeline code until I explicitly approve the plan. Stop and report if you want to expand beyond an approved build list.
+- Never expand beyond the agreed scope mid-execution. If you discover an adjacent defect, finish the scoped edits, STOP, and report it as a separate proposal rather than fixing it silently.
+- Prefer the smallest change that satisfies the requirement; if a fix balloons (e.g., rewriting a decoder), present option A (minimal) vs option B (full) and wait.
+
+### Documentation Style
+- Annotations and inline notes in contracts/build plans are ONE SENTENCE. Avoid multi-paragraph justifications inside doc edits.
+- Contract additions are terse; rationale goes in chat, not in the document.
+
 ## Project state
 
 **propygator** is a Python library for orbital simulation and satellite tracking, built on [Orekit](https://www.orekit.org/) via the `orekit_jpype` wrapper. Installable, JVM-free on import, **1102 tests pass**. Current version **`v0.8.0`** (2026-07-26). All five architecture §12 features are shipped — v1 is feature-complete and fully released, and every post-v1 follow-on is closed.
