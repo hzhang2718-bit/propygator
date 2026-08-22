@@ -573,7 +573,7 @@ the other nine inherit it.
 - [X] Swarm A/B
 - [X] read + summary row
 
-### **Chunk 7: window 4 -- `moderate_2022_04`** (moderate, t0 2022-04-29, ceiling 5.0)
+### **Chunk 7: window 4 -- `moderate_2022_04`** (moderate, t0 2022-04-29, ceiling 5.0) - Done
 
 The one window whose t0 moved for the 14-day extension (slid -1 d; see "The
 13 -> 14 day extension" above). Its span is otherwise the drawn one.
@@ -582,7 +582,7 @@ The one window whose t0 moved for the 14-day extension (slid -1 d; see "The
 - [X] Swarm A/B
 - [X] read + summary row
 
-### **Chunk 8: window 5 -- `intense_2024_06`** (intense, t0 2024-06-14, ceiling 5.0)
+### **Chunk 8: window 5 -- `intense_2024_06`** (intense, t0 2024-06-14, ceiling 5.0) - Done
 
 Intense exists only in 2024, so this row and Chunk 10's are confounded with
 mission epoch and altitude. Record it on the row rather than in the findings
@@ -592,36 +592,36 @@ alone.
 - [X] Swarm A/B
 - [X] read + summary row
 
-### **Chunk 9: window 6 -- `storm_2024_08`** (storm, t0 2024-08-11, ceiling 8.0)
+### **Chunk 9: window 6 -- `storm_2024_08`** (storm, t0 2024-08-11, ceiling 8.0) - Done
 
 Ap 127 on day 1. The first window where the 7-day in-arc fit is a compromise
 across storm and non-storm portions, so expect a poor fit residual and a Cd
 sitting between the two -- the contract already flags that storms defeat a
 scalar Cd. Read the coarse scan here.
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
-### **Chunk 10: window 7 -- `intense_2024_11`** (intense, t0 2024-11-23, ceiling 5.0)
+### **Chunk 10: window 7 -- `intense_2024_11`** (intense, t0 2024-11-23, ceiling 5.0) - Done
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
-### **Chunk 11: window 8 -- `storm_2025_05`** (storm, t0 2025-05-26, ceiling 8.0)
+### **Chunk 11: window 8 -- `storm_2025_05`** (storm, t0 2025-05-26, ceiling 8.0) - Done
 
 Storm across days 3-8, i.e. inside Part 2's arc and across its end.
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
-### **Chunk 12: window 9 -- `moderate_2025_07`** (moderate, t0 2025-07-23, ceiling 5.0)
+### **Chunk 12: window 9 -- `moderate_2025_07`** (moderate, t0 2025-07-23, ceiling 5.0) - Done
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
 ### **Chunk 13: window 10 -- `storm_2026_01`** (storm, t0 2026-01-13, ceiling 8.0)
 
@@ -629,9 +629,9 @@ Onset sits at day 6, so Part 2's arc is entirely pre-onset -- the drag runs here
 are the clean-arc counterpart to Part 3's mandated fit-right-before-onset case.
 Closes `results_drag_summary.txt` at 10/10.
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
 ## Part 3: TLE fitting validation
 

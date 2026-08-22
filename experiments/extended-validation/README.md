@@ -223,7 +223,7 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 |---|---|---|---|
 | 0 — maneuver screening | `screen` | `gracefo/results_screen.txt` | **10/10 windows CLEAN on C**, both gates. Two carry a real burn on D (`intense_2024_11`, `storm_2025_05`) and are kept — see the failure rule above. |
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
-| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **5/10 windows.** In low solar activity windows, sphere Cd tends to perform slightly worse than the reference Cd - 2.3. Box table tends to be about as bad as drag off. This is in line with v0.7.2 patterns, and the tables generally do worse with Swarm. In higher solar activity windows, the tables generally perform better, with the sphere table taking the lead.|
+| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **10 windows**, GRACE-FO and Swarm A, B. In low solar activity windows, sphere Cd tends to perform significantly worse than the reference Cd = 2.3. In higher solar activity windows, the tables generally perform better, with the sphere table taking the lead. The box table is one of the worst performers across the board. It is often worse than no drag for quiet windows, and it is rarely as good as the sphere table for active windows. In the few cases where the box table beats the sphere table, the win is small. The exception is window 4, where the box table performed surprisingly well. Overall, the Swarm A propagations feature significantly larger absolute errors, but the percent of errors absorbed by the drag tables tend to be similar across GRACE-FO and Swarm for Cd = 2.3 and sphere Cd. |
 | 3 — TLE fitting | `tle_01..10`, `tle_summary` | pending | — |
 
 ### Part 2 — drag propagations, per window
@@ -242,15 +242,15 @@ convention-free `B = Cd·A/m`. Full per-day tables are in the per-window files.
 | # | window | band | GRACE-FO C | Swarm A/B |
 |---|---|---|---|---|
 | 1 | `low_2019_12` | low | **82 / 49 / −36 %**; Cd 1.797, B 3.00e−3 | A **70 / 39 / −71 %**, Cd 1.737, B 4.15e−3<br>B **62 / 23 / −105 %**, Cd 1.597, B 3.81e−3 |
-| 2 | `low_2021_04` | low | **87 / 56 / -25 %**; Cd 2.500, B 4.17e-3 | A **80 / 53 / -45 %**, Cd 2.390, B 5.70e-3<br>B **87 / 55 / -51 %**, Cd 2.498, B 5.96e-3 |
-| 3 | `low_2021_06` | low | **74 / 94 / 50 %**; Cd 2.661, B 4.44e-3 | A **81 / 99 / 34 %**, Cd 2.389, B 5.70e-3<br>B **81 / 95 / 19 %**, Cd 2.328, B 5.56e-3 |
-| 4 | `moderate_2022_04` | moderate | **57 / 69 / 92 %**; Cd 3.610, B 6.03e-3 | A **65 / 73 / 73 %**, Cd 1.501 **RAILED**, B 3.58e-3<br>B **59 / 72 / 77 %**, Cd 3.464 B 8.27e-3 |
-| 5 | `intense_2024_06` | intense | **90 / 96 / 36 %**; Cd 2.460, B 4.13e-3 | A **87 / 99 / 26 %**, Cd 2.565, B 6.12e-3<br>B **96 / 85 / 1 %**, Cd 2.312 B 5.52e-3|
-| 6 | `storm_2024_08` | storm | pending | pending |
-| 7 | `intense_2024_11` | intense | pending | pending |
-| 8 | `storm_2025_05` | storm | pending | pending |
-| 9 | `moderate_2025_07` | moderate | pending | pending |
-| 10 | `storm_2026_01` | storm | pending | pending |
+| 2 | `low_2021_04` | low | **87 / 56 / −25 %**; Cd 2.500, B 4.17e−3 | A **80 / 53 / −45 %**, Cd 2.390, B 5.70e−3<br>B **87 / 55 / −51 %**, Cd 2.498, B 5.96e−3 |
+| 3 | `low_2021_06` | low | **74 / 94 / 50 %**; Cd 2.661, B 4.44e−3 | A **81 / 99 / 34 %**, Cd 2.389, B 5.70e−3<br>B **81 / 95 / 19 %**, Cd 2.328, B 5.56e−3 |
+| 4 | `moderate_2022_04` | moderate | **57 / 69 / 92 %**; Cd 3.610, B 6.03e−3 | A **65 / 73 / 73 %**, Cd 1.501 **RAILED**, B 3.58e−3<br>B **59 / 72 / 77 %**, Cd 3.464, B 8.27e−3 |
+| 5 | `intense_2024_06` | intense | **90 / 96 / 36 %**; Cd 2.460, B 4.13e−3 | A **87 / 99 / 26 %**, Cd 2.565, B 6.12e−3<br>B **96 / 85 / 1 %**, Cd 2.312, B 5.52e−3 |
+| 6 | `storm_2024_08` | storm | **83 / 92 / 52 %**; Cd 2.991, B 5.02e−3 | A **77 / 84 / 48 %**, Cd 3.220, B 7.68e−3<br>B **80 / 90 / 39 %**, Cd 3.076, B 7.34e−3 |
+| 7 | `intense_2024_11` | intense | **78 / 88 / 59 %**; Cd 2.865, B 4.81e−3 | A **74 / 82 / 54 %**, Cd 3.025, B 7.22e−3<br>B **80 / 92 / 39 %**, Cd 2.804, B 6.69e−3 |
+| 8 | `storm_2025_05` | storm | **78 / 91 / 57 %**; Cd 2.992, B 5.03e−3 | A **77 / 90 / 46 %**, Cd 3.064, B 7.31e−3<br>B **81 / 98 / 33 %**, Cd 2.857, B 6.82e−3 |
+| 9 | `moderate_2025_07` | moderate | **65 / 77 / 80 %**; Cd 3.289, B 5.53e−3 | A **61 / 70 / 79 %**, Cd 3.532, B 8.43e−3<br>B **63 / 76 / 70 %**, Cd 3.338, B 7.97e−3 |
+| 10 | `storm_2026_01` | storm | **88 / 94 / 35 %**; Cd 2.308, B 3.88e−3 | A **83 / 96 / 35 %**, Cd 2.524, B 6.02e−3<br>B **90 / 91 / 14 %**, Cd 2.262, B 5.40e−3 |
 
 **Every RMS is per-day**: day N is the RMS over [N−1 d, N d] alone, never
 accumulated from t0. A 0–N d window is dominated by its early, still
@@ -262,28 +262,34 @@ be read against it.
 **Swarm burns and railed Cd**: during window 4, Swarm A almost certainly
 experienced a burn. This caused its 7-day fitted Cd to be impacted and railed
 against the Cd = 1.5 threshold. This fitted Cd is an artifact and should not
-be taken literally. This burn is not marked by the deg 5 polynomial screen for
-review, although the abnormally large signal value and the 6.5% departure indicate
-that something is not right. Subsequently, all Swarm windows are screened with
-a vis-viva energy probe in probes/. Only Swarm A in window 4 registered for a burn
-with that screen, and the results sit in probes/ as well. As an aside, the deg 5
-polynomial screen incorrectly flagged Swarm B in window 3.
+be taken literally. This burn is not marked by the degree-5 polynomial screen
+for review, although the abnormally large signal value and the 6.5 % departure
+indicate that something is not right. Subsequently, all Swarm windows are
+screened with a vis-viva energy probe in `swarm/probes/`. Only Swarm A in
+window 4 registered for a burn with that screen, and the results sit in
+`swarm/probes/` as well. As an aside, the degree-5 polynomial screen
+incorrectly flagged Swarm B in windows 3 and 10.
 
 The **Swarm leg rests on estimated mass and geometry**, and its only maneuver
 gate is the degree-5 polynomial that missed both known-real burns in Chunk 2.
 Both limits are recorded on every Swarm row rather than worked around; see
-`swarm/README.md`. A and B are not a twin pair (435 km against 503 km), so the
+`swarm/README.md`. A and B are not a twin pair (424–470 km against 486–507 km
+over the ten windows), so the
 gap between their figures is an altitude difference before it is a body one.
 Swarm rows share the GRACE-FO t0 unless the row says otherwise.
 
-In the low activity windows 1-3, the standard Cd = 2.3 performed very well, while
+In the low activity windows 1–3, the standard Cd = 2.3 performed very well, while
 the sphere table gives generally acceptable results. The box table loses badly
-in all weak drag windows, which was expected. Window 3, which had slightly higher
+in windows 1 and 2, which was expected. Window 3, which had slightly higher
 activity, appears to favor the tables more than the other windows.
 
-In the higher activity windows 4-5, the sphere table generally dominates over
+In the higher activity windows 4–10, the sphere table generally dominates over
 the standard Cd and the box table. The box table does perform better than no drag
-in these windows, with a surprisingly good performance in window 4.
+in these windows, but it rarely does as well as the sphere table. Absolute errors
+tend to be greater with the Swarm A. Band label is not drag magnitude: the day-1
+drag-off signal on C tracks F10.7, so `storm_2025_05` (704 m) and `storm_2026_01`
+(545 m) sit below both intense windows (872 m and 1643 m), and only
+`storm_2024_08`, the set's highest F10.7 at 242.5, is the largest.
 
 ### Part 1 — table noise, GRACE-FO C/D over the three inherited windows
 
