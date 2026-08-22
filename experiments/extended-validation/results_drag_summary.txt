@@ -5,7 +5,7 @@ Extended validation -- Part 2 drag propagations, cross-window summary
   Every RMS is a PER-DAY value: day N is the RMS over [N-1 d, N d] alone, never accumulated from t0.
 
 ==============================================================================
-[gracefo]  1/10 windows
+[gracefo]  5/10 windows
 ==============================================================================
   3D RMS (m) by configuration and day
   window            band      sat  config                   day 1       day 3       day 7
@@ -14,19 +14,55 @@ Extended validation -- Part 2 drag propagations, cross-window summary
   low_2019_12       low       C    Cd fit (in-arc)            3.8        21.5         9.2
   low_2019_12       low       C    sphere table              24.2       380.1      2655.1
   low_2019_12       low       C    box table                 64.1       954.6      6457.0
+  low_2021_04       low       C    drag off                  77.2      1236.5     10034.2
+  low_2021_04       low       C    Cd = 2.3                  10.1        95.5       956.3
+  low_2021_04       low       C    Cd fit (in-arc)           17.7       207.4       170.1
+  low_2021_04       low       C    sphere table              34.0       453.5      1527.3
+  low_2021_04       low       C    box table                 96.1      1396.9      7968.1
+  low_2021_06       low       C    drag off                  77.0      1041.0      6129.9
+  low_2021_06       low       C    Cd = 2.3                  20.4       186.1       810.1
+  low_2021_06       low       C    Cd fit (in-arc)           11.5        52.9        28.9
+  low_2021_06       low       C    sphere table               4.5        56.9       694.0
+  low_2021_06       low       C    box table                 38.6       685.4      4611.8
+  moderate_2022_04  moderate  C    drag off                 631.1      8540.7     46756.7
+  moderate_2022_04  moderate  C    Cd = 2.3                 271.2      3395.4     16673.9
+  moderate_2022_04  moderate  C    Cd fit (in-arc)           66.2       468.3       487.3
+  moderate_2022_04  moderate  C    sphere table             196.7      2323.5     10215.1
+  moderate_2022_04  moderate  C    box table                 48.3      1167.2     10209.3
+  intense_2024_06   intense   C    drag off                 871.7     13094.0     83759.8
+  intense_2024_06   intense   C    Cd = 2.3                  84.3      1275.7      4741.0
+  intense_2024_06   intense   C    Cd fit (in-arc)           30.1       455.4       819.7
+  intense_2024_06   intense   C    sphere table              32.6       445.4      6729.7
+  intense_2024_06   intense   C    box table                561.8      8391.1     59892.3
 
   removed fraction of the drag-off signal (%), per day -- context only, no verdict
   window            band      sat  config                   day 1       day 3       day 7
   low_2019_12       low       C    Cd = 2.3                   82%         76%         72%
   low_2019_12       low       C    sphere table               49%         41%         36%
   low_2019_12       low       C    box table                 -36%        -47%        -55%
+  low_2021_04       low       C    Cd = 2.3                   87%         92%         90%
+  low_2021_04       low       C    sphere table               56%         63%         85%
+  low_2021_04       low       C    box table                 -25%        -13%         21%
+  low_2021_06       low       C    Cd = 2.3                   74%         82%         87%
+  low_2021_06       low       C    sphere table               94%         95%         89%
+  low_2021_06       low       C    box table                  50%         34%         25%
+  moderate_2022_04  moderate  C    Cd = 2.3                   57%         60%         64%
+  moderate_2022_04  moderate  C    sphere table               69%         73%         78%
+  moderate_2022_04  moderate  C    box table                  92%         86%         78%
+  intense_2024_06   intense   C    Cd = 2.3                   90%         90%         94%
+  intense_2024_06   intense   C    sphere table               96%         97%         92%
+  intense_2024_06   intense   C    box table                  36%         36%         28%
 
   fitted Cd, with the convention-free B = Cd*A/m beside it
   window            sat          Cd      B (m^2/kg)   mass (kg)   ceiling
   low_2019_12       C        1.7973    2.997516e-03     600.409       5.0
+  low_2021_04       C        2.5003    4.173917e-03     599.846       5.0
+  low_2021_06       C        2.6605    4.441947e-03     599.765       5.0
+  moderate_2022_04  C        3.6096    6.033762e-03     599.033       5.0
+  intense_2024_06   C        2.4596    4.130102e-03     596.339       5.0
 
 ==============================================================================
-[swarm]  1/10 windows
+[swarm]  5/10 windows
 ==============================================================================
   3D RMS (m) by configuration and day
   window            band      sat  config                   day 1       day 3       day 7
@@ -40,6 +76,46 @@ Extended validation -- Part 2 drag propagations, cross-window summary
   low_2019_12       low       B    Cd fit (in-arc)            2.9        22.6        20.8
   low_2019_12       low       B    sphere table              37.9       548.8      3761.3
   low_2019_12       low       B    box table                100.7      1422.3      9483.6
+  low_2021_04       low       A    drag off                 342.9      5600.8     45177.7
+  low_2021_04       low       A    Cd = 2.3                  68.3       724.9      2446.2
+  low_2021_04       low       A    Cd fit (in-arc)           84.0       965.6       790.4
+  low_2021_04       low       A    sphere table             160.0      2111.5      7019.4
+  low_2021_04       low       A    box table                498.4      7273.2     42011.9
+  low_2021_04       low       B    drag off                  91.5      1484.8     12110.5
+  low_2021_04       low       B    Cd = 2.3                  12.3       128.3      1150.4
+  low_2021_04       low       B    Cd fit (in-arc)           21.1       261.8       215.1
+  low_2021_04       low       B    sphere table              41.6       575.2      1941.6
+  low_2021_04       low       B    box table                138.0      2041.3     11911.2
+  low_2021_06       low       A    drag off                 318.4      4379.3     25788.5
+  low_2021_06       low       A    Cd = 2.3                  60.6       455.9       750.2
+  low_2021_06       low       A    Cd fit (in-arc)           51.1       306.7       218.4
+  low_2021_06       low       A    sphere table               2.6       464.6      5083.3
+  low_2021_06       low       A    box table                211.7      3686.5     25646.7
+  low_2021_06       low       B    drag off                  87.0      1161.4      6808.1
+  low_2021_06       low       B    Cd = 2.3                  16.5        95.6        32.0
+  low_2021_06       low       B    Cd fit (in-arc)           15.4        81.8        61.0
+  low_2021_06       low       B    sphere table               4.7       214.5      1930.8
+  low_2021_06       low       B    box table                 70.3      1207.0      8225.7
+  moderate_2022_04  moderate  A    drag off                2653.9     36270.5    540919.4
+  moderate_2022_04  moderate  A    Cd = 2.3                 935.3     11909.6    685660.5
+  moderate_2022_04  moderate  A    Cd fit (in-arc)         1532.5     20377.1    635319.5
+  moderate_2022_04  moderate  A    sphere table             714.0      8730.2    705449.4
+  moderate_2022_04  moderate  A    box table                703.8     11357.9    824711.3
+  moderate_2022_04  moderate  B    drag off                 751.1     10190.3     56124.2
+  moderate_2022_04  moderate  B    Cd = 2.3                 305.9      3795.5     18497.2
+  moderate_2022_04  moderate  B    Cd fit (in-arc)           80.6       561.3       591.9
+  moderate_2022_04  moderate  B    sphere table             212.9      2451.9     10386.8
+  moderate_2022_04  moderate  B    box table                171.4      3056.0     22040.9
+  intense_2024_06   intense   A    drag off                1360.2     20811.7    135033.3
+  intense_2024_06   intense   A    Cd = 2.3                 176.7      2745.3     12958.3
+  intense_2024_06   intense   A    Cd fit (in-arc)           41.9       664.3      1219.3
+  intense_2024_06   intense   A    sphere table              14.1       198.1      4056.3
+  intense_2024_06   intense   A    box table               1007.7     15269.7    108751.5
+  intense_2024_06   intense   B    drag off                 651.7      9944.9     64374.2
+  intense_2024_06   intense   B    Cd = 2.3                  23.1       369.3       344.7
+  intense_2024_06   intense   B    Cd fit (in-arc)           20.0       321.1       619.7
+  intense_2024_06   intense   B    sphere table              98.2      1436.3     12310.1
+  intense_2024_06   intense   B    box table                642.4      9711.4     68172.5
 
   removed fraction of the drag-off signal (%), per day -- context only, no verdict
   window            band      sat  config                   day 1       day 3       day 7
@@ -49,16 +125,56 @@ Extended validation -- Part 2 drag propagations, cross-window summary
   low_2019_12       low       B    Cd = 2.3                   62%         60%         56%
   low_2019_12       low       B    sphere table               23%         20%         14%
   low_2019_12       low       B    box table                -105%       -107%       -116%
+  low_2021_04       low       A    Cd = 2.3                   80%         87%         95%
+  low_2021_04       low       A    sphere table               53%         62%         84%
+  low_2021_04       low       A    box table                 -45%        -30%          7%
+  low_2021_04       low       B    Cd = 2.3                   87%         91%         91%
+  low_2021_04       low       B    sphere table               55%         61%         84%
+  low_2021_04       low       B    box table                 -51%        -37%          2%
+  low_2021_06       low       A    Cd = 2.3                   81%         90%         97%
+  low_2021_06       low       A    sphere table               99%         89%         80%
+  low_2021_06       low       A    box table                  34%         16%          1%
+  low_2021_06       low       B    Cd = 2.3                   81%         92%        100%
+  low_2021_06       low       B    sphere table               95%         82%         72%
+  low_2021_06       low       B    box table                  19%         -4%        -21%
+  moderate_2022_04  moderate  A    Cd = 2.3                   65%         67%        -27%
+  moderate_2022_04  moderate  A    sphere table               73%         76%        -30%
+  moderate_2022_04  moderate  A    box table                  73%         69%        -52%
+  moderate_2022_04  moderate  B    Cd = 2.3                   59%         63%         67%
+  moderate_2022_04  moderate  B    sphere table               72%         76%         81%
+  moderate_2022_04  moderate  B    box table                  77%         70%         61%
+  intense_2024_06   intense   A    Cd = 2.3                   87%         87%         90%
+  intense_2024_06   intense   A    sphere table               99%         99%         97%
+  intense_2024_06   intense   A    box table                  26%         27%         19%
+  intense_2024_06   intense   B    Cd = 2.3                   96%         96%         99%
+  intense_2024_06   intense   B    sphere table               85%         86%         81%
+  intense_2024_06   intense   B    box table                   1%          2%         -6%
 
   fitted Cd, with the convention-free B = Cd*A/m beside it
   window            sat          Cd      B (m^2/kg)   mass (kg)   ceiling
   low_2019_12       A        1.7373    4.146196e-03     419.000       5.0
   low_2019_12       B        1.5966    3.810545e-03     419.000       5.0
+  low_2021_04       A        2.3901    5.704378e-03     419.000       5.0
+  low_2021_04       B        2.4976    5.960792e-03     419.000       5.0
+  low_2021_06       A        2.3893    5.702337e-03     419.000       5.0
+  low_2021_06       B        2.3283    5.556835e-03     419.000       5.0
+  moderate_2022_04  A        1.5009    3.582114e-03     419.000       5.0
+  moderate_2022_04  B        3.4643    8.267981e-03     419.000       5.0
+  intense_2024_06   A        2.5648    6.121306e-03     419.000       5.0
+  intense_2024_06   B        2.3116    5.516901e-03     419.000       5.0
 
   degree-5 maneuver screen -- the ONLY gate on this leg, and a CLEAN is weak evidence rather than a quiet window
   window            sat      signal (m)   departure (m)      call
   low_2019_12       A            7107.2            21.4     CLEAN
   low_2019_12       B            2959.7            32.4     CLEAN
+  low_2021_04       A            4540.0            96.7     CLEAN
+  low_2021_04       B            1986.5            49.5     CLEAN
+  low_2021_06       A            1070.0            48.1     CLEAN
+  low_2021_06       B             131.0            39.1    REVIEW
+  moderate_2022_04  A         1135341.3         73403.4     CLEAN
+  moderate_2022_04  B           25722.7            72.0     CLEAN
+  intense_2024_06   A           16277.8            89.0     CLEAN
+  intense_2024_06   B            2139.3            35.6     CLEAN
 
 ==============================================================================
 [context]  the frozen v0.7.2 removed-fraction reading, for comparison

@@ -1,0 +1,53 @@
+==============================================================================
+Extended validation -- Swarm energy-step maneuver probe
+==============================================================================
+[versions] propygator 0.8.0, numpy 2.4.6
+[what]  one-revolution-mean semi-major axis from the delivered SP3 truth.
+  Drag removes energy monotonically, so a STEP is a maneuver, a data
+  defect, or nothing -- it is the one thing drag cannot produce.
+[why]   the degree-5 polynomial is this leg's only gate, and it
+  normalizes by the peak along-track signal, so a maneuver big enough
+  to inflate that signal hides inside its own denominator.
+[limits]  ENERGY only -- a pure cross-track or inclination burn is
+  invisible here, and a bad POD day could mimic a step. This does not
+  replace the polynomial, which catches safe-mode and attitude events.
+[detection]  robust |z| > 20 on the one-revolution change in
+  the smoothed a, median/MAD scale. Pre-registered, NOT tuned: clean
+  windows top out near 4 sigma and the detection sits above 250, so any
+  cut from 10 to 100 gives the identical verdict.
+[scope]  the 8 loaded days of each frozen window, at the native
+  10 s grid -- exactly the span Part 2's drag rows rest on.
+[data root]  experiments/extended-validation/data/swarm
+------------------------------------------------------------------------------
+  win  window             sat   alt km  sigma m     worst m         z  verdict
+    1  low_2019_12        A      435.3     6.22       -23.5      -3.7  clean
+    1  low_2019_12        B      502.5     6.12       -22.4      -3.6  clean
+    2  low_2021_04        A      431.6     6.44       -24.2      -3.6  clean
+    2  low_2021_04        B      501.4     6.09       -22.6      -3.7  clean
+    3  low_2021_06        A      431.0     6.33       -23.8      -3.7  clean
+    3  low_2021_06        B      501.3     5.94       -22.5      -3.8  clean
+    4  moderate_2022_04   A      424.1     6.46     +1685.6    +261.7  STEP
+    4  moderate_2022_04   B      506.6     6.22       -23.1      -3.5  clean
+    5  intense_2024_06    A      469.9     6.22       -25.1      -3.6  clean
+    5  intense_2024_06    B      506.3     6.10       -23.3      -3.6  clean
+    6  storm_2024_08      A      466.4     6.15       -31.3      -4.0  clean
+    6  storm_2024_08      B      504.4     6.47       -25.3      -3.2  clean
+    7  intense_2024_11    A      456.6     6.27       -34.1      -4.3  clean
+    7  intense_2024_11    B      499.0     6.07       -25.5      -3.6  clean
+    8  storm_2025_05      A      441.3     6.14       -26.9      -3.8  clean
+    8  storm_2025_05      B      491.8     6.27       -24.1      -3.6  clean
+    9  moderate_2025_07   A      438.9     6.32       -26.4      -3.6  clean
+    9  moderate_2025_07   B      490.7     6.11       -23.4      -3.6  clean
+   10  storm_2026_01      A      425.9     6.97       -30.9      -3.8  clean
+   10  storm_2026_01      B      485.5     6.19       -27.8      -4.2  clean
+------------------------------------------------------------------------------
+[detection]  window 04 moderate_2022_04, Swarm A
+  step epoch        2022-05-03T05:12:49 TAI   (t0 + 4.2170 d)
+  one-rev-mean a    6796.365 km -> 6798.583 km   (da = +2217.9 m)
+  nodal period      5583.92 s -> 5586.73 s   (dT = +2.81 s)
+  implied dV        +1.250 m/s along-track, near-circular
+  thrust duration   ~1952 s (~0.35 rev) beyond the boxcar ramp -- extended or multi-burn
+
+[summary]  20 satellite-window(s) screened, 1 STEP, 0 skipped
+  worst clean deviation 4.3 sigma against the 20 cut
+  STEP: window 04 moderate_2022_04 Swarm A, da +2217.9 m at +261.7 sigma

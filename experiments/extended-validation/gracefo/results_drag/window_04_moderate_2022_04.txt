@@ -1,0 +1,146 @@
+==============================================================================
+Extended validation -- Part 2 drag: window 04 moderate_2022_04 (moderate)
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/extended-validation/data/gracefo
+[window] moderate_2022_04, band moderate, t0 2022-04-29, 14 days landed, 8 loaded, 7-day arc
+  note: slid -1 d from 2022-04-30 at the 13->14 day extension (F10.7 flatness 1.372 -> 1.220 against a 1.35 cap)
+[convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
+  A_ref = 1.0013468 m^2; box x 0.7588835 (height) x y 3.6100207 (length) x z 1.3195 (width) m, +Y held on the wind by InPlaneTracking(ecef)
+  identity 1, ram face H*W  = 1.00134678 m^2 vs A_ref 1.0013468 (rel 2.2e-08)
+  identity 2, sides 2L(H+W) = 15.0060149 m^2 vs Table 5 15.0060150 (rel 5.7e-09)
+  Cd fit: tol 0.002, objective = the FULL 7-day along-track RMS
+  every fitted Cd prints B = Cd*A/m beside it -- the only convention-free number, and the one that travels between studies
+[space weather]  window aggregates, re-read from CSSI at runtime
+  source: <orekit-data>/CSSI-Space-Weather-Data/SpaceWeather-All-v1.2.txt  (UPDATED 2026 May 10 15:40:00.00)
+  F10.7 120.2 (range 109-133), Ctr81 129.8, Ap max 15, ap3 max 32, Kp max 4.3
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 8 daily files
+  1 Hz records 691200 (QC-dropped 0); subsampled to 60 s -> 11520 epochs
+  seam gaps > 1.5 s: 0 (max gap 1.0 s)
+  span: 2022-04-29T00:00:19 -> 2022-05-06T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  read over the full 14-day window, not the 8 loaded, so this is the same mass the screen and Part 3 print
+  C: gas mean 29.1194 kg over 336 records (range 29.1097..29.1295) -> dry 569.914 + gas = 599.033 kg
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  re-computed here over all 14 days -- free, and it keeps this results file readable without results_screen.txt beside it
+  [screen tier-1 THR1B] sat C: CLEAN
+    6263 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 7142000 ms, last 7142000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[parser checks]
+  from_iso(to_iso()) == epoch for all 11520: True
+  grid uniformity: max |dt - 60 s| = 0.000e+00 s
+  |r0| = 6856.6 km (altitude ~ 478 km)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  |dr| = 1.122e-08 m, |dv| = 8.841e-12 m/s (bound 5e-08 m)
+[tables]  shipped a-priori tables at this window's conditions
+  arc-mean conditions over 169 samples: r 6871.2 km, rho 5.365e-13 kg/m^3 (min 1.482e-13, max 1.058e-12)
+  shipped tables there: sphere Cd 2.828 -> CdA 2.8317 m^2 on A_ref 1.0013468
+  box per-face Cd: ram 3.201 / side 0.080 / leeward 0.000 -> face-sum CdA 4.4035 m^2
+  [axis check]  Sigma Cd_i*A_i by which body face rides the wind:
+    +Y ram, the wired mapping :   4.403 m^2  <- must be smallest
+    +X ram (nadir/zenith face):  15.845 m^2  (wrong)
+    +Z ram (slant-side face)  :   9.690 m^2  (wrong)
+    wired mapping smallest: PASS
+[Cd fit]  golden section on the FULL 7-day along-track RMS (stderr trace)
+  coarse scan (7 evaluations over [1.50, 5.00])
+            Cd     along RMS (m)
+        1.5000         14500.261
+        2.0833         10494.432
+        2.6667          6486.843
+        3.2500          2495.751
+        3.8333          1587.470
+        4.4167          5568.286
+        5.0000          9574.843
+  fitted Cd = 3.60956 on A_ref = 1.0013468 m^2, B = Cd*A/m = 6.033762e-03 m^2/kg
+  23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (683 s wall)
+[runs]  5 propagations, 7-day arc from t0, output 60 s, high_precision
+    1: drag off                  20 s wall
+    2: drag on (Cd=2.3)          27 s wall
+    3: drag on (Cd fit)          27 s wall
+    4: sphere table              28 s wall
+    5: box table (IPT)           58 s wall
+[per-day]  propagated - truth, ITRF RIC RMS (m). Day N = [N-1 d, N d] ALONE, never accumulated from t0.
+  config                day      radial         along       cross            3D
+  1: drag off             1       11.31        631.02        0.14        631.13
+                          2       27.76       3406.57        0.42       3406.68
+                          3       39.22       8540.58        0.81       8540.67
+                          4       43.97      15606.25        1.09      15606.31
+                          5       43.42      24300.18        1.39      24300.22
+                          6       56.93      34659.77        1.70      34659.81
+                          7      105.74      46756.62        2.06      46756.74
+  2: drag on (Cd=2.3)     1        4.89        271.11        0.07        271.15
+                          2       11.69       1406.25        0.21       1406.30
+                          3       16.69       3395.31        0.43       3395.35
+                          4       20.77       5980.84        0.55       5980.88
+                          5       23.87       9039.22        0.61       9039.25
+                          6       27.74      12588.90        0.77      12588.93
+                          7       32.67      16673.86        0.82      16673.90
+  3: drag on (Cd fit)     1        1.52         66.21        0.06         66.23
+                          2        3.35        267.57        0.13        267.59
+                          3        4.69        468.24        0.23        468.26
+                          4        6.07        505.90        0.25        505.93
+                          5        7.49        365.19        0.27        365.27
+                          6        8.70        112.20        0.55        112.54
+                          7       10.42        487.17        0.56        487.28
+  4: sphere table         1        3.59        196.65        0.06        196.68
+                          2        8.35        991.50        0.17        991.54
+                          3       11.61       2323.48        0.36       2323.51
+                          4       14.42       3959.99        0.44       3960.01
+                          5       16.82       5806.67        0.47       5806.69
+                          6       19.90       7878.23        0.63       7878.26
+                          7       23.28      10215.04        0.64      10215.06
+  5: box table (IPT)      1        1.15         48.26        0.08         48.27
+                          2        3.91        366.09        0.13        366.11
+                          3        8.06       1167.18        0.11       1167.21
+                          4       12.75       2568.97        0.12       2569.01
+                          5       18.36       4548.11        0.36       4548.14
+                          6       25.02       7101.19        0.75       7101.23
+                          7       35.13      10209.28        0.90      10209.34
+[read]  the contract's horizons, days 1, 3, 7
+  drag signal: day-1 drag-off 3D RMS 631.1 m against the ~4 m/day conservative floor -> 158x
+  removed fraction of the drag-off signal, per day (no verdict column -- this part has no benchmark):
+    config                     day 1       day 3       day 7
+    2: drag on (Cd=2.3)          57%         60%         64%
+    4: sphere table              69%         73%         78%
+    5: box table (IPT)           92%         86%         78%
+  the day-1 column is what compares to the frozen v0.7.2 table (Cd=2.3 86/67/56 %, sphere 53/80/63 %, box -24/79/96 % for quiet/active/storm) -- day 1 is identical under both conventions, so that comparison survives the per-day rule exactly. Reading days 3 or 7 against it would not be like-for-like.
+[machine]  fixed-token rows for summarize_drag.py -- do not reformat
+  MROW gracefo moderate_2022_04 moderate C drag_off 1 11.3056 631.0245 0.1359 631.1258
+  MROW gracefo moderate_2022_04 moderate C drag_off 2 27.7577 3406.5708 0.4229 3406.6839
+  MROW gracefo moderate_2022_04 moderate C drag_off 3 39.2201 8540.5755 0.8139 8540.6656
+  MROW gracefo moderate_2022_04 moderate C drag_off 4 43.9652 15606.2512 1.0891 15606.3132
+  MROW gracefo moderate_2022_04 moderate C drag_off 5 43.4161 24300.1767 1.3882 24300.2155
+  MROW gracefo moderate_2022_04 moderate C drag_off 6 56.9303 34659.7677 1.7000 34659.8145
+  MROW gracefo moderate_2022_04 moderate C drag_off 7 105.7445 46756.6168 2.0637 46756.7364
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 1 4.8909 271.1098 0.0700 271.1539
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 2 11.6866 1406.2525 0.2109 1406.3010
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 3 16.6861 3395.3103 0.4336 3395.3514
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 4 20.7748 5980.8407 0.5466 5980.8768
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 5 23.8731 9039.2233 0.6132 9039.2548
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 6 27.7358 12588.8985 0.7702 12588.9291
+  MROW gracefo moderate_2022_04 moderate C cd_2p3 7 32.6734 16673.8642 0.8230 16673.8963
+  MROW gracefo moderate_2022_04 moderate C cd_fit 1 1.5180 66.2108 0.0597 66.2282
+  MROW gracefo moderate_2022_04 moderate C cd_fit 2 3.3450 267.5709 0.1259 267.5918
+  MROW gracefo moderate_2022_04 moderate C cd_fit 3 4.6913 468.2400 0.2264 468.2636
+  MROW gracefo moderate_2022_04 moderate C cd_fit 4 6.0742 505.8985 0.2502 505.9350
+  MROW gracefo moderate_2022_04 moderate C cd_fit 5 7.4900 365.1891 0.2741 365.2660
+  MROW gracefo moderate_2022_04 moderate C cd_fit 6 8.6995 112.1994 0.5477 112.5375
+  MROW gracefo moderate_2022_04 moderate C cd_fit 7 10.4165 487.1695 0.5623 487.2812
+  MROW gracefo moderate_2022_04 moderate C sphere 1 3.5882 196.6488 0.0625 196.6815
+  MROW gracefo moderate_2022_04 moderate C sphere 2 8.3549 991.5044 0.1740 991.5396
+  MROW gracefo moderate_2022_04 moderate C sphere 3 11.6115 2323.4844 0.3579 2323.5134
+  MROW gracefo moderate_2022_04 moderate C sphere 4 14.4232 3959.9875 0.4371 3960.0138
+  MROW gracefo moderate_2022_04 moderate C sphere 5 16.8180 5806.6662 0.4669 5806.6906
+  MROW gracefo moderate_2022_04 moderate C sphere 6 19.8961 7878.2306 0.6343 7878.2558
+  MROW gracefo moderate_2022_04 moderate C sphere 7 23.2850 10215.0355 0.6356 10215.0620
+  MROW gracefo moderate_2022_04 moderate C box 1 1.1488 48.2589 0.0768 48.2726
+  MROW gracefo moderate_2022_04 moderate C box 2 3.9106 366.0918 0.1340 366.1127
+  MROW gracefo moderate_2022_04 moderate C box 3 8.0611 1167.1828 0.1073 1167.2106
+  MROW gracefo moderate_2022_04 moderate C box 4 12.7467 2568.9746 0.1181 2569.0062
+  MROW gracefo moderate_2022_04 moderate C box 5 18.3648 4548.1071 0.3622 4548.1442
+  MROW gracefo moderate_2022_04 moderate C box 6 25.0246 7101.1894 0.7516 7101.2335
+  MROW gracefo moderate_2022_04 moderate C box 7 35.1274 10209.2781 0.9011 10209.3386
+  MFIT gracefo moderate_2022_04 C 3.60956 6.033762e-03 599.033 5.0
+  wall time: 848 s

@@ -578,9 +578,9 @@ the other nine inherit it.
 The one window whose t0 moved for the 14-day extension (slid -1 d; see "The
 13 -> 14 day extension" above). Its span is otherwise the drawn one.
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
 ### **Chunk 8: window 5 -- `intense_2024_06`** (intense, t0 2024-06-14, ceiling 5.0)
 
@@ -588,9 +588,9 @@ Intense exists only in 2024, so this row and Chunk 10's are confounded with
 mission epoch and altitude. Record it on the row rather than in the findings
 alone.
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
 ### **Chunk 9: window 6 -- `storm_2024_08`** (storm, t0 2024-08-11, ceiling 8.0)
 
