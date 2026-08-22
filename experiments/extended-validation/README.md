@@ -223,7 +223,7 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 |---|---|---|---|
 | 0 — maneuver screening | `screen` | `gracefo/results_screen.txt` | **10/10 windows CLEAN on C**, both gates. Two carry a real burn on D (`intense_2024_11`, `storm_2025_05`) and are kept — see the failure rule above. |
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
-| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **1/10 windows.** Window 1 (low) reproduces the frozen quiet pattern on GRACE-FO C, box table included: it loses where drag is weak, which is the predicted sign and not an inversion. |
+| 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **3/10 windows.** In low solar activity windows, sphere Cd tends to perform slightly worse than the reference Cd - 2.3. Box table tends to be about as bad as drag off. This is in line with v0.7.2 patterns, and the tables generally do worse with Swarm. |
 | 3 — TLE fitting | `tle_01..10`, `tle_summary` | pending | — |
 
 ### Part 2 — drag propagations, per window
@@ -242,8 +242,8 @@ convention-free `B = Cd·A/m`. Full per-day tables are in the per-window files.
 | # | window | band | GRACE-FO C | Swarm A/B |
 |---|---|---|---|---|
 | 1 | `low_2019_12` | low | **82 / 49 / −36 %**; Cd 1.797, B 3.00e−3 | A **70 / 39 / −71 %**, Cd 1.737, B 4.15e−3<br>B **62 / 23 / −105 %**, Cd 1.597, B 3.81e−3 |
-| 2 | `low_2021_04` | low | pending | pending |
-| 3 | `low_2021_06` | low | pending | pending |
+| 2 | `low_2021_04` | low | **87 / 56 / -25 %**; Cd 2.500, B 4.17e-3 | A **80 / 53 / -45 %**, Cd 2.390, B 5.70e-3<br>B **87 / 55 / -51 %**, Cd 2.498, B 5.96e-3 |
+| 3 | `low_2021_06` | low | **74 / 94 / 50 %**; Cd 2.661, B 4.44e-3 | A **81 / 99 / 34 %**, Cd 2.389, B 5.70e-3<br>B **81 / 95 / 19 %**, Cd 2.328, B 5.56e-3 |
 | 4 | `moderate_2022_04` | moderate | pending | pending |
 | 5 | `intense_2024_06` | intense | pending | pending |
 | 6 | `storm_2024_08` | storm | pending | pending |
@@ -266,9 +266,10 @@ Both limits are recorded on every Swarm row rather than worked around; see
 gap between their figures is an altitude difference before it is a body one.
 Swarm rows share the GRACE-FO t0 unless the row says otherwise.
 
-Window 1 tracks the frozen quiet row (86 / 53 / −24 %) on GRACE-FO C, box table
-included: a table losing where drag is weak is the predicted sign, not the
-inversion that would warrant a bug search.
+In the low activity windows 1-3, the standard Cd = 2.3 performed very well, while
+the sphere table gives generally acceptable results. The box table loses badly
+in all weak drag windows, which was expected. Window 3, which had slightly higher
+activity, appears to favor the tables more than the other windows.
 
 ### Part 1 — table noise, GRACE-FO C/D over the three inherited windows
 

@@ -552,7 +552,7 @@ conventions moving in opposite directions, not a cross-study check.
 Each chunk below carries the same three items: GRACE-FO C, Swarm A/B, and the
 read into the summary.
 
-### **Chunk 4: window 1 -- `low_2019_12`** (low, t0 2019-12-23, ceiling 5.0)
+### **Chunk 4: window 1 -- `low_2019_12`** (low, t0 2019-12-23, ceiling 5.0) - Done
 
 First full run of the apparatus: read the output shape critically here, before
 the other nine inherit it.
@@ -561,17 +561,17 @@ the other nine inherit it.
 - [X] Swarm A/B
 - [X] read + summary row
 
-### **Chunk 5: window 2 -- `low_2021_04`** (low, t0 2021-04-15, ceiling 5.0)
+### **Chunk 5: window 2 -- `low_2021_04`** (low, t0 2021-04-15, ceiling 5.0) - Done
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
-### **Chunk 6: window 3 -- `low_2021_06`** (low, t0 2021-06-17, ceiling 5.0)
+### **Chunk 6: window 3 -- `low_2021_06`** (low, t0 2021-06-17, ceiling 5.0) - Done
 
-- [ ] GRACE-FO C
-- [ ] Swarm A/B
-- [ ] read + summary row
+- [X] GRACE-FO C
+- [X] Swarm A/B
+- [X] read + summary row
 
 ### **Chunk 7: window 4 -- `moderate_2022_04`** (moderate, t0 2022-04-29, ceiling 5.0)
 
