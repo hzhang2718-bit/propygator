@@ -623,7 +623,7 @@ Storm across days 3-8, i.e. inside Part 2's arc and across its end.
 - [X] Swarm A/B
 - [X] read + summary row
 
-### **Chunk 13: window 10 -- `storm_2026_01`** (storm, t0 2026-01-13, ceiling 8.0)
+### **Chunk 13: window 10 -- `storm_2026_01`** (storm, t0 2026-01-13, ceiling 8.0) - Done
 
 Onset sits at day 6, so Part 2's arc is entirely pre-onset -- the drag runs here
 are the clean-arc counterpart to Part 3's mandated fit-right-before-onset case.
