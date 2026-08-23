@@ -93,6 +93,15 @@ re-runs Part 2 and is a scheduled multi-hour act, not a pre-commit check.
 `--only <group>` is what a normal session runs; `--parse-only` on a driver is
 the cheap JVM-free check.
 
+**`--verify` leaves its scratch directory behind, deliberately.** It runs into a
+fresh `extval-verify-*` under the OS temp dir (`%TEMP%`, `/tmp`) and never
+removes it, so after a diff you can still open the regenerated file that
+produced it — the reason to keep them is exactly the case where `--verify`
+fails. Nothing reads them again and no committed evidence references one, so
+they are safe to delete at any time; they accumulate at ~15 KB a run, on every
+machine, and clearing them is a manual step. The frozen `real-world-validation`
+orchestrator behaves identically under the prefix `rwv-verify-`.
+
 ## Conventions
 
 One A/m convention covers every non-box run — the `Cd = 2.3` run, the fitted-Cd

@@ -108,6 +108,11 @@ consolidates them.
   evidence is each leg's README + results files.
 - Evidence numbers are deterministic (same code, truth files, orekit-data);
   only wall-clock timings vary between runs — `run_all.py --verify` masks them.
+- **`--verify` leaves its scratch directory behind, deliberately.** It runs into
+  a fresh `rwv-verify-*` under the OS temp dir (`%TEMP%`, `/tmp`) and never
+  removes it, so after a diff you can still open the regenerated file that
+  produced it. Nothing reads them again and no committed evidence references
+  one, so they are safe to delete at any time; clearing them is a manual step.
 - **Evidence is frozen at its v0.7.2 numbers** — the historical record of what
   was measured against the table that shipped then. The Chunk 5 leeward floor
   (v0.7.3) regenerated `box_face_cd_default.npz`, so a post-v0.7.3 `--verify`
