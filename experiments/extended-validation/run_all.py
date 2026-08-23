@@ -91,6 +91,22 @@ GROUPS["drag_summary"] = (
     [("summarize_drag.py", [])],
 )
 
+# --- Part 3 (Chunks 14-18) ----------------------------------------------------
+# One group per window, GRACE-FO C only -- no Swarm leg in this part. A window is
+# 5-10 min rather than Part 2's ~50, so separability buys less here, but it is
+# what `--verify --only tle_NN` needs and it costs nothing to keep uniform.
+# Registered by the chunk that CREATES them (14), so these exist before their
+# evidence does; --verify says so rather than running to find out.
+for _i, _name in enumerate(_TABLE_ORDER, start=1):
+    GROUPS[f"tle_{_i:02d}"] = (
+        f"gracefo/results_tle/window_{_i:02d}_{_name}.txt",
+        [("gracefo/run_tle_window.py", [_name])],
+    )
+GROUPS["tle_summary"] = (
+    "results_tle_summary.txt",
+    [("summarize_tle.py", [])],
+)
+
 # Twenty bare names in --only is unusable, so a few aliases expand to them.
 ALIASES: dict[str, list[str]] = {
     "drag": [f"drag_{i:02d}" for i in range(1, 11)],
@@ -98,6 +114,7 @@ ALIASES: dict[str, list[str]] = {
     "part2": [f"drag_{i:02d}" for i in range(1, 11)]
     + [f"swarm_{i:02d}" for i in range(1, 11)]
     + ["drag_summary"],
+    "tle": [f"tle_{i:02d}" for i in range(1, 11)],
 }
 
 

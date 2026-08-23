@@ -700,7 +700,7 @@ build caveat; `tle-fit-strategy-findings.md` sec 3, the conservative default).
 naturally pairs with short tau. The contract specifies uniform 300 measurements,
 so the fading-memory result characterises the uniform-sampling version alone.
 
-### **Chunk 14: Part 3 apparatus (no committed evidence)**
+### **Chunk 14: Part 3 apparatus (no committed evidence)** - Done
 
 **Goal.** Build what the window chunks share and land the catalogue pull, before
 ten windows are written against either. Verified on JVM-free identities and a
@@ -765,10 +765,10 @@ on every catalogue row -- it is the known confounder in any catalogue comparison
 - `run_all.py --list` shows the groups and the alias expands.
 
 **Checklist**
-- [ ] Space-Track pull + cross-tag check, all 10 windows
-- [ ] `tle_fit_common.py` (+ the tau = None no-op)
-- [ ] `run_tle_window.py` + smoke arc
-- [ ] `summarize_tle.py`, `run_all.py` groups + alias, README
+- [X] Space-Track pull + cross-tag check, all 10 windows
+- [X] `tle_fit_common.py` (+ the tau = None no-op)
+- [X] `run_tle_window.py` + smoke arc
+- [X] `summarize_tle.py`, `run_all.py` groups + alias, README
 
 ### Chunks 15-17 -- the windows, in table order
 
@@ -872,6 +872,11 @@ alongside the sensitivity line for the `arm_zero`-substituted mapping.
 **single** tau at **>= 1.5x in at least two bands** with **no band below 0.8x**
 (none made > 1.25x worse). Default is **DEFER**. Bands are the window table's
 low / moderate / intense / storm.
+
+**Report with it: the fade rows alone run at `max_iterations = 200`.** That value
+caps *evaluations* as well as iterations and `tau = 0.5` needs 105 on the 6 d arc,
+so the shipped 100 aborts it 5 short of a converged answer -- meaning a promotion
+to sec 1.2 would have to raise the shipped default with it.
 
 **`[misclass]`** every window whose gate-selected arm was not in the correct set,
 listed with its r, s and the arm that won. A misclassification is the finding.

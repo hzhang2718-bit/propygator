@@ -19,6 +19,7 @@ extended-validation/
 ├── run_all.py         regenerate / --verify orchestrator; --list is authoritative
 ├── drag_common.py     Part 2 primitives shared by both legs (the per-day rule)
 ├── summarize_drag.py  cross-window text parse → results_drag_summary.txt
+├── summarize_tle.py   cross-window text parse → results_tle_summary.txt
 ├── data/              raw truth + reference docs (gitignored, never committed)
 │   ├── reference/     third-party reference PDFs (see "Reference documents")
 │   ├── tarballs/      TRANSIENT download staging, deleted after extraction
@@ -34,7 +35,13 @@ extended-validation/
 │   ├── run_screen.py         both maneuver gates  → results_screen.txt
 │   ├── run_table_noise.py    the twin ratios      → results_table_noise.txt
 │   ├── run_drag_window.py    Part 2, one window   → results_drag/window_NN_*.txt
-│   └── results_drag/         one file per window (group `drag_NN`)
+│   ├── results_drag/         one file per window (group `drag_NN`)
+│   ├── tle_fit_common.py     Part 3 arc geometry, the 13 configs, the r/s gate,
+│   │                         and the age-weighted harness (fitter privates)
+│   ├── catalog_tles.py       the ten Space-Track sets, frozen literals + the
+│   │                         cross-tag check (no runtime network)
+│   ├── run_tle_window.py     Part 3, one window   → results_tle/window_NN_*.txt
+│   └── results_tle/          one file per window (group `tle_NN`)
 └── swarm/             the Swarm A/B leg — see swarm/README.md
     ├── swarm_sp3.py          SP3 reader (ZIP + concat over the frozen parser)
     ├── swarm_common.py       ESTIMATED geometry and mass
@@ -51,9 +58,18 @@ row. Splitting those out beats growing a second convention table here that would
 drift from the first.
 
 **Group names.** `--only drag_04` is one complete window; the aliases `drag`,
-`swarm` and `part2` expand to the twenty window groups plus the summary, because
-twenty bare names in `--only` is unusable. `run_all.py --list` prints every
-group with its output path and every alias with its expansion.
+`swarm` and `part2` expand to the twenty Part 2 window groups plus the summary,
+and `tle` to the ten Part 3 windows, because twenty bare names in `--only` is
+unusable. `run_all.py --list` prints every group with its output path and every
+alias with its expansion.
+
+**Part 3's non-evidence flags.** `run_tle_window.py` carries four switches that
+produce no evidence and are never committed as a results file: `--parse-only`
+(JVM-free parse, checks and arc geometry), `--emit-fixture` (the Chunk 23 gate
+pin's literals, JVM-free), `--smoke` (a five-configuration one-day run that
+proves the driver end to end), and `--verify-harness` (the build plan's
+`tau = None` no-op check on the private fade harness, which nothing else in the
+study exercises).
 
 ## Running
 
@@ -224,7 +240,7 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 | 0 — maneuver screening | `screen` | `gracefo/results_screen.txt` | **10/10 windows CLEAN on C**, both gates. Two carry a real burn on D (`intense_2024_11`, `storm_2025_05`) and are kept — see the failure rule above. |
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
 | 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **10 windows**, GRACE-FO and Swarm A, B. In low solar activity windows, sphere Cd tends to perform significantly worse than the reference Cd = 2.3. In higher solar activity windows, the tables generally perform better, with the sphere table taking the lead. The box table is one of the worst performers across the board. It is often worse than no drag for quiet windows, and it is rarely as good as the sphere table for active windows. In the few cases where the box table beats the sphere table, the win is small. The exception is window 4, where the box table performed surprisingly well. Overall, the Swarm A propagations feature significantly larger absolute errors, but the percent of errors absorbed by the drag tables tend to be similar across GRACE-FO and Swarm for Cd = 2.3 and sphere Cd. |
-| 3 — TLE fitting | `tle_01..10`, `tle_summary` | pending | — |
+| 3 — TLE fitting | `tle_01..10`, `tle_summary` | `gracefo/results_tle/`, `results_tle_summary.txt` | Apparatus landed and the catalogue pull cleared (**cross-tag 10/10 PASS**); the ten windows and the three pre-registered benchmarks are pending. |
 
 ### Part 2 — drag propagations, per window
 
@@ -312,3 +328,73 @@ bodies flying through the same atmosphere under the same model produce
 consistent drag results. The four ratios do not support a stronger statement,
 and none is made here — in particular this part sets no error bar on a fitted
 Cd, and the fitted Cd levels are not compared across A/m conventions.
+
+### Part 3 — TLE fitting, per window
+
+Thirteen scored configurations per window, all fitted to **truth** except the two
+state rows, all forecasting `[T, T + 7 d]` from the one common arc end
+`T = t0 + 6 d`, read per-day at day 1 / day 3 / day 7 past T. Fourteen runs, thirteen
+scored: the 3-day staging fit `fit3` supplies the gate's `s` and is not a row, and
+the `catalog` row fits nothing. **This part carries the study's three benchmarks**,
+all pre-registered and all adjudicated in Chunk 18 — nothing is scored in the
+per-window files or in `results_tle_summary.txt`.
+
+**The gate mapping is horizon-independent; the playbook's rows are not.** Rows 2
+and 3 carry qualifiers the r/s table drops — `B* = 0` is scoped to "~3 d horizons"
+with a held B\* directed at "≥ 4 d", and the fresh fit to "horizon ≤ 1 d". Days 3
+and 7 therefore score two of the three arms past the horizon their own source
+claims for them, so a poor result there may be the playbook working as documented
+rather than the gate mispredicting. Chunk 18 separates the two using
+`arm_transplant`, which runs in every window regardless of the gate's selection.
+
+`T` is the truth sample at index 8640, **not** a UTC instant: GNV1B days start at
+GPS midnight, so `T` sits 18 s before the UTC day boundary the catalogue pull used
+and that Orekit's daily-Ap NRLMSISE-00 steps a storm on. Index 8640 is nonetheless
+the sample *nearest* that boundary (18 s before, against 42 s after for 8641), and
+it falls on the pre-onset side — which is the side `storm_2026_01`'s mandated
+fit-right-before-onset case needs. Nothing is interpolated; every residual here
+aligns to truth by array index.
+
+| win | window | band | gate `r` | gate `s` | arm | status |
+|---|---|---|---|---|---|---|
+| 1 | `low_2019_12` | low | — | — | — | pending |
+| 2 | `low_2021_04` | low | — | — | — | pending |
+| 3 | `low_2021_06` | low | — | — | — | pending |
+| 4 | `moderate_2022_04` | moderate | — | — | — | pending |
+| 5 | `intense_2024_06` | intense | — | — | — | pending |
+| 6 | `storm_2024_08` | storm | — | — | — | pending |
+| 7 | `intense_2024_11` | intense | — | — | — | pending |
+| 8 | `storm_2025_05` | storm | — | — | — | pending |
+| 9 | `moderate_2025_07` | moderate | — | — | — | pending |
+| 10 | `storm_2026_01` | storm | — | — | — | pending |
+
+**The catalogue pull and its cross-tag check (2026-08-22).** NORAD 43476
+`gp_history`, pulled by hand from Space-Track by the maintainer; the raw paste and
+the derived per-window resolution live in the gitignored
+`data/gracefo/catalog/`, and the ten selected sets are frozen literals in
+`gracefo/catalog_tles.py` — there is no committed fetcher and none is wanted.
+10/10 windows resolved by the contract's rule (latest epoch ≤ `T`) out of 148
+candidates, staleness 1.57–10.22 h.
+
+Cross-tagging between close-flying objects is a known catalogue failure mode, so
+every set was propagated into `[T, T + 1 d]` and checked against **both** twins:
+
+| | measured across the ten windows |
+|---|---|
+| residual vs C | 664 – 1004 m |
+| residual vs D | 173.6 – 221.8 km |
+| ratio (bar 5×) | **195 – 301×**, 10/10 PASS |
+| C–D separation | 173.0 – 222.3 km |
+
+**These four ranges are provisional.** They come from a one-time sweep that is not
+committed as a script, so no `--verify` reproduces them today; Chunk 18 re-derives
+them from `results_tle_summary.txt`, at which point every figure is traceable to a
+committed window file.
+
+Every window clears the bar by ~40×, so no verdict is marginal, and a ~200 km
+offset is what staleness cannot manufacture — which is what makes this a *tag*
+test rather than a quality test. Window 9, the 10.22 h staleness outlier, scores
+738 m against C, mid-pack among the ten; that is one day's evidence, not a verdict
+on its `catalog` row. The permanent guard is `run_tle_window.py`, which re-runs the
+check in every window's `[catalog]` block and hard-exits on a miss, so each
+committed window file carries its own verdict.
