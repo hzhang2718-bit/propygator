@@ -64,19 +64,20 @@ the verdict is built on. The contract defines CLEAN as "the accumulator is flat
 and both on-times are zero", so neither is folded into :attr:`Thr1bScreen.clean`
 -- widening the gate is a contract amendment and the maintainer's call. Measured
 across window 1 and the three frozen v0.7.2 windows (16,248 records,
-2026-08-19): neither bit is ever set. Bit 6 occurs 3 times, always on D, and
-affects a burn's reported TIME rather than its detection.
+2026-08-19): neither bit is ever set. Bit 6 affects a burn's reported TIME
+rather than its detection, and ``results_screen.txt`` carries it on 6 of the 20
+satellite-windows -- including C in ``low_2021_04``, so it is not D-only.
 
 ZERO-RECORD DAYS ARE NORMAL, AND ARE NOT A HOLE IN THE SCREEN (2026-08-20).
 GRACE-FO's activation rate fell from ~450 records/day in 2019-2022 to 1-5/day for
-C by 2024-2025, so an occasional day logs nothing at all -- four of them, all on
-C, across windows 6, 8 and 9. They are complete products rather than short
+C by 2024-2025, so an occasional day logs nothing at all -- six of them, all on
+C, across windows 6, 8, 9 and 10. They are complete products rather than short
 downloads: each declares ``num_records: 0`` in its own header, and that declared
-count is cross-checked against the parsed body on EVERY file (252/252 match on
-the data held). Such a day is recorded and skipped rather than raised on, because
-``accum_dur_orb_ctrl`` is CUMULATIVE -- a burn inside the gap would raise the
-value read on the next day that carries records. A gap bracketed by an unchanged
-accumulator is therefore exactly as screened as a day full of records.
+count is cross-checked against the parsed body on EVERY file (280/280 across the
+ten-window screen). Such a day is recorded and skipped rather than raised on,
+because ``accum_dur_orb_ctrl`` is CUMULATIVE -- a burn inside the gap would raise
+the value read on the next day that carries records. A gap bracketed by an
+unchanged accumulator is therefore exactly as screened as a day full of records.
 
 KNOWN LIMIT -- EDGE GAPS. That bracketing argument needs a record on BOTH sides,
 so a zero-record day at the START or END of the window is a genuine hole: a burn

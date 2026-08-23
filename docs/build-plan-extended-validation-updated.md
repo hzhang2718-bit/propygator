@@ -810,28 +810,28 @@ single-digit-% calibration bar. Recorded as an expectation, not a bar.
 
 **Read.** Fill the window's rows in `results_tle_summary.txt`.
 
-### **Chunk 15: windows 1-3** -- `low_2019_12`, `low_2021_04`, `low_2021_06`
+### **Chunk 15: windows 1-3** -- `low_2019_12`, `low_2021_04`, `low_2021_06` - Done
 
 Read window 1's output shape critically before the other nine inherit it. All
 three are low-activity, so expect r to fail its threshold (v0.7.2 measured
 0.15-1.14 quiet) and the mapping to select `arm_zero` throughout -- the first
 transfer test of the gate's quiet arm.
 
-- [ ] window 1 (shape read)
-- [ ] window 2
-- [ ] window 3
+- [X] window 1 (shape read)
+- [X] window 2
+- [X] window 3
 
-### **Chunk 16: windows 4-6** -- `moderate_2022_04`, `intense_2024_06`, `storm_2024_08`
+### **Chunk 16: windows 4-6** -- `moderate_2022_04`, `intense_2024_06`, `storm_2024_08` - Done
 
 First storm window. `storm_2024_08`'s Ap 127 sits on day 1, behind both staging
 arcs, so the gate sees a calm arc there; selecting a non-storm arm is the correct
 call, not a miss.
 
-- [ ] window 4
-- [ ] window 5
-- [ ] window 6
+- [X] window 4
+- [X] window 5
+- [X] window 6
 
-### **Chunk 17: windows 7-10** -- `intense_2024_11`, `storm_2025_05`, `moderate_2025_07`, `storm_2026_01`
+### **Chunk 17: windows 7-10** -- `intense_2024_11`, `storm_2025_05`, `moderate_2025_07`, `storm_2026_01` - Done
 
 `storm_2025_05` spans days 3-8, so its storm is inside the staging arcs and
 across the forecast start -- the `s` half of the gate is what is under test.
@@ -840,10 +840,10 @@ where day 6 starts, so its arc is entirely pre-onset and the forecast opens at
 onset: the contract's mandated fit-right-before-onset case, needing no extra
 download. Closes `results_tle_summary.txt` at 10/10.
 
-- [ ] window 7
-- [ ] window 8
-- [ ] window 9
-- [ ] window 10
+- [X] window 7
+- [X] window 8
+- [X] window 9
+- [X] window 10
 
 ### **Chunk 18: adjudication**
 
@@ -873,10 +873,11 @@ alongside the sensitivity line for the `arm_zero`-substituted mapping.
 (none made > 1.25x worse). Default is **DEFER**. Bands are the window table's
 low / moderate / intense / storm.
 
-**Report with it: the fade rows alone run at `max_iterations = 200`.** That value
-caps *evaluations* as well as iterations and `tau = 0.5` needs 105 on the 6 d arc,
-so the shipped 100 aborts it 5 short of a converged answer -- meaning a promotion
-to sec 1.2 would have to raise the shipped default with it.
+**Report with it: the fade rows alone run at `max_iterations = 800`** (raised from
+200 on 2026-08-23, which was calibrated on window 1 alone and aborted window 3).
+That value caps *evaluations* as well as iterations, so read `tau = 0.5`'s real
+demand off the committed `TFADE` rows -- a promotion to sec 1.2 would have to
+raise the shipped 100 to clear that maximum, which is the cost of promoting.
 
 **`[misclass]`** every window whose gate-selected arm was not in the correct set,
 listed with its r, s and the arm that won. A misclassification is the finding.

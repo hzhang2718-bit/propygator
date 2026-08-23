@@ -63,13 +63,14 @@ and `tle` to the ten Part 3 windows, because twenty bare names in `--only` is
 unusable. `run_all.py --list` prints every group with its output path and every
 alias with its expansion.
 
-**Part 3's non-evidence flags.** `run_tle_window.py` carries four switches that
+**Part 3's non-evidence flags.** `run_tle_window.py` carries five switches that
 produce no evidence and are never committed as a results file: `--parse-only`
 (JVM-free parse, checks and arc geometry), `--emit-fixture` (the Chunk 23 gate
 pin's literals, JVM-free), `--smoke` (a five-configuration one-day run that
-proves the driver end to end), and `--verify-harness` (the build plan's
+proves the driver end to end), `--verify-harness` (the build plan's
 `tau = None` no-op check on the private fade harness, which nothing else in the
-study exercises).
+study exercises), and `--verify-gate` (the frozen thresholds against the
+playbook and one arm per corner case; needs neither data nor JVM).
 
 ## Running
 

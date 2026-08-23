@@ -161,17 +161,24 @@ ARC_ALIGN_TOL_S = 1e-9
 
 # THE FADE ROWS GET A LARGER BUDGET THAN THE SHIPPED DEFAULT, and only they do.
 # `max_iterations` bounds evaluations as well as iterations (fitter.py, one
-# value into setMaxIterations AND setMaxEvaluations), and tau = 0.5 over the 6 d
-# arc needs 96 iterations / 105 EVALUATIONS -- so at the shipped 100 it died on
-# the evaluation budget 5 short of a converged answer, which would have been
-# recorded as "tau = 0.5 cannot be fitted" (measured: identical 3192.7 m RMS and
-# B* at caps 200 / 400 / 800, so this buys convergence, not a lucky truncation).
-# Short tau is expensive because uniform 300-sample subsampling leaves it an
-# effective N of ~25 of 300, the sampling-skew axis the build plan scopes out.
+# value into setMaxIterations AND setMaxEvaluations), and short tau is expensive
+# because uniform 300-sample subsampling leaves it an effective N of ~25 of 300 --
+# the sampling-skew axis the build plan scopes out.
+#
+# RAISED 200 -> 800 (2026-08-23) AFTER 200 KILLED WINDOW 3. The 200 was
+# calibrated on window 1 alone and does not generalise: a one-time uncommitted
+# sweep of tau = 0.5 over all ten windows put the worst case at 471 evaluations,
+# with seven of the ten past 200, so 800 is ~1.7x the worst case seen. Those
+# sweep figures are PROVISIONAL -- every window's real demand lands in its own
+# TFADE row, and Chunk 18 re-derives the range from the committed files. A cap
+# above the demand cannot change a fitted answer (LM stops on convergence), so
+# raising it moves no number in a window that was already converging; windows 1
+# and 2 were never cap-bound and only their printed cap line changes.
+#
 # The unweighted rows keep the shipped 100 deliberately: they exist to represent
 # what a user gets at defaults, and they top out at 20 evaluations across all
 # ten windows and every band, a ~5x margin.
-FADE_MAX_ITERATIONS = 200
+FADE_MAX_ITERATIONS = 800
 
 
 def verify_harness(eph) -> int:
@@ -873,7 +880,8 @@ def main() -> None:
         print(
             f"[fade]  the age-weighted fits' own conditioning -- these rows "
             f"alone run at max_iterations {FADE_MAX_ITERATIONS}, not the "
-            f"shipped 100 (it caps evaluations too; short tau needs ~105)"
+            f"shipped 100 (it caps evaluations too; this window's own demand is "
+            f"the evals column below)"
         )
         print(
             "  WEIGHTED QUANTITIES -- never compared against r < "

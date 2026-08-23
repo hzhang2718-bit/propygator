@@ -1,0 +1,197 @@
+==============================================================================
+Extended validation -- Part 3 TLE fitting: window 01 low_2019_12 (low)
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/extended-validation/data/gracefo
+[window] low_2019_12, band low, t0 2019-12-23, 14 days landed, 14 loaded
+[space weather]  window aggregates, re-read from CSSI at runtime
+  source: <orekit-data>/CSSI-Space-Weather-Data/SpaceWeather-All-v1.2.txt  (UPDATED 2026 May 10 15:40:00.00)
+  F10.7 71.9 (range 70-73), Ctr81 71.3, Ap max 8, ap3 max 18, Kp max 3.3
+[parse]
+  C = GRACE-FO 1 (GRACE C) (NORAD 43476), platform 'GRACE C' v04, 14 daily files
+  1 Hz records 1209600 (QC-dropped 0); subsampled to 60 s -> 20160 epochs
+  seam gaps > 1.5 s: 0 (max gap 1.0 s)
+  span: 2019-12-23T00:00:19 -> 2020-01-05T23:59:19 TAI
+[mass]  MAS1B tank gas, both tanks (L1 Handbook sec 4.2.17)
+  C: gas mean 30.4952 kg over 336 records (range 30.4896..30.5005) -> dry 569.914 + gas = 600.409 kg
+  mass enters Part 3 only through the two state rows' reference propagations; every fit below is to TRUTH and carries no mass
+[screen tier-1 THR1B]  exact gate, no threshold, storm-proof
+  [screen tier-1 THR1B] sat C: CLEAN
+    6734 records over 14 daily files; qualflg seen 00001100 (reported, never a drop rule)
+    accum_dur_orb_ctrl: first 3500000 ms, last 3500000 ms, moved 0 ms, 1 distinct value(s)
+    max on_time_orb_ctrl_1/_2: 0 / 0 ms over 0 firing record(s)
+[parser checks]
+  from_iso(to_iso()) == epoch for all 20160: True
+  grid uniformity: max |dt - 60 s| = 0.000e+00 s
+[arc geometry]  every scored arc ENDS at T; they differ only in reach
+  T = truth index 8640 = 2019-12-29T00:00:19 TAI | UTC 2019-12-28T23:59:42
+  T sits 18 s before the UTC day boundary -- GNV1B days start at GPS midnight -- and index 8640 is the truth sample NEAREST that boundary (18 s before, vs 42 s after for 8641); nothing is interpolated
+  forecast [T, T + 7 d] on the 60 s grid, read per-day at day(s) 1, 3, 7 -- day N is [N-1 d, N d] PAST T alone, never accumulated
+[staging]  fit2 (2 d, B* free) IS the scored naive_2d row; fit3 is not scored
+  fit2: 18 iters, in-arc RMS 660.8 m
+  fit3: 18 iters, in-arc RMS 678.8 m (4 s wall)
+[gate]  the playbook's r/s trust gate, thresholds FROZEN and never re-fitted
+  sigma0(fit2)      = 389.617
+  sigma(BSTAR) raw  = 1.232410e-08
+  B*(fit2)          = 8.266000e-06
+  B*(fit3)          = -3.236400e-07
+  r = sigma0*sigma(B*)/|B*| = 0.580895  (bar r < 0.05) -> FAIL
+  s = |B*3 - B*2|/|B*2|     = 1.03915  (bar s < 0.1) -> FAIL
+  mapping selects: arm_zero
+  all three arms run regardless -- the mapping is applied by summarize_tle.py, so a re-score needs no re-fit
+[runs]  13 scored configurations
+    naive 2 d (shipped default)           1 s wall
+    arm: transplant fit2 B*               2 s wall
+    arm: fresh 1 d, B* = 0                2 s wall
+    arm: freshest 1 d, B* free            2 s wall
+    catalogue (Space-Track)               1 s wall
+    state path, sphere table             10 s wall
+    state path, box table (IPT)          19 s wall
+    fade tau = 0.5 d                      8 s wall
+    fade tau = 0.75 d                     5 s wall
+    fade tau = 1 d                        4 s wall
+    fade tau = 1.5 d                      3 s wall
+    fade tau = 2 d                        2 s wall
+    fade tau = 3 d                        2 s wall
+[arc-end alignment]  every scored arc ends at T and spans what it reports
+  naive_2d         [T - 2 d, T]: end delta +0.0e+00 s, fitted span 172800.0 s (delta +0.0e+00 s)
+  arm_transplant   [T - 1 d, T]: end delta +0.0e+00 s, fitted span 86400.0 s (delta +0.0e+00 s)
+  arm_zero         [T - 1 d, T]: end delta +0.0e+00 s, fitted span 86400.0 s (delta +0.0e+00 s)
+  arm_fresh        [T - 1 d, T]: end delta +0.0e+00 s, fitted span 86400.0 s (delta +0.0e+00 s)
+  catalog          no arc (the row fits nothing)
+  state_sphere     [T - 2 d, T]: end delta +0.0e+00 s, fitted span 172800.0 s (delta +0.0e+00 s)
+  state_box        [T - 2 d, T]: end delta +0.0e+00 s, fitted span 172800.0 s (delta +0.0e+00 s)
+  fade_tau_0p5     [T - 6 d, T]: end delta +0.0e+00 s, fitted span 518400.0 s (delta +0.0e+00 s)
+  fade_tau_0p75    [T - 6 d, T]: end delta +0.0e+00 s, fitted span 518400.0 s (delta +0.0e+00 s)
+  fade_tau_1       [T - 6 d, T]: end delta +0.0e+00 s, fitted span 518400.0 s (delta +0.0e+00 s)
+  fade_tau_1p5     [T - 6 d, T]: end delta +0.0e+00 s, fitted span 518400.0 s (delta +0.0e+00 s)
+  fade_tau_2       [T - 6 d, T]: end delta +0.0e+00 s, fitted span 518400.0 s (delta +0.0e+00 s)
+  fade_tau_3       [T - 6 d, T]: end delta +0.0e+00 s, fitted span 518400.0 s (delta +0.0e+00 s)
+  worst |end delta| = 0.0e+00 s, worst |span delta| = 0.0e+00 s (tol 1e-09 s)
+[catalog]  Space-Track gp_history, latest epoch at or before T
+  D truth checks: start delta +0.0e+00 s, max |dt - 60 s| = 0.000e+00 s over 1441 samples
+  epoch 2019-12-28T20:36:36.599616 UTC; staleness 0.1410 d (3.38 h)
+  pull recorded 0.1412 d against UTC-midnight T (the 18 s GPS/UTC offset; selection unaffected), 10 candidates in [T-5d, T+1d] (after dedup)
+  cross-tag day 1: RMS vs C 835.2 m, vs D 183.1 km, ratio 219.2x (bar 5x) -> PASS
+  C-D separation over that day: 182.6 km -- what a cross-tagged set would show and staleness cannot produce
+[state]  numerical reference vs truth over the fitted arc
+  the a-priori tables cannot meet sec 1.2's single-digit-% calibration bar, so degradation roughly this size is EXPECTED -- recorded as an expectation, never a bar
+  state path, sphere table     drift RMS      94.2 m, end     210.7 m
+  state path, box table (IPT)  drift RMS     250.5 m, end     562.8 m
+[fade]  the age-weighted fits' own conditioning -- these rows alone run at max_iterations 800, not the shipped 100 (it caps evaluations too; this window's own demand is the evals column below)
+  WEIGHTED QUANTITIES -- never compared against r < 0.05 / s < 0.1: age weighting turns sigma0 and the covariance into weighted quantities and the playbook's thresholds do not carry over (the conservative default)
+  id                iters  evals        sigma0     sigma(B*)
+  fade_tau_0p5         96    105       71.0182  1.425521e-07
+  fade_tau_0p75        59     63       90.9801  5.205955e-08
+  fade_tau_1           36     40       108.396  2.570845e-08
+  fade_tau_1p5         23     26       137.957  1.045645e-08
+  fade_tau_2           20     22        162.68  6.307300e-09
+  fade_tau_3           18     19       202.493  3.768395e-09
+[rows]  forecast RMS vs truth, per-day 3D (m). Day N = [N-1 d, N d] PAST T alone.
+  id                  in-arc          B*       day 1       day 3       day 7
+  naive_2d             660.8   8.266e-06       834.1      1831.2      3130.5
+  arm_transplant       621.1   8.266e-06       729.1       832.2      1917.6
+  arm_zero             620.9   0.000e+00       719.5      1227.8      3714.3
+  arm_fresh            620.7  -2.464e-05       778.9      3368.4     16074.4
+  catalog                  -   8.716e-06       835.2       816.4      1628.1
+  state_sphere         660.7   1.354e-05       790.9      1031.2      2268.1
+  state_box            660.4   2.182e-05      1019.8      1619.1      7903.5
+  fade_tau_0p5        3192.7   3.083e-05       694.8      1564.7     11025.6
+  fade_tau_0p75       3174.5   3.018e-05       695.8      1458.9     10519.7
+  fade_tau_1          1782.5   1.665e-05       696.6       856.6      3194.1
+  fade_tau_1p5         993.7   4.830e-06       809.9      2128.1      4787.3
+  fade_tau_2           880.4   1.148e-06       903.9      2722.1      7193.7
+  fade_tau_3           816.0  -1.028e-06      1007.3      3148.8      8773.7
+  in-arc RMS class: the SGP4 representation floor is ~500-700 m on a GNV1B arc; rows past 2000 m: fade_tau_0p5, fade_tau_0p75
+[breakdown]  radial / along / cross / 3D RMS (m), per configuration per day
+  id                day      radial         along       cross            3D
+  naive_2d            1      207.29        786.89      183.14        834.09
+                      3      331.13       1790.18      197.11       1831.19
+                      7      746.75       3029.89      249.19       3130.49
+  arm_transplant      1      157.07        690.08      175.03        729.06
+                      3      272.74        764.62      182.99        832.18
+                      7      688.52       1775.11      228.04       1917.57
+  arm_zero            1      157.07        679.97      175.03        719.49
+                      3      272.44       1183.14      182.98       1227.81
+                      7      685.54       3643.35      227.98       3714.28
+  arm_fresh           1      157.14        742.54      175.03        778.91
+                      3      271.81       3352.43      182.96       3368.40
+                      7      676.66      16058.54      227.79      16074.40
+  catalog             1      147.49        805.67      163.60        835.24
+                      3      251.81        760.52      157.47        816.45
+                      7      654.73       1478.96      186.74       1628.15
+  state_sphere        1      207.30        740.94      183.15        790.89
+                      3      331.54        956.30      197.12       1031.16
+                      7      749.47       2126.09      249.25       2268.06
+  state_box           1      207.99        981.46      183.15       1019.83
+                      3      332.93       1572.14      197.14       1619.05
+                      7      754.47       7863.48      249.35       7903.53
+  fade_tau_0p5        1      120.97        658.09      187.13        694.79
+                      3      216.57       1536.26      203.09       1564.69
+                      7      632.23      11004.41      258.02      11025.57
+  fade_tau_0p75       1      131.18        658.64      182.15        695.84
+                      3      235.85       1426.54      194.63       1458.95
+                      7      653.77      10496.46      245.45      10519.67
+  fade_tau_1          1      143.30        656.88      182.17        696.57
+                      3      253.54        794.74      194.67        856.61
+                      7      667.86       3113.79      245.43       3194.05
+  fade_tau_1p5        1      167.88        771.08      182.19        809.90
+                      3      285.00       2099.95      194.70       2128.13
+                      7      696.86       4729.91      245.39       4787.27
+  fade_tau_2          1      191.71        864.34      182.19        903.90
+                      3      312.94       2697.02      194.71       2722.09
+                      7      724.59       7152.91      245.36       7193.70
+  fade_tau_3          1      230.75        963.15      183.69       1007.29
+                      3      356.15       3122.33      198.37       3148.83
+                      7      768.10       8736.37      251.04       8773.66
+[machine]  fixed-token rows for summarize_tle.py -- do not reformat
+  TGATE low_2019_12 low 5.808954e-01 1.039153e+00 3.896173e+02 1.232410e-08 8.266000e-06 -3.236400e-07 arm_zero
+  TROW low_2019_12 low naive_2d 1 207.2944 786.8872 183.1437 834.0888 660.7551 8.266000e-06
+  TROW low_2019_12 low naive_2d 3 331.1289 1790.1807 197.1124 1831.1872 660.7551 8.266000e-06
+  TROW low_2019_12 low naive_2d 7 746.7459 3029.8866 249.1905 3130.4853 660.7551 8.266000e-06
+  TROW low_2019_12 low arm_transplant 1 157.0684 690.0834 175.0338 729.0559 621.0647 8.266000e-06
+  TROW low_2019_12 low arm_transplant 3 272.7449 764.6239 182.9898 832.1807 621.0647 8.266000e-06
+  TROW low_2019_12 low arm_transplant 7 688.5221 1775.1117 228.0432 1917.5735 621.0647 8.266000e-06
+  TROW low_2019_12 low arm_zero 1 157.0652 679.9725 175.0335 719.4920 620.8653 0.000000e+00
+  TROW low_2019_12 low arm_zero 3 272.4387 1183.1411 182.9825 1227.8145 620.8653 0.000000e+00
+  TROW low_2019_12 low arm_zero 7 685.5397 3643.3463 227.9808 3714.2849 620.8653 0.000000e+00
+  TROW low_2019_12 low arm_fresh 1 157.1353 742.5399 175.0326 778.9053 620.6733 -2.464100e-05
+  TROW low_2019_12 low arm_fresh 3 271.8103 3352.4296 182.9606 3368.4031 620.6733 -2.464100e-05
+  TROW low_2019_12 low arm_fresh 7 676.6638 16058.5373 227.7945 16074.4015 620.6733 -2.464100e-05
+  TROW low_2019_12 low catalog 1 147.4879 805.6727 163.5971 835.2396 -1.0000 8.715500e-06
+  TROW low_2019_12 low catalog 3 251.8054 760.5151 157.4660 816.4464 -1.0000 8.715500e-06
+  TROW low_2019_12 low catalog 7 654.7306 1478.9592 186.7372 1628.1472 -1.0000 8.715500e-06
+  TROW low_2019_12 low state_sphere 1 207.3019 740.9399 183.1453 790.8908 660.6941 1.353800e-05
+  TROW low_2019_12 low state_sphere 3 331.5401 956.3043 197.1240 1031.1618 660.6941 1.353800e-05
+  TROW low_2019_12 low state_sphere 7 749.4681 2126.0879 249.2527 2268.0562 660.6941 1.353800e-05
+  TROW low_2019_12 low state_box 1 207.9901 981.4568 183.1480 1019.8335 660.4116 2.182200e-05
+  TROW low_2019_12 low state_box 3 332.9349 1572.1363 197.1427 1619.0501 660.4116 2.182200e-05
+  TROW low_2019_12 low state_box 7 754.4684 7863.4810 249.3516 7903.5266 660.4116 2.182200e-05
+  TROW low_2019_12 low fade_tau_0p5 1 120.9656 658.0944 187.1276 694.7933 3192.6557 3.083200e-05
+  TROW low_2019_12 low fade_tau_0p5 3 216.5707 1536.2609 203.0930 1564.6876 3192.6557 3.083200e-05
+  TROW low_2019_12 low fade_tau_0p5 7 632.2303 11004.4079 258.0157 11025.5739 3192.6557 3.083200e-05
+  TROW low_2019_12 low fade_tau_0p75 1 131.1763 658.6418 182.1496 695.8410 3174.4872 3.018200e-05
+  TROW low_2019_12 low fade_tau_0p75 3 235.8496 1426.5405 194.6299 1458.9461 3174.4872 3.018200e-05
+  TROW low_2019_12 low fade_tau_0p75 7 653.7671 10496.4639 245.4502 10519.6679 3174.4872 3.018200e-05
+  TROW low_2019_12 low fade_tau_1 1 143.3006 656.8825 182.1709 696.5745 1782.5359 1.665300e-05
+  TROW low_2019_12 low fade_tau_1 3 253.5433 794.7368 194.6743 856.6148 1782.5359 1.665300e-05
+  TROW low_2019_12 low fade_tau_1 7 667.8567 3113.7945 245.4276 3194.0544 1782.5359 1.665300e-05
+  TROW low_2019_12 low fade_tau_1p5 1 167.8819 771.0770 182.1863 809.8988 993.6959 4.830200e-06
+  TROW low_2019_12 low fade_tau_1p5 3 285.0002 2099.9546 194.7026 2128.1315 993.6959 4.830200e-06
+  TROW low_2019_12 low fade_tau_1p5 7 696.8638 4729.9149 245.3855 4787.2673 993.6959 4.830200e-06
+  TROW low_2019_12 low fade_tau_2 1 191.7068 864.3392 182.1895 903.8953 880.3825 1.147900e-06
+  TROW low_2019_12 low fade_tau_2 3 312.9420 2697.0203 194.7065 2722.0878 880.3825 1.147900e-06
+  TROW low_2019_12 low fade_tau_2 7 724.5857 7152.9081 245.3619 7193.7001 880.3825 1.147900e-06
+  TROW low_2019_12 low fade_tau_3 1 230.7489 963.1456 183.6923 1007.2921 816.0363 -1.028500e-06
+  TROW low_2019_12 low fade_tau_3 3 356.1500 3122.3294 198.3692 3148.8306 816.0363 -1.028500e-06
+  TROW low_2019_12 low fade_tau_3 7 768.0979 8736.3655 251.0400 8773.6582 816.0363 -1.028500e-06
+  TCAT low_2019_12 0.141035 835.2396 183065.2994 219.1770 PASS
+  TSTATE low_2019_12 state_sphere 94.1980 210.7059
+  TSTATE low_2019_12 state_box 250.4920 562.7747
+  TFADE low_2019_12 fade_tau_0p5 96 105 7.101817e+01 1.425521e-07
+  TFADE low_2019_12 fade_tau_0p75 59 63 9.098009e+01 5.205955e-08
+  TFADE low_2019_12 fade_tau_1 36 40 1.083957e+02 2.570845e-08
+  TFADE low_2019_12 fade_tau_1p5 23 26 1.379570e+02 1.045645e-08
+  TFADE low_2019_12 fade_tau_2 20 22 1.626804e+02 6.307300e-09
+  TFADE low_2019_12 fade_tau_3 18 19 2.024933e+02 3.768395e-09
+  wall time: 71 s
