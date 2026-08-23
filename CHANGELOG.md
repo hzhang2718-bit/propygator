@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- An extended validation study that examines the numerical propagator during drag-
+significant runs and tests propygator's TLE fitting mechanisms and playbook.
+- Ran 1-day arc propagations on the GRACE-FO twin using fitted Cd, sphere Cd, and
+box Cd. THe resulting RMS values are similar as expected. The fitted Cd values also
+agree well.
+- Ran 14-day drag-significant propagations on GRACE-FO C, Swarm A, and Swarm B with
+drag off, Cd = 2.3, Cd = fitted, sphere Cd, and box Cd. The results are analyzed and
+compiled in the experiment's README.
+
 ## [0.8.0] - 2026-07-26
 
 ### Added

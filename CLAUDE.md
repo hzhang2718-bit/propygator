@@ -18,6 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Documentation Style
 - Annotations and inline notes in contracts/build plans are ONE SENTENCE. Avoid multi-paragraph justifications inside doc edits.
 - Contract additions are terse; rationale goes in chat, not in the document.
+- Whenever possible, aim to use fewer words.
 
 ## Project state
 
