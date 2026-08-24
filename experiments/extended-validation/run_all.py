@@ -106,6 +106,12 @@ GROUPS["tle_summary"] = (
     "results_tle_summary.txt",
     [("summarize_tle.py", [])],
 )
+# Chunk 18. The study's ONLY scoring pass, kept a separate group from
+# `tle_summary` so the unscored evidence and the adjudication stay separable.
+GROUPS["tle_bench"] = (
+    "results_tle_adjudication.txt",
+    [("adjudicate_tle.py", [])],
+)
 
 # Twenty bare names in --only is unusable, so a few aliases expand to them.
 ALIASES: dict[str, list[str]] = {

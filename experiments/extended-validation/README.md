@@ -20,6 +20,7 @@ extended-validation/
 ├── drag_common.py     Part 2 primitives shared by both legs (the per-day rule)
 ├── summarize_drag.py  cross-window text parse → results_drag_summary.txt
 ├── summarize_tle.py   cross-window text parse → results_tle_summary.txt
+├── adjudicate_tle.py  Chunk 18, the study's ONLY scoring pass → results_tle_adjudication.txt
 ├── data/              raw truth + reference docs (gitignored, never committed)
 │   ├── reference/     third-party reference PDFs (see "Reference documents")
 │   ├── tarballs/      TRANSIENT download staging, deleted after extraction
@@ -250,7 +251,7 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 | 0 — maneuver screening | `screen` | `gracefo/results_screen.txt` | **10/10 windows CLEAN on C**, both gates. Two carry a real burn on D (`intense_2024_11`, `storm_2025_05`) and are kept — see the failure rule above. |
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
 | 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **10 windows**, GRACE-FO and Swarm A, B. In low solar activity windows, sphere Cd tends to perform significantly worse than the reference Cd = 2.3. In higher solar activity windows, the tables generally perform better, with the sphere table taking the lead. The box table is one of the worst performers across the board. It is often worse than no drag for quiet windows, and it is rarely as good as the sphere table for active windows. In the few cases where the box table beats the sphere table, the win is small. The exception is window 4, where the box table performed surprisingly well. Overall, the Swarm A propagations feature significantly larger absolute errors, but the percent of errors absorbed by the drag tables tend to be similar across GRACE-FO and Swarm for Cd = 2.3 and sphere Cd. |
-| 3 — TLE fitting | `tle_01..10`, `tle_summary` | `gracefo/results_tle/`, `results_tle_summary.txt` | Apparatus landed and the catalogue pull cleared (**cross-tag 10/10 PASS**); the ten windows and the three pre-registered benchmarks are pending. |
+| 3 — TLE fitting | `tle_01..10`, `tle_summary`, `tle_bench` | `gracefo/results_tle/`, `results_tle_summary.txt`, `results_tle_adjudication.txt` | **10/10 windows landed, cross-tag 10/10 PASS.** Three pre-registered benchmarks adjudicated (Chunk 18): `[bench-1]` **HIT** (gate beats naive, 27/30 under the tie rule), `[bench-2]` **MISS** (gate is redundant with always-`arm_transplant`), `[bench-3]` **PROMOTE** (`fade_tau_1p5` clears the bar) — see the moderate-band caveat below. |
 
 ### Part 2 — drag propagations, per window
 
@@ -367,16 +368,18 @@ aligns to truth by array index.
 
 | win | window | band | gate `r` | gate `s` | arm | status |
 |---|---|---|---|---|---|---|
-| 1 | `low_2019_12` | low | — | — | — | pending |
-| 2 | `low_2021_04` | low | — | — | — | pending |
-| 3 | `low_2021_06` | low | — | — | — | pending |
-| 4 | `moderate_2022_04` | moderate | — | — | — | pending |
-| 5 | `intense_2024_06` | intense | — | — | — | pending |
-| 6 | `storm_2024_08` | storm | — | — | — | pending |
-| 7 | `intense_2024_11` | intense | — | — | — | pending |
-| 8 | `storm_2025_05` | storm | — | — | — | pending |
-| 9 | `moderate_2025_07` | moderate | — | — | — | pending |
-| 10 | `storm_2026_01` | storm | — | — | — | pending |
+| 1 | `low_2019_12` | low | 0.5809 | 1.039 | `arm_zero` | misclassified — day 7, 1.94x |
+| 2 | `low_2021_04` | low | 46.57 | 56.13 | `arm_zero` | clean |
+| 3 | `low_2021_06` | low | 0.4987 | 2.035 | `arm_zero` | clean |
+| 4 | `moderate_2022_04` | moderate | 0.07383 | 0.3119 | `arm_zero` | misclassified — days 1/3/7, up to 4.02x |
+| 5 | `intense_2024_06` | intense | 0.02536 | 0.04419 | `arm_transplant` | clean |
+| 6 | `storm_2024_08` | storm | 0.01274 | 0.06184 | `arm_transplant` | clean |
+| 7 | `intense_2024_11` | intense | 0.01242 | 0.06884 | `arm_transplant` | clean |
+| 8 | `storm_2025_05` | storm | 0.02438 | 0.01233 | `arm_transplant` | clean |
+| 9 | `moderate_2025_07` | moderate | 0.03557 | 0.04274 | `arm_transplant` | clean |
+| 10 | `storm_2026_01` | storm | 0.02355 | 0.05637 | `arm_transplant` | clean |
+
+"Misclassified" means the gate-selected arm was outside the tie set (>1.5x the best arm) at that day; see `results_tle_adjudication.txt`'s `[misclass]` block. 8/10 windows clean; `moderate_2022_04`'s three-day miss feeds the benchmark verdicts below.
 
 **The catalogue pull and its cross-tag check (2026-08-22).** NORAD 43476
 `gp_history`, pulled by hand from Space-Track by the maintainer; the raw paste and
@@ -394,12 +397,16 @@ every set was propagated into `[T, T + 1 d]` and checked against **both** twins:
 | residual vs C | 664 – 1004 m |
 | residual vs D | 173.6 – 221.8 km |
 | ratio (bar 5×) | **195 – 301×**, 10/10 PASS |
-| C–D separation | 173.0 – 222.3 km |
+| C–D separation | 174.2 – 222.0 km |
 
-**These four ranges are provisional.** They come from a one-time sweep that is not
-committed as a script, so no `--verify` reproduces them today; Chunk 18 re-derives
-them from `results_tle_summary.txt`, at which point every figure is traceable to a
-committed window file.
+**These four ranges are no longer provisional.** They originally came from a
+one-time sweep that was never committed as a script; Chunk 18 re-derived all four
+from the ten committed window files, so `--verify --only tle_bench` now reproduces
+them and every figure traces to a committed artifact. Three matched the sweep
+within the precision they were quoted at. **C–D separation did not** — the sweep
+said 173.0 – 222.3 km — and since its output was not retained, the disagreement is
+recorded rather than explained. The committed quantity is the per-day RMS of
+`|r_C − r_D|` over forecast day 1 (`gracefo/catalog_tles.py:337`).
 
 Every window clears the bar by ~40×, so no verdict is marginal, and a ~200 km
 offset is what staleness cannot manufacture — which is what makes this a *tag*
@@ -408,3 +415,18 @@ test rather than a quality test. Window 9, the 10.22 h staleness outlier, scores
 on its `catalog` row. The permanent guard is `run_tle_window.py`, which re-runs the
 check in every window's `[catalog]` block and hard-exits on a miss, so each
 committed window file carries its own verdict.
+
+**The three pre-registered benchmarks (Chunk 18, group `tle_bench` /
+`results_tle_adjudication.txt`).**
+
+| benchmark | bar | result | verdict |
+|---|---|---|---|
+| `[bench-1]` gate vs `naive_2d` | tie rate ≥ 70 % (21/30) | 27/30 = 90.0 % | **HIT** |
+| `[bench-2]` gate vs every fixed arm | gate's hit rate strictly highest | gate 26/30, always-`arm_transplant` 30/30 | **MISS — gate is REDUNDANT**, not wrong: always-`arm_transplant` alone matches or beats it everywhere |
+| `[bench-3]` fading memory promotion | ≥ 1.5x median day-3 gain in ≥ 2 bands, no band < 0.8x | `fade_tau_1p5`: intense 1.652x, moderate 3.332x, no band < 0.851x | **PROMOTE** — `fade_tau_1p5` clears the bar |
+
+`[bench-1]`'s HIT hinges on the contract's tie rule (strict rate is 53.3 %, a
+MISS). `[bench-3]`'s moderate-band median is carried by `moderate_2022_04`,
+the one window `[misclass]` flags as badly wrong (up to 4.02x); see the
+adjudication file's `[misclass]` and `[sensitivity]` blocks before treating
+either verdict as final.

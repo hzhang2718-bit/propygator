@@ -845,7 +845,7 @@ download. Closes `results_tle_summary.txt` at 10/10.
 - [X] window 9
 - [X] window 10
 
-### **Chunk 18: adjudication**
+### **Chunk 18: adjudication** - Done
 
 **Goal.** Score the three pre-registered benchmarks and write down what missed.
 A text pass over the ten committed files -- no JVM, no re-runs.
@@ -890,10 +890,10 @@ state-path rows' degradation against their measured reference drift; every
 configuration's convergence and in-arc RMS class.
 
 **Checklist**
-- [ ] `results_tle_summary.txt` closed at 10/10
-- [ ] three benchmark verdicts, HIT/MISS, misses written as misses
-- [ ] post-hoc block labelled
-- [ ] playbook revision decision recorded (the doc rewrite is Part 4)
+- [X] `results_tle_summary.txt` closed at 10/10
+- [X] three benchmark verdicts, HIT/MISS, misses written as misses
+- [X] post-hoc block labelled
+- [X] playbook revision decision recorded (the doc rewrite is Part 4)
 
 ## Part 4: Wrap-up and docs work
 
@@ -1025,6 +1025,17 @@ third arm's free-vs-held ambiguity resolved the way the study measured it; and t
 gate's domain of validity written down -- r certifies in-arc observability, s
 catches nonstationarity, neither certifies forward validity.
 
+**Decision recorded (2026-08-23 amendment).** The r/s gate is retired -- bench-2's
+30/30 clean result makes always-`arm_transplant` the default recipe,
+regime-validated (ten windows, four bands) but not body-validated (GRACE-FO only).
+The fading-memory PROMOTE verdict is quoted as printed, not re-scored, but stated
+beside its bar: the moderate band's median is carried by `moderate_2022_04`, which
+`[misclass]` already flags up to 4.02x, so the playbook records it as a live
+candidate, not a settled win. `docs/tle-fit-strategy-findings.md`'s
+log-spaced-sampling axis (sec 3, 2026-07-19) also survives, now corroborated by
+Chunk 18's in-arc RMS table (`fade_tau_0.5` to 23 km against a ~600 m floor); the
+file is trimmed to keep it alongside the refit-cadence route, not archived.
+
 **Also.** `docs/tle-fit-strategy-findings.md` -- record which of its open routes
 this study executed and which survive. Archive it to `docs/history/` if only the
 refit-cadence route is left; otherwise trim it to what remains. Its pre-registered
@@ -1124,6 +1135,10 @@ archival) and this build plan, both to `docs/history/`.
 committed as a recipe. PROMOTE ships this study **without** the API change; the
 `measurement_decay_tau` amendment is then its own feature branch off `main`, with
 its own minor release.
+
+**Decision recorded (2026-08-23 amendment).** PROMOTE alone does not authorize that
+future branch -- Chunk 22's caveat (moderate-band contamination, the unresolved
+log-spaced-sampling axis) is weighed first.
 
 **Maintainer's.** Version bump to `v0.8.1` and the editable reinstall that bump
 requires, the CHANGELOG entry, the PR, the squash-merge, the tag. If anything landed

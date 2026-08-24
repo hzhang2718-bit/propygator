@@ -46,16 +46,20 @@ right inclination, the right mean motion and valid checksums, and would quietly
 turn Part 3's ``catalog`` row into a measurement of the wrong satellite.
 :func:`cross_tag_check` propagates each row into ``[T, T + 1 d]`` and requires
 the residual against C truth to beat the residual against D truth by
-:data:`CROSS_TAG_MIN_RATIO`. Measured over the ten windows -- **provisional
-figures**, from a one-time uncommitted sweep, re-derived from committed window
-files at Chunk 18:
+:data:`CROSS_TAG_MIN_RATIO`. Measured over the ten windows and **re-derived from
+the committed window files at Chunk 18** (``results_tle_adjudication.txt``),
+which is what these figures now rest on:
 
 - residual **vs C 664-1004 m**, **vs D 173.6-221.8 km**, ratio **195-301x**
   against the 5x bar -- every window clears it by ~40x, so no verdict is
   marginal;
-- the twins are **173.0-222.3 km** apart on forecast day 1, which is what a
+- the twins are **174.2-222.0 km** apart on forecast day 1, which is what a
   cross-tagged set would show and what staleness cannot manufacture. That is
-  what makes this a TAG test rather than a quality test;
+  what makes this a TAG test rather than a quality test. The one-time sweep's
+  provisional 173.0-222.3 km did not survive re-derivation, and since that
+  sweep's output was not retained the disagreement is recorded rather than
+  explained; the committed quantity is the per-day RMS of ``|r_C - r_D|``
+  computed in :func:`cross_tag_check`;
 - window 9, the 10.22 h staleness outlier, scores **738 m vs C** -- mid-pack
   among the ten, not degraded. Read as one day's evidence, not as a verdict on
   its ``catalog`` row; Chunk 18 adjudicates staleness against outcome.
