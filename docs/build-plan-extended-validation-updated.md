@@ -909,7 +909,7 @@ The six contract deliverables map on as: 1 -> Chunk 20, 2 -> Chunk 21, 3 -> Chun
 **Nothing here regenerates evidence or softens a verdict.** Wrap-up transcribes
 committed results files; a missed benchmark is written down as missed.
 
-### **Chunk 19: the DSMC correction (prose only)**
+### **Chunk 19: the DSMC correction (prose only)** - Done
 
 **Goal.** Apply the contract's "One important correction" and nothing else.
 Independent of every result in this study, so it can run at any point; it is first
@@ -941,12 +941,12 @@ new name goes in even if this chunk runs first.
 proof the correction stayed additive.
 
 **Checklist**
-- [ ] four live claims corrected, additively and dated
-- [ ] `gracefo/README.md` correction block
-- [ ] two frozen-README link paths repointed
-- [ ] frozen `--verify` green
+- [X] four live claims corrected, additively and dated
+- [X] `gracefo/README.md` correction block
+- [X] two frozen-README link paths repointed
+- [*] frozen `--verify` green *NOT green, but acknowledged for now
 
-### **Chunk 20: evidence surface close-out**
+### **Chunk 20: evidence surface close-out** - Done
 
 **Goal.** Deliverable 1 -- every results file committed and regenerable by one
 orchestrator command, with the per-window separability the contract asks for twice.
@@ -970,8 +970,8 @@ re-verified; no results file carries a wall-clock-dependent line `--verify` cann
 mask.
 
 **Checklist**
-- [ ] `run_all.py` groups, aliases, `--list`, `--verify`
-- [ ] study README finalized incl. findings-at-a-glance and the verify policy
+- [X] `run_all.py` groups, aliases, `--list`, `--verify`
+- [X] study README finalized incl. findings-at-a-glance and the verify policy
 
 ### **Chunk 21: findings -- append to the existing doc, then rename**
 

@@ -73,6 +73,27 @@ proves the driver end to end), `--verify-harness` (the build plan's
 study exercises), and `--verify-gate` (the frozen thresholds against the
 playbook and one arm per corner case; needs neither data nor JVM).
 
+## Windows
+
+The ten frozen study windows (build plan `## GRACE-FO and Swarm windows used`;
+`gracefo/windows.py`'s `FROZEN_INDICES` re-checks the same table against CSSI at
+runtime rather than trusting it). All ten are 14 days; `t0` is the first UTC day.
+
+| # | window | band | t0 | end (excl.) | F10.7 (range) | Ap max | note |
+|---|---|---|---|---|---|---|---|
+| 1 | `low_2019_12` | low | 2019-12-23 | 2020-01-06 | 71.9 (70-73) | 8 | |
+| 2 | `low_2021_04` | low | 2021-04-15 | 2021-04-29 | 77.3 (75-83) | 28 | |
+| 3 | `low_2021_06` | low | 2021-06-17 | 2021-07-01 | 83.1 (76-94) | 13 | |
+| 4 | `moderate_2022_04` | moderate | 2022-04-29 | 2022-05-13 | 120.2 (109-133) | 15 | slid −1 d from 2022-04-30 at the 13→14 day extension |
+| 5 | `intense_2024_06` | intense | 2024-06-14 | 2024-06-28 | 187.4 (167-203) | 17 | "intense" exists only in 2024 — confounded with mission epoch/altitude |
+| 6 | `storm_2024_08` | storm | 2024-08-11 | 2024-08-25 | 242.5 (225-282) | **127** | storm at day 1 — storm-contaminated fit arc, calm forecast |
+| 7 | `intense_2024_11` | intense | 2024-11-23 | 2024-12-07 | 198.6 (174-225) | 11 | see window 5 |
+| 8 | `storm_2025_05` | storm | 2025-05-26 | 2025-06-09 | 137.4 (115-164) | **98** | storm across days 3–8 — nonstationarity, the gate's `s` half |
+| 9 | `moderate_2025_07` | moderate | 2025-07-23 | 2025-08-06 | 147.8 (143-157) | 27 | |
+| 10 | `storm_2026_01` | storm | 2026-01-13 | 2026-01-27 | 166.0 (117-232) | **144** | storm onset at the day-6 boundary — fit-right-before-onset case |
+
+Ctr81/ap3/Kp columns are in the build plan's table; dropped here for width.
+
 ## Running
 
 Everything runs in the **propygator conda env** — the locked departure from
@@ -84,6 +105,10 @@ lookups, not generator runs.
 conda run --no-capture-output -n propygator python run_all.py --list
 conda run --no-capture-output -n propygator python run_all.py --only noise
 conda run --no-capture-output -n propygator python run_all.py --verify --only noise
+
+# regenerate/verify a single window, e.g. Part 2 window 4 or Part 3 window 7
+conda run --no-capture-output -n propygator python run_all.py --only drag_04
+conda run --no-capture-output -n propygator python run_all.py --verify --only tle_07
 ```
 
 Use `--no-capture-output`; without it `conda run` buffers everything to the end
@@ -252,6 +277,42 @@ explicitly as **hit or miss**; a miss is written down as a miss.
 | 1 — table noise | `noise` | `gracefo/results_table_noise.txt` | **12/12 metrics HIT.** Worst departure 6.55 % against a 20 % bar; the twin Cd ratio within 1.15 % of 1.0 against a 10 % bar. |
 | 2 — drag propagations | `drag_01..10`, `swarm_01..10`, `drag_summary` | `gracefo/results_drag/`, `swarm/results_drag/`, `results_drag_summary.txt` | **10 windows**, GRACE-FO and Swarm A, B. In low solar activity windows, sphere Cd tends to perform significantly worse than the reference Cd = 2.3. In higher solar activity windows, the tables generally perform better, with the sphere table taking the lead. The box table is one of the worst performers across the board. It is often worse than no drag for quiet windows, and it is rarely as good as the sphere table for active windows. In the few cases where the box table beats the sphere table, the win is small. The exception is window 4, where the box table performed surprisingly well. Overall, the Swarm A propagations feature significantly larger absolute errors, but the percent of errors absorbed by the drag tables tend to be similar across GRACE-FO and Swarm for Cd = 2.3 and sphere Cd. |
 | 3 — TLE fitting | `tle_01..10`, `tle_summary`, `tle_bench` | `gracefo/results_tle/`, `results_tle_summary.txt`, `results_tle_adjudication.txt` | **10/10 windows landed, cross-tag 10/10 PASS.** Three pre-registered benchmarks adjudicated (Chunk 18): `[bench-1]` **HIT** (gate beats naive, 27/30 under the tie rule), `[bench-2]` **MISS** (gate is redundant with always-`arm_transplant`), `[bench-3]` **PROMOTE** (`fade_tau_1p5` clears the bar) — see the moderate-band caveat below. |
+
+### Order-of-magnitude errors
+
+A quick-look complement to the per-window tables below: how far off truth these
+propagations tend to run, not a benchmark and not scored. Cell = **day-1 / day-7
+3D RMS vs truth**, median across each band's windows so one active or storm
+window's spike doesn't dominate the read, rounded to ~2 significant figures.
+Bands regroup the window table above: **quiet** = the low band (windows 1–3),
+**active** = moderate + intense pooled (4/5/7/9), **storm** = 6/8/10; day-1 is
+skipped for storm (one day is not enough signal there). Read the per-window
+files for exact figures and caveats (window 4's railed Swarm A Cd among them).
+
+**Part 2 drag, GRACE-FO C** (`Cd = 2.3` / sphere table / box table)
+
+| band | Cd=2.3 | sphere | box |
+|---|---|---|---|
+| quiet | 10 m / 960 m | 24 m / 1.5 km | 64 m / 6.5 km |
+| active | 280 m / 18 km | 190 m / 11 km | 370 m / 40 km |
+| storm | — / 18 km | — / 9.4 km | — / 45 km |
+
+**Part 2 drag, Swarm A+B pooled**
+
+| band | Cd=2.3 | sphere | box |
+|---|---|---|---|
+| quiet | 33 m / 1.5 km | 40 m / 4.4 km | 170 m / 19 km |
+| active | 300 m / 23 km | 200 m / 11 km | 670 m / 80 km |
+| storm | — / 25 km | — / 14 km | — / 90 km |
+
+**Part 3 TLE fitting, GRACE-FO C** (`naive_2d` / `arm_transplant`, the gate's
+usual pick)
+
+| band | naive_2d | arm_transplant |
+|---|---|---|
+| quiet | 830 m / 12 km | 800 m / 9.1 km |
+| active | 760 m / 9 km | 740 m / 11 km |
+| storm | — / 24 km | — / 21 km |
 
 ### Part 2 — drag propagations, per window
 
