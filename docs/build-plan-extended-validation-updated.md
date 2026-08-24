@@ -973,7 +973,7 @@ mask.
 - [X] `run_all.py` groups, aliases, `--list`, `--verify`
 - [X] study README finalized incl. findings-at-a-glance and the verify policy
 
-### **Chunk 21: findings -- append to the existing doc, then rename**
+### **Chunk 21: findings -- append to the existing doc, then rename** - Done
 
 **Goal.** Deliverable 2. This study does **not** get its own findings document. Its
 findings are appended to `docs/real-world-validation-findings.md`, which is then
@@ -1010,9 +1010,9 @@ unchanged apart from the additive re-scoping notes (diff-checkable); the
 fading-memory verdict stated with its bar quoted rather than paraphrased.
 
 **Checklist**
-- [ ] new sections appended from section 9
-- [ ] sections 1-8 numbers intact; re-scoping notes additive
-- [ ] renamed to `docs/validation-findings.md`; title + status block rewritten
+- [X] new sections appended from section 9
+- [X] sections 1-8 numbers intact; re-scoping notes additive
+- [X] renamed to `docs/validation-findings.md`; title + status block rewritten
 
 ### **Chunk 22: playbook revision**
 
@@ -1040,7 +1040,9 @@ file is trimmed to keep it alongside the refit-cadence route, not archived.
 **Also.** `docs/tle-fit-strategy-findings.md` -- record which of its open routes
 this study executed and which survive. Archive it to `docs/history/` if only the
 refit-cadence route is left; otherwise trim it to what remains. Its pre-registered
-fading-memory bar is resolved in Chunk 18 and is quoted here, not restated.
+fading-memory bar is resolved in Chunk 18 and is quoted here, not restated. This
+document is touched on my the `tle-fit-strategy` experiment, and that will need
+to be resolved at build time.
 
 **Checklist**
 - [ ] playbook revised to the measured verdict

@@ -537,9 +537,10 @@ the credibility claim rested on a bad citation.
 
 Four live claims rest on the band. All are corrected additively, in
 prose, with a dated note -- surrounding measured numbers stay:
-- `real-world-validation-findings.md:118-120` -- "NRLMSISE-00
+- `validation-findings.md:121-123` (renamed from
+  `real-world-validation-findings.md` at Chunk 21) -- "NRLMSISE-00
   over-predicts deep-solar-minimum density by >= 25 %"
-- `real-world-validation-findings.md:125-129` -- the tables are
+- `validation-findings.md:133-137` -- the tables are
   physically credible, sphere/box read against the band edges
 - `experiments/real-world-validation/README.md:99` -- the
   "both DSMC-credible" summary row
