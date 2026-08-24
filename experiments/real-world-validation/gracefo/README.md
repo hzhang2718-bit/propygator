@@ -669,3 +669,23 @@ Readings from the a-priori-table rows (2026-07-15):
   (two blocks: the §1.2 State-reference-path composition check per window;
   regenerated 2026-07-15 with the a-priori-table rows + the native-vs-external
   equivalence check — the original three rows recompute in the same run).
+
+## DSMC band correction (2026-08-24)
+
+The `DSMC_CD_BAND = (2.65, 4.5)` cited throughout this leg (`gracefo_common.py:65`,
+`results.txt`) is **withdrawn in full, not refuted**. Both edges trace to the same
+non-DSMC source: Leipner et al. (arXiv 2503.21651), a closed-loop panel-deployment
+simulation, states "for the shape of the top mounted double solar panels values of
+cD=2.65 and cD=4.5 (doubled value of GRACE-FO shape) were considered" — both
+numbers are *assumed inputs* for a hypothetical double-panel bus, not DSMC output,
+and not the GRACE geometry. Leipner's own baseline (cD=2.25) traces to Wöske et al.
+2018, an accelerometer-calibration paper, not a Cd derivation. Leipner does not
+cite Mehta, McLaughlin & Sutton 2013 (Adv. Space Res. 52(12) 2035-2051) anywhere —
+so the code comment's attribution of the lower edge (2.65) to that genuine GRACE
+DSMC study is unverified, and the coincidence with Leipner's own considered value
+is at least as likely an explanation. Mehta et al. 2013 is a real DSMC-based Cd
+model for GRACE, but its reported value could not be checked against the paper.
+This is not a claim that the shipped tables fall outside a correct band — only
+that no verified citation currently supports either specific edge.
+`gracefo_common.py`, `results.txt` and `run_gracefo.py` are frozen evidence and
+are not edited.

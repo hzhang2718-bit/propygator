@@ -27,7 +27,7 @@ last:
 (relationship pins; `box_and_panels` geometry upgrade **deferred**), and the
 Chunk 4 wrap-up shipped the pinned tests
 (`tests/propagation/test_real_world_*.py`, `tests/tle/test_fitter_real_world.py`),
-the findings doc (`docs/real-world-validation-findings.md`), and the README
+the findings doc (`docs/validation-findings.md`), and the README
 Validation note. Chunks 5 and 6 are order-independent follow-ons on their own
 branches off `main`; the build plan stays active.
 
@@ -87,7 +87,7 @@ progress to stderr.
 ## Findings at a glance
 
 Full tables and readings live in the leg READMEs (the committed `results.txt`
-files are the raw evidence); `docs/real-world-validation-findings.md`
+files are the raw evidence); `docs/validation-findings.md`
 consolidates them.
 
 | Leg | Headline | Where |
@@ -101,6 +101,10 @@ consolidates them.
 | Fitter vs. catalog | converges on real data (~630 m post-fit RMS); **catalog parity** with regime-appropriate `fit_bstar` (ratios 0.83–2.10); quiet 1-day B\*-on runaway = §1.2's own guidance validated | `gracefo/README.md` "Fitter vs. catalog" |
 | Fitting-span sweep | 2-day `fitting_span` default **empirically vindicated**; regime rule: weak drag → hold a calibrated B\*, strong drag → fit B\* on ~2 d | `gracefo/README.md` sweep subsection |
 | State path | free **iff** the ballistic coefficient is calibrated (single-digit-%); uncalibrated Cd costs 7× and no fit diagnostic can see it; a-priori tables can't meet the bar | `gracefo/README.md` state-path subsection |
+
+**DSMC band correction (2026-08-24):** the "A-priori Cd tables" row's
+DSMC-credible read cites a band withdrawn in full — see `gracefo/README.md`
+"DSMC band correction."
 
 ## Conventions
 

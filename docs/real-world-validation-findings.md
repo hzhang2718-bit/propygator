@@ -122,13 +122,20 @@ lever spans the "10–30 % density uncertainty" the plan named — the number
 that calibrates solar-sail expectations (a high-A/m sail lives in the same
 band).
 
+**DSMC band correction (2026-08-24):** the cited band is withdrawn in full —
+both edges trace to the same non-DSMC paper's assumed sensitivity values, not
+independent DSMC results; detail in
+`experiments/real-world-validation/gracefo/README.md` "DSMC band correction."
+
 **The a-priori Cd tables are physically credible — and density-limited by
 construction.** With no reference Cd supplied, on A_ram: sphere table 2.92 /
 2.70 / 2.51, box table 4.42 / 4.06 / 3.88 (quiet/active/storm) — the sphere at
 the DSMC band's low edge, the box inside it (its larger Cd is the edge-on skin
-friction a sphere structurally cannot see — more complete, not over-drag). An
-orbit residual constrains only ρ·Cd·A, so the no-fit runs expose the *window's
-density bias through the table*, never the table alone:
+friction a sphere structurally cannot see — more complete, not over-drag).
+**DSMC band correction (2026-08-24):** see the note above — this "low edge"
+read rests on the same withdrawn citation. An orbit residual constrains only
+ρ·Cd·A, so the no-fit runs expose the *window's density bias through the
+table*, never the table alone:
 
 - **The storm sign test resolved H1.** The box table's share of the fitted
   product ran 2.23× → 1.21× → **0.97×** (quiet → active → storm): its

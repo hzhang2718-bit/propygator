@@ -558,6 +558,12 @@ and why, left as written. `features.md:431` and the two
 `docs/history/` Tier-B notes mention DSMC only as a generation
 *method* and need no action.
 
+**Amendment (2026-08-24): broadened to both edges.** Leipner states cD=2.65
+and cD=4.5 together as assumed double-panel sensitivity values (neither
+DSMC, neither GRACE geometry) and never cites Mehta 2013, so the lower
+edge's Mehta attribution is unverified, not merely unchecked.
+`DSMC_CD_BAND` is withdrawn in full.
+
 ## Conventions and constraints
 
 **The earlier experiment is frozen.** `experiments/real-world-validation/`

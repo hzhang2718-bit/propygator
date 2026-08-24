@@ -17,6 +17,16 @@ agree well.
 - Ran 14-day drag-significant propagations on GRACE-FO C, Swarm A, and Swarm B with
 drag off, Cd = 2.3, Cd = fitted, sphere Cd, and box Cd. The results are analyzed and
 compiled in the experiment's README.
+- Ran TLE fitting tests over the 10 windows to test the fidelity of naive 2-day fits,
+the TLE playbook, the catalogue TLE, fitting from state, and fading memory fits. The
+results are then parsed and compared against stated benchmarks.
+- (Compiled findings in `docs/validation-findings.md`. Formerly
+`docs/real-world-validation.md`.)
+
+## Fixed
+
+- Withdrew DMSC statement from real world validation study after a closer read
+revealed that the cited paper does not support the previously claimed Cd band.
 
 ## [0.8.0] - 2026-07-26
 

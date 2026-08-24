@@ -168,6 +168,8 @@ READ_DAYS = (1, 3, 7)
 # Transcribed from real-world-validation/gracefo/gracefo_common.py with the
 # lines cited, so a diff against that file is a one-line check.
 CD_NOMINAL = 2.3  # gracefo_common.py:40 -- free-molecular nominal
+# near Leipner et al.'s cD=2.25 "standard" GRACE-FO value (arXiv 2503.21651,
+# via Woske et al. 2018 -- not independently verified)
 CR = 1.3  # gracefo_common.py:41 -- sphere reflection coefficient
 SUBSAMPLE_S = 60.0  # gracefo_common.py:47 -- the truth diff grid
 

@@ -913,17 +913,18 @@ committed results files; a missed benchmark is written down as missed.
 
 **Goal.** Apply the contract's "One important correction" and nothing else.
 Independent of every result in this study, so it can run at any point; it is first
-because it is the only wrap-up item with no dependency.
+because it is the only wrap-up item with no dependency. Before starting, first
+re-verify the claim.
 
 **Edit.** The four live claims the contract lists, each additively, each with a
 dated note, every surrounding measured number left in place -- the two spots in the
 findings doc, the frozen study README's summary row, and `CLAUDE.md` -- plus one
 correction block appended to `gracefo/README.md`.
 
-**Wording discipline: withdrawn, not refuted.** The band's lower edge traces to a
-genuine DSMC study of the GRACE bus whose values were never checked against the
-paper, so the correction may **not** assert the tables fall outside a correct band.
-It may only say the credibility claim rested on a mis-sourced upper edge.
+**Wording discipline: withdrawn, not refuted.** Both edges trace to the same
+non-DSMC paper's assumed sensitivity values (2026-08-24 broadening), so the
+correction may **not** assert the tables fall outside a correct band. It may
+only say the credibility claim rested on a mis-sourced band.
 
 **Do not touch.** `gracefo_common.py:65`, `results.txt`, `run_gracefo.py`, and
 `docs/history/`. No results file is regenerated.
@@ -970,7 +971,7 @@ mask.
 
 **Checklist**
 - [ ] `run_all.py` groups, aliases, `--list`, `--verify`
-- [ ] study README finalised incl. findings-at-a-glance and the verify policy
+- [ ] study README finalized incl. findings-at-a-glance and the verify policy
 
 ### **Chunk 21: findings -- append to the existing doc, then rename**
 
@@ -1128,6 +1129,14 @@ repo.
 **Run.** `pre-commit run --all-files`; `conda run -n propygator pytest`; per-group
 `run_all.py --verify` across the three parts, plus the frozen study's `--verify`.
 
+**Known red, by design.** The frozen study's `--verify` still shows a ~0.2%
+box-table (Run 5) shift -- root-caused in Chunk 19 (v0.7.3's leeward-floor fix
+works correctly; its README note undersold the effect by ~5 orders of
+magnitude). Deliberately deferred to its own separate branch, not fixed here:
+the first frozen-study revisit beyond a pre-sanctioned prose exception, so it
+gets its own process. Not a regression -- diff it against this known finding,
+don't chase it.
+
 **Archive.** `docs/extended-validation-updated.md` (the contract instructs its own
 archival) and this build plan, both to `docs/history/`.
 
@@ -1145,7 +1154,8 @@ requires, the CHANGELOG entry, the PR, the squash-merge, the tag. If anything la
 on `main` during the study, the study is re-run before the merge.
 
 **Checklist**
-- [ ] hooks, full suite, per-group verifies, frozen verify
+- [ ] hooks, full suite, per-group verifies; frozen verify run and diffed
+      against the known Chunk 19 finding (no *new* divergence)
 - [ ] contract + build plan archived to `docs/history/`
 - [ ] fading-memory verdict recorded (DEFER default)
 - [ ] handed to maintainer for version bump, CHANGELOG, PR, tag
