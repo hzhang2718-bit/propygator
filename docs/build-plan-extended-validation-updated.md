@@ -1014,7 +1014,7 @@ fading-memory verdict stated with its bar quoted rather than paraphrased.
 - [X] sections 1-8 numbers intact; re-scoping notes additive
 - [X] renamed to `docs/validation-findings.md`; title + status block rewritten
 
-### **Chunk 22: playbook revision**
+### **Chunk 22: playbook revision** - Done
 
 **Goal.** Deliverable 3. This study exists partly to invalidate the playbook, so
 the revision follows Chunk 18's verdict rather than defending the recipe.
@@ -1044,9 +1044,24 @@ fading-memory bar is resolved in Chunk 18 and is quoted here, not restated. This
 document is touched on my the `tle-fit-strategy` experiment, and that will need
 to be resolved at build time.
 
+**Decision recorded (2026-08-24 amendment, maintainer-directed).** Supersedes the
+trim-in-place and docs/history/ calls above: `docs/tle-fitting-playbook.md` and
+`docs/tle-fit-strategy-findings.md` are archived unchanged to
+`experiments/tle-fit-strategy/`, since their evidence is now covered by
+`docs/validation-findings.md` sec 14/16/17 and docs/ clutter was a live concern.
+The revision itself ships as new file `docs/tle-fitting-playbook-updated.md`. r and
+s are dropped from it entirely (not just the gate-mapping table) -- they gated arm
+selection only, never fed the transplant fit, and their standalone diagnostic value
+was never separately tested, so restating it would not be pulling its weight.
+Reconciliation debt for Chunk 24: repoint every inbound reference to the old
+`docs/tle-fitting-playbook.md` path (root README, both notebooks, `CLAUDE.md`, and
+`docs/validation-findings.md` sec 14/16/17 itself) to
+`docs/tle-fitting-playbook-updated.md`, alongside the findings-doc rename sweep
+already scoped there.
+
 **Checklist**
-- [ ] playbook revised to the measured verdict
-- [ ] `tle-fit-strategy-findings.md` closed, trimmed, or archived
+- [X] playbook revised to the measured verdict
+- [X] `tle-fit-strategy-findings.md` closed, trimmed, or archived
 
 ### **Chunk 23: pinned regression tests**
 

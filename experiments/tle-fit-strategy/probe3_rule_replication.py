@@ -2,7 +2,7 @@
 
 Part of the **TLE fit strategy** experiment (2026-07-19; see README.md). The
 rule under test (from probe 1's single-anchor evidence; now
-``docs/tle-fitting-playbook.md``):
+``tle-fitting-playbook.md``, same folder):
 
   1. Fit 2 d with B* free. Read r = sigma0*sigma(B*)/|B*|.
   2. r < 0.05  -> B* is real: transplant it (hold) into a fresh 1 d element

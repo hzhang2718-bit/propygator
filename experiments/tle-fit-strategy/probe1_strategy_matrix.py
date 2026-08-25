@@ -20,7 +20,7 @@ shipped ``run_fit_vs_catalog.py --sweep`` used 6):
 Every fit records the v0.8.0 diagnostics: sigma0, raw + sigma0-scaled
 sigma(B*), and the linear/quadratic coefficients of the in-arc along-track RIC
 residual -- the candidate catalog-free discriminators behind the playbook's
-r-gate (``docs/tle-fitting-playbook.md``).
+r-gate (``tle-fitting-playbook.md``, same folder).
 
 Design mirrors ``run_fit_vs_catalog.py --sweep``: end-anchored fit arcs, all
 ending at the day-7 start; common forecast window = days 7-10 (4 days).

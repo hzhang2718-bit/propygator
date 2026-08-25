@@ -622,6 +622,12 @@ the compute has finished.
    standing. If the gate passes, the playbook records that its
    thresholds now rest on this study's window set instead of a
    single satellite.
+
+   Amendment (2026-08-24): delivered as new file
+   `docs/tle-fitting-playbook-updated.md`, not an in-place edit; the
+   original `docs/tle-fitting-playbook.md` and
+   `docs/tle-fit-strategy-findings.md` are archived unchanged to
+   `experiments/tle-fit-strategy/`.
 4. **New pinned regression tests**, following the earlier study's
    pattern: measured values with a generous margin, testing
    relationships rather than exact numbers. They exist to catch a

@@ -1,13 +1,12 @@
 # TLE fit strategy — open questions and validation routes
 
 > **Status: working notes (non-binding, forward-looking).** Companion to
-> `docs/tle-fitting-playbook.md` (the recipe) and
-> `experiments/tle-fit-strategy/` (the evidence). This note records **how to
-> test the playbook further** and **how to decide whether fading-memory
-> weighting deserves a §1.2 amendment** — the two threads left open by the
-> 2026-07-19 strategy session. Nothing here is scheduled; each section is a
-> candidate election in the experiments rhythm. Archive to `docs/history/`
-> when resolved.
+> `tle-fitting-playbook.md` (the recipe, same folder) and this experiment's
+> evidence. This note records **how to test the playbook further** and **how
+> to decide whether fading-memory weighting deserves a §1.2 amendment** — the
+> two threads left open by the 2026-07-19 strategy session. Relocated here
+> 2026-08-24 from `docs/` by extended-validation Chunk 22; see
+> `docs/validation-findings.md` §14/§16/§17 for what that study resolved.
 
 ## 1. What is established vs what is assumed
 
