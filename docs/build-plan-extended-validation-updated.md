@@ -1063,7 +1063,7 @@ already scoped there.
 - [X] playbook revised to the measured verdict
 - [X] `tle-fit-strategy-findings.md` closed, trimmed, or archived
 
-### **Chunk 23: pinned regression tests**
+### **Chunk 23: pinned regression tests** - Done
 
 **Goal.** Deliverable 4. These exist to catch a wiring regression, not to freeze a
 physical result.
@@ -1087,10 +1087,10 @@ no-JVM guards.
 perturbed; added suite runtime in seconds, not minutes.
 
 **Checklist**
-- [ ] Part 1 pin
-- [ ] Part 2 pin
-- [ ] Part 3 pin
-- [ ] full suite green, v0.7.2 pins untouched
+- [X] Part 1 pin
+- [X] Part 2 pin
+- [X] Part 3 pin
+- [X] full suite green, v0.7.2 pins untouched
 
 ### **Chunk 24: reconciliation**
 
