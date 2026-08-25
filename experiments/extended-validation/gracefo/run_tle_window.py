@@ -261,14 +261,16 @@ def verify_gate() -> int:
     ``summarize_tle.py`` only ever exercises the corners the ten landed windows
     happen to hit.
 
-    The thresholds are checked against ``docs/tle-fitting-playbook.md`` itself,
-    not merely against their own literals -- they are pre-registered predictions
-    carried verbatim from that document, so the document is the authority.
+    The thresholds are checked against the original
+    ``experiments/tle-fit-strategy/tle-fitting-playbook.md`` (archived unchanged
+    at extended-validation Chunk 22) itself, not merely against their own
+    literals -- they are pre-registered predictions carried verbatim from that
+    document, so the document is the authority.
     """
     print("[verify-gate]  frozen thresholds and the gate -> arm mapping")
     failures = 0
 
-    playbook = _HERE.parents[2] / "docs" / "tle-fitting-playbook.md"
+    playbook = _HERE.parents[1] / "tle-fit-strategy" / "tle-fitting-playbook.md"
     text = playbook.read_text(encoding="utf-8")
     for label, const, literal in (
         ("R_THRESHOLD", R_THRESHOLD, "r < 0.05?"),

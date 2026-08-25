@@ -1092,7 +1092,7 @@ perturbed; added suite runtime in seconds, not minutes.
 - [X] Part 3 pin
 - [X] full suite green, v0.7.2 pins untouched
 
-### **Chunk 24: reconciliation**
+### **Chunk 24: reconciliation** - Done
 
 **Goal.** Deliverable 5, everything except the showcase.
 
@@ -1110,10 +1110,10 @@ perturbed; added suite runtime in seconds, not minutes.
   `docs/history/` are historical records and stay as written.
 
 **Checklist**
-- [ ] README validation section
-- [ ] notebook 07 section 9
-- [ ] `CLAUDE.md`
-- [ ] rename sweep clean (no live reference to the old path)
+- [X] README validation section
+- [X] notebook 07 section 9
+- [X] `CLAUDE.md`
+- [X] rename sweep clean (no live reference to the old path)
 
 ### **Chunk 25: `notebooks/00_showcase.ipynb`**
 

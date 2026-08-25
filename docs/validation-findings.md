@@ -599,7 +599,7 @@ Thirteen scored configurations per window, all fitted to **truth** except two
 state-path rows, GRACE-FO C only. Every arc ends at the common instant
 `T = t0 + 6 d`; every forecast runs `[T, T + 7 d]`, read per-day at day 1/3/7
 past T. The r/s gate's thresholds are **carried verbatim from
-`tle-fitting-playbook.md`** (r < 0.05, s < 0.1) and never re-fitted — a
+`experiments/tle-fit-strategy/tle-fitting-playbook.md`** (r < 0.05, s < 0.1) and never re-fitted — a
 misclassification is the finding, not something to recalibrate away. Gate
 mapping:
 
@@ -648,7 +648,7 @@ the gate mispredicting; Chunk 18 isolates this with `arm_transplant`, run in
 every window regardless of the gate's pick. And the fading-memory result
 characterizes **uniform 300-measurement sampling only** — the log-spaced,
 recency-weighted axis that naturally pairs with short τ was not measured
-(`docs/tle-fit-strategy-findings.md` §3, still open).
+(`experiments/tle-fit-strategy/tle-fit-strategy-findings.md` §3, still open).
 
 **A promotion's cost, if elected:** the fading-memory rows alone needed
 `max_iterations = 800` (worst observed demand 471 evaluations,
@@ -699,7 +699,7 @@ recoverable from orbit data — adding satellites does not change this.
   closed question.
 - **The fading-memory result is uniform-sampling only** — the log-spaced
   axis that pairs naturally with short τ remains untested
-  (`docs/tle-fit-strategy-findings.md` §3).
+  (`experiments/tle-fit-strategy/tle-fit-strategy-findings.md` §3).
 - **Swarm's table rows conflate geometry error with model error** — its
   mass and box are ESA-sourced estimates, not measurements, so a Swarm
   table-vs-truth gap cannot be attributed to the drag model alone the way
@@ -734,7 +734,7 @@ New from this study:
   actual playbook language; this doc records the measured PROMOTE verdict
   and its moderate-band caveat for that chunk to weigh.
 - **The log-spaced-sampling axis** for fading memory
-  (`docs/tle-fit-strategy-findings.md` §3) — corroborated further here
+  (`experiments/tle-fit-strategy/tle-fit-strategy-findings.md` §3) — corroborated further here
   (§14's `max_iterations` cost), still unresolved.
 - **A second body for Part 3.** This study closes the "single window per
   regime" gap (§16) but not the "single body" one for TLE fitting

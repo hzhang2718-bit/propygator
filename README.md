@@ -196,10 +196,11 @@ epoch, plus `BSTAR`) and the signed residual structure `residuals_ric_m`
 matter because **in-arc RMS is an anti-signal for forward prediction** — a free
 B\* on a short arc happily absorbs along-track error into a garbage drag
 coefficient, and B\* handling alone is the difference between ~1 km and 50+ km
-of drift at +3 days. [`docs/tle-fitting-playbook.md`](docs/tle-fitting-playbook.md)
-turns two numbers off those diagnostics into a gate that picks the fitting
-strategy, measured against GRACE-FO truth across quiet / active / storm drag
-regimes.
+of drift at +3 days.
+[`docs/tle-fitting-playbook-updated.md`](docs/tle-fitting-playbook-updated.md)
+turns those diagnostics into a measured fitting recipe — fit B\* free on a
+2-day arc, transplant it onto a fresh 1-day refit — validated against
+GRACE-FO truth across ten quiet-to-storm windows.
 
 ## Features
 
@@ -236,14 +237,22 @@ misconception with the code's own tests:
 - **Drag stack** — GRACE-FO vs. GNV1B orbits across solar-quiet, solar-max,
   and Gannon-storm conditions: a single fitted Cd collapses the along-track
   residual to **1.9–6.4 m/day** (calm conditions); the remainder is
-  thermospheric-density uncertainty, quantified.
+  thermospheric-density uncertainty, quantified. Extended to ten GRACE-FO
+  windows plus Swarm A/B as a limited-information stress case: **no single
+  a-priori Cd model wins everywhere** — a per-face drag table leads once
+  drag is active, a naive constant `Cd = 2.3` wins in quiet conditions, and
+  a box-shape table trails almost everywhere.
 - **TLE fitter** — fits measured GRACE-FO truth at ~630 m RMS and predicts at
   **operational-catalog parity** (0.8–2.1× the Space-Track TLE over +3 days).
+  A single fitting recipe (2-day free-B\* fit, transplanted onto a fresh
+  1-day refit) tied or beat every alternative tested in **30 of 30**
+  window-by-day cells across four solar-activity bands.
 
 Details, provenance, and honest caveats:
-[`docs/real-world-validation-findings.md`](docs/real-world-validation-findings.md);
+[`docs/validation-findings.md`](docs/validation-findings.md);
 the committed evidence lives under
-[`experiments/real-world-validation/`](experiments/real-world-validation/).
+[`experiments/real-world-validation/`](experiments/real-world-validation/) and
+[`experiments/extended-validation/`](experiments/extended-validation/).
 
 ## Notebooks
 
