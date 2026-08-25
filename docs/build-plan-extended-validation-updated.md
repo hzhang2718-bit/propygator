@@ -1115,7 +1115,7 @@ perturbed; added suite runtime in seconds, not minutes.
 - [X] `CLAUDE.md`
 - [X] rename sweep clean (no live reference to the old path)
 
-### **Chunk 25: `notebooks/00_showcase.ipynb`**
+### **Chunk 25: `notebooks/00_showcase.ipynb`** - Done
 
 **Goal.** The showcase gets its own chunk, because it is the one artifact rendered
 outside the repository.
@@ -1135,9 +1135,9 @@ tooling is deliberately not committed and the rendered HTML lives in the website
 repo.
 
 **Checklist**
-- [ ] edit details received from maintainer
-- [ ] showcase updated; runs offline and deterministically end to end
-- [ ] export needed? recorded either way
+- [X] edit details received from maintainer
+- [X] showcase updated; runs offline and deterministically end to end
+- [X] export needed? recorded either way
 
 ### **Chunk 26: release readiness and archival**
 
