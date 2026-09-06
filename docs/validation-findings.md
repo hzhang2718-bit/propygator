@@ -6,9 +6,9 @@
 > `docs/history/build-plan-real-world-validation.md`, 2026-07-19). §§9–17:
 > the **extended-validation study** (evidence in
 > `experiments/extended-validation/`; contract
-> `docs/extended-validation-updated.md` + build plan
-> `docs/build-plan-extended-validation-updated.md`, both to be archived to
-> `docs/history/` at study close). Consolidated into one document rather than
+> `docs/history/extended-validation-updated.md` + build plan
+> `docs/history/build-plan-extended-validation-updated.md`, both archived at
+> study close, 2026-09-06). Consolidated into one document rather than
 > kept as two that have to be read together. Nothing here amends a shipped
 > contract — where either study touched shipped behavior, the outcome was
 > either "validated as documented" or a named fix chunk (Chunk 5, §8; the
@@ -386,7 +386,7 @@ Every claim in §§1–8 rests on **one GRACE-FO satellite**. The r/s trust gate
 the regime arms, and the fitted-Cd density lever are all untested bets on
 transfer — validated on a single body over a handful of windows. The
 extended-validation study (`study/extended-validation`, contract
-`docs/extended-validation-updated.md`) attacks that gap with three
+`docs/history/extended-validation-updated.md`) attacks that gap with three
 independent parts and no shared benchmark apparatus:
 
 1. **Table noise** — do GRACE-FO's own twins (C and D, essentially the same

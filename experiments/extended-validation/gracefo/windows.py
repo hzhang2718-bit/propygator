@@ -3,10 +3,10 @@
 THE WINDOW LIST IS FROZEN EVIDENCE, NOT A CONFIGURATION KNOB. It was drawn once
 (``random.Random``, seed 20260814) without reference to how well the propagator
 performs on any of it, and recorded in both
-``docs/build-plan-extended-validation-updated.md`` and here. The draw is never
-repeated at runtime and this table is never re-sorted, re-drawn or extended
-without a recorded retirement (contract, "Important: the windows are drawn
-once").
+``docs/history/build-plan-extended-validation-updated.md`` and here. The draw
+is never repeated at runtime and this table is never re-sorted, re-drawn or
+extended without a recorded retirement (contract, "Important: the windows are
+drawn once").
 
 WHY THE AGGREGATES ARE RE-READ RATHER THAN TRUSTED. ``FROZEN_INDICES`` below
 transcribes the build plan's table so that a transcription error shows up as a

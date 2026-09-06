@@ -1,9 +1,10 @@
 # Extended Validation — drag propagations, TLE fitting tests, and table noise
 
-Evidence tree for the study contracted in `docs/extended-validation-updated.md`.
-**The contract wins on every conflict**; `docs/features.md` and
-`docs/architecture.md` win over the contract. The working blueprint is
-`docs/build-plan-extended-validation-updated.md`.
+Evidence tree for the study contracted in
+`docs/history/extended-validation-updated.md`. **The contract wins on every
+conflict**; `docs/features.md` and `docs/architecture.md` win over the contract.
+The working blueprint is
+`docs/history/build-plan-extended-validation-updated.md`.
 
 Every external claim propygator makes rests on one satellite (GRACE-FO 1). This
 study widens that base in three parts: **table noise** on the GRACE-FO C/D

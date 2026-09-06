@@ -1,8 +1,8 @@
 """Table noise -- GRACE-FO C/D over the three inherited windows (Chunk 2).
 
-Evidence for ``docs/build-plan-extended-validation-updated.md`` Chunk 2, the
-contract's "The design - table noise". GRACE-FO C and D are essentially the same
-body flying through the same atmosphere, so a quantity measured on one and
+Evidence for ``docs/history/build-plan-extended-validation-updated.md`` Chunk 2,
+the contract's "The design - table noise". GRACE-FO C and D are essentially the
+same body flying through the same atmosphere, so a quantity measured on one and
 divided by the same quantity on the other should come out near 1.0. Four such
 ratios are computed per window; a large departure is a bug signal, not a
 finding.

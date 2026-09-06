@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-**propygator** is a Python library for orbital simulation and satellite tracking, built on [Orekit](https://www.orekit.org/) via the `orekit_jpype` wrapper. Installable, JVM-free on import, **1102 tests pass**. Current version **`v0.8.0`** (2026-07-26). All five architecture §12 features are shipped — v1 is feature-complete and fully released, and every post-v1 follow-on is closed.
+**propygator** is a Python library for orbital simulation and satellite tracking, built on [Orekit](https://www.orekit.org/) via the `orekit_jpype` wrapper. Installable, JVM-free on import, **1105 tests pass**. Current version **`v0.8.0`** (2026-07-26). All five architecture §12 features are shipped — v1 is feature-complete and fully released, and every post-v1 follow-on is closed.
 
 ### Release history
 
@@ -61,7 +61,7 @@ Three post-v1 efforts produced propygator's entire external evidence base. The f
 - Fading-memory age-weighting (internals-only, probe 2) is the single-fit rival; its pre-registered §1.2-amendment bar was resolved by the extended validation study's `[bench-3]`: **PROMOTE**, but carried by one window whose gate misclassification also contaminates its own baseline — **not adopted** in the default recipe (`docs/validation-findings.md` §14, §16).
 - **Noise floor:** anchor scatter is 2–3×, so differences < 1.5× are noise. The sweep's "quiet: longer span is better" did **not** replicate across anchors.
 
-**Extended validation study** (`study/extended-validation`, started 2026-08-09; findings `docs/validation-findings.md` §9–17; evidence + `run_all.py --only <group>` orchestrator in `experiments/extended-validation/`; contract `docs/extended-validation-updated.md`). Tests whether the two efforts above — measured on GRACE-FO 1 alone — transfer to ten more windows and a second body.
+**Extended validation study** (`study/extended-validation`, started 2026-08-09; findings `docs/validation-findings.md` §9–17; evidence + `run_all.py --only <group>` orchestrator in `experiments/extended-validation/`; contract `docs/history/extended-validation-updated.md`). Tests whether the two efforts above — measured on GRACE-FO 1 alone — transfer to ten more windows and a second body.
 
 - Ten frozen GRACE-FO C windows (low/moderate/intense/storm, 2019–2026, seed `20260814`) plus Swarm A/B as a limited-information stress case (unknown mass/geometry).
 - **Drag (Part 2, no benchmark).** No single a-priori Cd model wins everywhere: the per-face sphere table leads once drag is active and beats a naive `Cd = 2.3` there; `Cd = 2.3` wins in quiet conditions; the box table is the worst performer nearly everywhere. The bug-hunt trigger (a table losing badly where drag is strong) did **not** fire. Swarm's absolute errors are much larger, but its removed-fraction *shape* tracks GRACE-FO's.
@@ -69,7 +69,7 @@ Three post-v1 efforts produced propygator's entire external evidence base. The f
 - **TLE fitting (Part 3) revised the playbook.** One recipe — free-B\* 2-day fit transplanted onto a fresh 1-day refit — tied-or-beat every alternative in 30/30 window-day cells across four bands, making the original r/s trust gate redundant. New recipe: `docs/tle-fitting-playbook-updated.md`; original + open-questions doc archived unchanged in `experiments/tle-fit-strategy/`.
 - Table noise (Part 1, twin GRACE-FO C/D ratios): 12/12 HIT.
 - **DSMC band correction** (2026-08-24, prose only): the original "DSMC-credible" read cited a band traced to one non-DSMC paper; retracted in `experiments/real-world-validation/gracefo/README.md`.
-- Still open: notebook `00_showcase.ipynb` refresh and release readiness (build plan Chunks 25–26); expected release `v0.8.1`.
+- Wrap-up state (2026-09-06): Chunks 0–25 done; Chunk 26 has pre-commit and the full suite green and both study docs archived. Still open — the per-group `run_all.py --verify` sweep, the frozen study's known-red `--verify` diff (a ~0.2% v0.7.3 box-table shift on Run 5, deferred to its own branch), the fading-memory branch-authorization call, and the maintainer's `v0.8.1` release steps.
 
 ### Where things live
 
@@ -122,7 +122,6 @@ Read these before implementing anything — decisions in them are deliberate; do
 
 - `docs/architecture.md` — the single most important file: cross-cutting design (data model, module structure, conventions, key decisions, testing). Section numbers (§3, §6, §10, §11…) are cited throughout the code.
 - `docs/features.md` — per-feature sub-designs. **§1.1 / §1.2 / §1.3 / §1.4 / §1.5 are the binding contracts** for the five shipped surfaces — every signature, preset, validation rule, metadata grammar, output (don't change an implemented signature; §1.5 and §1.2 carry as-built Outcome notes; §1.2 amended 2026-07-10, 07-18, and 07-19). (§1.4's buffer *magnitudes* — `output_step`/`half_window_s`/`refresh_s` — are tunable placeholders, not contract.)
-- `docs/extended-validation-updated.md` — the extended validation study's contract (see "Validation evidence" above for the measured results). It wins over every non-binding doc; `features.md`/`architecture.md` win over it. Its working blueprint is `docs/build-plan-extended-validation-updated.md` (26 chunks; **0–24 done, 25–26 open** — showcase refresh and release readiness; the contract wins on conflict). Both archived to `docs/history/` at wrap-up. The retired GRACE-lineage pair — contract `docs/extended-validation.md` and plan `docs/build-plan-extended-validation.md` — are **both deleted**; recover from git history only as history.
 - `docs/project_meta.md` — governance/distribution (MIT, GitHub-only, tier-(a) personal portfolio, minimal CI). *Supersedes* the tier-(b) framing that leaks into a few spots of `architecture.md`.
 - `docs/release-process.md` — the feature-branch → tagged-release walkthrough. Reinforces the version-bump-needs-reinstall gotcha and `git branch -D` (not `-d`) for squash-merged branches. The maintainer runs the git steps.
 - `docs/changelog-guidelines.md` — the Keep-a-Changelog rhythm + grouping conventions (CHANGELOG is hand-maintained).
@@ -145,6 +144,7 @@ Read these before implementing anything — decisions in them are deliberate; do
 - `prospective-forces-and-progress-findings.md` — feasibility notes on three `propagate_numerical` enhancements, all resolved; the mechanism reference (§4 is the progress step-handler probe).
 - `build-plan-feature-1.3,4-notes.md` — 1.3/1.4 scoping notes, every item since resolved.
 - `build-plan-real-world-validation.md` — the `v0.7.2` study (Chunks 0–4) + its follow-on Chunks 5–7 (`v0.7.3` / `v0.8.0`); retired 2026-07-19 with every chunk closed.
+- `extended-validation-updated.md` (contract) + `build-plan-extended-validation-updated.md` (26 chunks) — the extended validation study, archived 2026-09-06 at study close; the contract wins over the plan, `features.md`/`architecture.md` win over both. The retired GRACE-lineage pair — `docs/extended-validation.md` and `docs/build-plan-extended-validation.md` — are **both deleted**; recover from git history only as history.
 
 ## Environment & running
 

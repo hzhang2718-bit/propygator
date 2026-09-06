@@ -1,10 +1,11 @@
 """Pinned regression: the extended-validation study's Part 1 twin ratio.
 
-Deliverable 4 of ``docs/extended-validation-updated.md`` (build plan Chunk 23),
-following the earlier study's pinned-test pattern -- measured values with a
-generous margin, relationships rather than exact numbers. Catches a wiring
-regression in propygator's drag/table stack; does not re-test the experiment's
-own driver code (``run_table_noise.py``), which stays outside ``testpaths``.
+Deliverable 4 of ``docs/history/extended-validation-updated.md`` (build plan
+Chunk 23), following the earlier study's pinned-test pattern -- measured values
+with a generous margin, relationships rather than exact numbers. Catches a
+wiring regression in propygator's drag/table stack; does not re-test the
+experiment's own driver code (``run_table_noise.py``), which stays outside
+``testpaths``.
 
 GRACE-FO C and D are (nearly) the same body flying through the same
 atmosphere at the same time, so a quantity measured on one and divided by the

@@ -1,10 +1,10 @@
 """Pinned regression: the extended-validation study's Part 2 drag ordering.
 
-Deliverable 4 of ``docs/extended-validation-updated.md`` (build plan Chunk 23),
-following the earlier study's pinned-test pattern -- measured values with a
-generous margin, relationships rather than exact numbers. Catches a wiring
-regression in propygator's drag stack; does not re-test the experiment's own
-driver code (``run_drag_window.py``), which stays outside ``testpaths``.
+Deliverable 4 of ``docs/history/extended-validation-updated.md`` (build plan
+Chunk 23), following the earlier study's pinned-test pattern -- measured values
+with a generous margin, relationships rather than exact numbers. Catches a
+wiring regression in propygator's drag stack; does not re-test the experiment's
+own driver code (``run_drag_window.py``), which stays outside ``testpaths``.
 
 Part 2's headline reading is that the shipped sphere Cd table beats a naive
 ``Cd = 2.3`` in the study's active windows (CLAUDE.md "Part 2 is measured").

@@ -1,8 +1,8 @@
 """Part 2 drag propagations, one GRACE-FO window per invocation (Chunks 4-13).
 
-Evidence for ``docs/build-plan-extended-validation-updated.md`` Part 2, the
-contract's "Part A: additional drag-significant propagations, GRACE-FO". Five
-configurations, five propagations, one 7-day arc from the window's t0:
+Evidence for ``docs/history/build-plan-extended-validation-updated.md`` Part 2,
+the contract's "Part A: additional drag-significant propagations, GRACE-FO".
+Five configurations, five propagations, one 7-day arc from the window's t0:
 
 1. drag off -- the residual growth IS the drag signal the model has to remove
 2. drag on, ``Cd = 2.3`` -- the naive constant

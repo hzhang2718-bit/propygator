@@ -1,8 +1,9 @@
 """Part 3 TLE fitting tests, one GRACE-FO window per invocation (Chunks 14-18).
 
-Evidence for ``docs/build-plan-extended-validation-updated.md`` Part 3, the
-contract's "The design -- TLE fitting tests". Thirteen scored configurations,
-all forecasting the same ``[T, T + 7 d]`` from the same arc end ``T = t0 + 6 d``:
+Evidence for ``docs/history/build-plan-extended-validation-updated.md`` Part 3,
+the contract's "The design -- TLE fitting tests". Thirteen scored
+configurations, all forecasting the same ``[T, T + 7 d]`` from the same arc end
+``T = t0 + 6 d``:
 
     naive_2d  arm_transplant  arm_zero  arm_fresh  catalog
     state_sphere  state_box  fade_tau_{0.5,0.75,1,1.5,2,3}

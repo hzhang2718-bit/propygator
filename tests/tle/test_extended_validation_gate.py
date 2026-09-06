@@ -1,8 +1,8 @@
 """Pinned regression: the extended-validation study's Part 3 gate classification.
 
-Deliverable 4 of ``docs/extended-validation-updated.md`` (build plan Chunk 23),
-following the earlier study's pinned-test pattern -- measured values with a
-generous margin, relationships rather than exact numbers.
+Deliverable 4 of ``docs/history/extended-validation-updated.md`` (build plan
+Chunk 23), following the earlier study's pinned-test pattern -- measured values
+with a generous margin, relationships rather than exact numbers.
 
 Unlike the Part 1/2 pins, this one also exercises real study code:
 ``tle_fit_common.compute_rs``/``select_arm``/``parse_bstar``/``bstar_sigma``

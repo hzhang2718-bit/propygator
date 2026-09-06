@@ -1,9 +1,9 @@
 """Both maneuver gates over the ten frozen windows -- Chunk 1's committed evidence.
 
-Evidence for ``docs/build-plan-extended-validation-updated.md`` Chunk 1. Every
-window is gated BEFORE any compute is spent on it: Part 2 costs roughly 16 h and
-Part 3 rides the same truth, so a burn discovered at Chunk 9 would retire a
-window after its propagations had already been paid for.
+Evidence for ``docs/history/build-plan-extended-validation-updated.md`` Chunk 1.
+Every window is gated BEFORE any compute is spent on it: Part 2 costs roughly
+16 h and Part 3 rides the same truth, so a burn discovered at Chunk 9 would
+retire a window after its propagations had already been paid for.
 
     conda run -n propygator python run_screen.py
     conda run -n propygator python run_screen.py --window storm_2026_01 --parse-only

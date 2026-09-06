@@ -1171,8 +1171,8 @@ requires, the CHANGELOG entry, the PR, the squash-merge, the tag. If anything la
 on `main` during the study, the study is re-run before the merge.
 
 **Checklist**
-- [ ] hooks, full suite, per-group verifies; frozen verify run and diffed
+- [X] hooks, full suite, per-group verifies; frozen verify run and diffed
       against the known Chunk 19 finding (no *new* divergence)
-- [ ] contract + build plan archived to `docs/history/`
-- [ ] fading-memory verdict recorded (DEFER default)
-- [ ] handed to maintainer for version bump, CHANGELOG, PR, tag
+- [X] contract + build plan archived to `docs/history/`
+- [X] fading-memory verdict recorded (DEFER default)
+- [X] handed to maintainer for version bump, CHANGELOG, PR, tag
