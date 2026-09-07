@@ -1,10 +1,15 @@
 # Build plan: Earth radiation pressure resume (+ frozen-study `--verify` repair)
 
-> **Status: DRAFT (2026-09-06) — not started.** Two independent parts, two
-> branches. **Part A** resumes the parked `earth_radiation` feature now that
-> conda-forge ships an `orekit_jpype` wrapping Orekit ≥ 13.1.6. **Part B**
-> repairs the real-world-validation `run_all.py --verify`, red since v0.7.3 and
-> deferred to "its own process" by the extended-validation plan's Chunk 26.
+> **Status: Part A CLOSED at its A0 STOP gate (2026-09-06) — the feature stays
+> parked. Part B is the live half, unstarted.** The gate did not flip: Orekit's
+> 13.1.6 `acos` horizon fix is real, but `KnockeRediffusedForceModel` carries a
+> **second** defect — the Lambertian emission cosine computed as the geocentric
+> central angle — inflating ERP **1.98× at LEO** and 1.21× at GEO. A1–A5 stand
+> as the recipe for whenever upstream fixes it; the evidence, the measured
+> factors, and the stricter two-probe resume bar are in
+> `experiments/earth-radiation/README.md`. **Part B** repairs the
+> real-world-validation `run_all.py --verify`, red since v0.7.3 and deferred to
+> "its own process" by the extended-validation plan's Chunk 26.
 > Part A's **binding contract is the ERP half of
 > `docs/history/general-upgrades-1.md` "Planetary Third-Body & Earth Radiation
 > Pressure"**; where this plan and that section disagree, the **contract wins**.
@@ -19,7 +24,7 @@
 | `erp-runtime-chunk2.patch` still applies to `main` | `git apply --check` exit 0, 15 commits past its `a9259dc` base |
 | conda-forge offers `orekit_jpype` **13.1.7.0 and 13.1.7.1** | `conda search -c conda-forge orekit_jpype` |
 | the working env is still **13.1.4.0** | `importlib.metadata` in the env |
-| `environment.yml`'s `orekit_jpype=13.1.*` already permits both | file read |
+| ~~`environment.yml`'s `orekit_jpype=13.1.*` already permits both~~ — **corrected 2026-09-06: the `jpype1=1.5.*` pin blocks the upgrade**, since `orekit_jpype 13.1.7.x` requires `jpype1 1.7.1.*`; adoption is a two-pin change | `conda env create` solver failure, then `conda search --info` |
 | CI builds from `environment.yml` with `cache-environment: true` | `.github/workflows/ci.yml:32-39` |
 | the ERP Supercessions were never folded back | `features.md` contains no `earth_radiation`; `architecture.md:1185` still says "blocked" |
 | the LAGEOS truth file is on disk | `data/lageos/esa.orb.lageos2.230422.v70.sp3.gz` |
@@ -85,7 +90,7 @@ the **`orekit` fixture**; experiment stdout **ASCII-only**.
 
 ---
 
-# Part A — the `earth_radiation` resume
+# Part A — the `earth_radiation` resume - PARKED
 
 Branch `feature/earth-radiation` off `main`. Not the extended-validation branch,
 which forbade this work explicitly.
@@ -94,24 +99,31 @@ which forbade this work explicitly.
 
 **Goal:** prove the upstream fix is in before touching `src/`.
 
-**Create / edit:** an uncommitted copy of `environment.yml` with the pin bumped
-to `orekit_jpype=13.1.7.*`, in the scratchpad — `environment.yml` itself is only
-edited at A5, if adopted.
+**Create / edit:** an uncommitted copy of `environment.yml` in the scratchpad
+with **both** pins bumped — `orekit_jpype` and `jpype1`, which 13.1.7.x forces
+to `1.7.1.*`; `environment.yml` itself is only edited at A5, if adopted.
 
-**Reuse:** `experiments/earth-radiation/knocke_bug_probe.py` unchanged — it is
-the self-verdicting resume check and needs no ERP runtime.
+**Reuse:** `experiments/earth-radiation/knocke_bug_probe.py` and
+`knocke_cosine_probe.py` unchanged — together they are the resume check, and
+neither needs the ERP runtime.
 
-**You run:** `conda env create -n propygator-erp -f <the copy>`, then
-`conda run -n propygator-erp python experiments/earth-radiation/knocke_bug_probe.py`.
-**Never mutate the working env.**
+**You run:** `conda env create -n propygator-erp -f <the copy>`, then both
+probes under `conda run -n propygator-erp`. **Never mutate the working env.**
 
-**Verify:** the verdict flips to LOOKS FIXED — LEO eclipse within ~±50 % of the
-5.13e-9 m/s² IR-only anchor (it read 1.24e-8, 2.42× hot, on 13.1.4.0) and GEO
-within an order of the 1.3245e-10 anchor; the SRP control still matches theory.
+**Verify — two gates, both required** (2026-09-06 found a second defect that the
+first gate alone cannot see):
+
+1. `knocke_bug_probe.py` reads **~0.85**, not 1.00 — the anchor assumes a uniform
+   e = 0.68 and a 1 AU Sun where the model uses e ≈ 0.55 at 51.6° latitude and a
+   January Sun; the SRP control still matches theory. (13.1.4.0 read 2.42;
+   13.1.7.1 reads 1.69.)
+2. `knocke_cosine_probe.py` reads an as-coded inflation of **1.000×** — i.e. the
+   Lambertian emission cosine is finally the emission cosine.
 
 > ### 🛑 STOP gate
-> A verdict that does not flip means the wrapper does not carry the fix: stop,
-> record the tag row in the experiment README, and leave the feature parked.
+> Either gate failing means the wrapper does not carry both fixes: stop, record
+> the tag row in the experiment README, and leave the feature parked. Gate 2
+> failed on 13.1.7.1 at 1.98× — that is where Part A closed.
 
 ## Chunk A1 — measure what the Orekit bump moves
 
@@ -126,8 +138,10 @@ moved, with the measured shift — attention on the three real-world pinned modu
 `test_fitter_real_world.py`), the fitter pins, and the plot snapshots.
 
 **Decide (maintainer):** whether `propygator` adopts 13.1.7.x and whether
-`environment.yml` gets an exact pin. Note the standing exposure either way: the
-`13.1.*` pin means any CI cache miss already rebuilds on 13.1.7.1.
+`environment.yml` gets an exact pin. There is **no standing CI exposure** — the
+`jpype1=1.5.*` pin blocks 13.1.7 outright, so a cache miss still rebuilds on
+13.1.4.0. (The 13.1.7.1 suite run is already banked: 1105 passed, no pinned
+number moved — see the experiment README.)
 
 **Verify:** the suite is green in the clone env, or every failure is explained
 and sized — an unexplained failure blocks A2.

@@ -1,0 +1,29 @@
+orekit_jpype version: 13.1.7.1
+spacecraft: sphere A=1.0 m^2, Cr=1.5, m=200.0 kg
+epoch: 2026-01-01T00:00:00 UTC
+
+SRP at lit LEO point: 3.5370e-08 m/s^2
+  theory 3.4200e-08 * ~1.034 (January Sun distance) = 3.5363e-08  -> ratio 1.000
+
+LEO ~400 km (a=6778 km, i=51.6 deg) Knocke ERP vs angularResolution:
+  res[deg]   nu=0 [m/s^2]   nu=90 eclipse   nu=270
+      90.0   4.2294e-06     2.4757e-06      8.9745e-06
+      45.0   1.2388e-06     7.2512e-07      2.6286e-06
+      30.0   5.6663e-07     3.3168e-07      1.2024e-06
+      15.0   1.4411e-07     8.4357e-08      3.0580e-07
+      10.0   6.7461e-08     3.9591e-08      1.4306e-07
+       5.0   2.3378e-08     1.3890e-08      4.9724e-08
+       2.0   1.4789e-08     8.9247e-09      3.1666e-08
+       1.0   1.4333e-08     8.6622e-09      3.0711e-08
+  IR-only anchor at nu=90: 5.1255e-09 m/s^2
+
+GEO (a=42164 km, i=0.1 deg) Knocke ERP vs angularResolution:
+  res[deg]   nu=0 [m/s^2]   nu=270
+      15.0   2.3398e-10     3.2776e-10
+       5.0   2.4005e-10     3.3278e-10
+       2.0   2.4222e-10     3.3462e-10
+       1.0   2.4108e-10     3.3360e-10
+  IR-only anchor: 1.3245e-10 m/s^2 (dayside adds albedo, up to ~2x)
+
+VERDICT (converged LEO eclipse / IR-only anchor = 1.69):
+  UNEXPECTED value -- investigate before shipping either way.
