@@ -1,0 +1,271 @@
+==============================================================================
+Extended validation -- Part 2 drag, SWARM leg: window 03 low_2021_06 (low)
+==============================================================================
+[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[data root] experiments/extended-validation/data/swarm
+[window] low_2021_06, band low, t0 2021-06-17, 8 days loaded, 7-day arc
+[convention]  EVERY NUMBER BELOW RESTS ON ESTIMATES -- that is the point
+  box x 1.0 (height) x y 5.0 (length) x z 1.0 (width) m, A_ref = 1.0 m^2, mass = 419.0 kg -- all ESTIMATES, consistent with ESA's mission description; sources disagree
+  ram face H*W = 1.0000 m^2 = A_ref; +Y held on the wind by InPlaneTracking(ecef)
+  mass is a fixed literal, identical for both satellites and every window -- Swarm has no MAS1B analogue here
+  A and B are NOT a twin pair (B flies higher), so an A-vs-B difference is an altitude difference before it is a body difference
+[space weather]  window aggregates, re-read from CSSI at runtime
+  source: <orekit-data>/CSSI-Space-Weather-Data/SpaceWeather-All-v1.2.txt  (UPDATED 2026 May 10 15:40:00.00)
+  F10.7 83.1 (range 76-94), Ctr81 79.3, Ap max 13, ap3 max 27, Kp max 4.0
+------------------------------------------------------------------------------
+--- Swarm A ---
+------------------------------------------------------------------------------
+[parse]
+  Swarm A (SP3 id L47), SP3-d, 8 daily files
+  time system GPS -> TAI via the locked GPS + 19 s route; coordinate system IGb14 -> Frame.ITRF
+  69120 records on the delivered 10 s grid; subsampled to 60 s -> 11520 epochs
+  span: 2021-06-17T00:00:19 -> 2021-06-24T23:59:19 TAI
+[parser checks]
+  t0 anchor: 2021-06-17T00:00:19 vs GPS midnight on 2021-06-17 = 2021-06-17T00:00:19 TAI (offset +0.000 s)
+  from_iso(to_iso()) == epoch for all 11520: True
+  grid uniformity: max |dt - 60 s| = 0.000e+00 s
+  |r| 6797.6..6817.6 km (altitude ~431 km); |v| 7610.6..7647.2 m/s (Earth-fixed)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  |dr| = 3.433e-09 m, |dv| = 1.052e-12 m/s (bound 5e-08 m)
+[tables]  shipped a-priori tables at this window's conditions
+  arc-mean conditions over 169 samples: r 6809.1 km, rho 3.266e-13 kg/m^3 (min 1.067e-13, max 6.356e-13)
+  shipped tables there: sphere Cd 2.833 -> CdA 2.8334 m^2 on A_ref 1.0000000
+  box per-face Cd: ram 3.212 / side 0.076 / leeward 0.000 -> face-sum CdA 4.7367 m^2
+  [axis check]  Sigma Cd_i*A_i by which body face rides the wind:
+    +Y ram, the wired mapping :   4.737 m^2  <- must be smallest
+    +X ram (nadir/zenith face):  16.973 m^2  (wrong)
+    +Z ram (slant-side face)  :  16.973 m^2  (wrong)
+    wired mapping smallest: PASS
+[Cd fit]  golden section on the FULL 7-day along-track RMS (stderr trace)
+  coarse scan (7 evaluations over [1.50, 5.00])
+            Cd     along RMS (m)
+        1.5000          5017.170
+        2.0833          1739.230
+        2.6667          1578.922
+        3.2500          4853.287
+        3.8333          8144.899
+        4.4167         11434.038
+        5.0000         14724.036
+  fitted Cd = 2.38928 on A_ref = 1.0000000 m^2, B = Cd*A/m = 5.702337e-03 m^2/kg
+  23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (902 s wall)
+[runs]  5 propagations, 7-day arc from t0, output 60 s, high_precision
+    (the Cd = 2.3 run goes 8.00 d so it also feeds the screen below)
+    1: drag off                  21 s wall
+    2: drag on (Cd=2.3)          33 s wall
+    3: drag on (Cd fit)          29 s wall
+    4: sphere table              29 s wall
+    5: box table (IPT)           74 s wall
+[screen deg-5]  the ONLY gate on this leg -- Swarm has no THR1B analogue
+  drag-on Cd = 2.3 over the full 8.00-day load: signal 1070.0 m, departure 48.1 m (4.5%) -> CLEAN against the pre-registered 10% bar
+  RECORDED AS WEAK EVIDENCE. This gate missed both known-real burns in Chunk 2 (0.8 % / 1.9 %), because it normalizes by an unfitted Cd = 2.3 along-track error of tens of kilometres. A CLEAN here does not establish a quiet window, and an undetected maneuver stays a live risk on the rows below. The bar is not re-fitted (contract).
+[per-day]  propagated - truth, ITRF RIC RMS (m). Day N = [N-1 d, N d] ALONE, never accumulated from t0.
+  config                day      radial         along       cross            3D
+  1: drag off             1        5.71        318.33        0.60        318.38
+                          2       14.33       1724.12        1.28       1724.18
+                          3       21.70       4379.25        1.77       4379.31
+                          4       26.64       8143.15        2.18       8143.19
+                          5       27.82      12893.76        2.31      12893.79
+                          6       28.25      18699.56        2.24      18699.58
+                          7       29.83      25788.49        2.69      25788.50
+  2: drag on (Cd=2.3)     1        1.33         60.59        0.61         60.61
+                          2        2.21        250.28        1.36        250.29
+                          3        2.94        455.92        1.95        455.93
+                          4        3.72        633.29        2.65        633.31
+                          5        4.89        676.43        3.01        676.45
+                          6        6.18        657.40        3.21        657.44
+                          7        6.85        750.19        3.98        750.23
+  3: drag on (Cd fit)     1        1.22         51.08        0.61         51.10
+                          2        2.05        194.90        1.37        194.92
+                          3        2.89        306.65        1.96        306.67
+                          4        4.16        347.78        2.67        347.82
+                          5        5.75        219.00        3.04        219.10
+                          6        7.36         78.03        3.26         78.44
+                          7        8.07        218.17        4.04        218.36
+  4: sphere table         1        1.02          2.28        0.62          2.57
+                          2        3.01        101.67        1.38        101.73
+                          3        5.45        464.58        2.00        464.61
+                          4        9.07       1125.73        2.77       1125.77
+                          5       12.71       2181.61        3.19       2181.65
+                          6       16.70       3552.02        3.48       3552.06
+                          7       19.48       5083.22        4.34       5083.26
+  5: box table (IPT)      1        4.06        211.67        0.28        211.71
+                          2       13.08       1309.10        0.48       1309.16
+                          3       23.23       3686.41        0.55       3686.49
+                          4       36.80       7294.51        0.88       7294.61
+                          5       53.36      12218.95        0.87      12219.07
+                          6       77.93      18372.72        0.83      18372.88
+                          7      108.81      25646.47        1.38      25646.70
+[read]  the contract's horizons, days 1, 3, 7
+  drag signal: day-1 drag-off 3D RMS 318.4 m against the ~4 m/day conservative floor -> 80x
+  removed fraction of the drag-off signal, per day (no verdict column -- this part has no benchmark):
+    config                     day 1       day 3       day 7
+    2: drag on (Cd=2.3)          81%         90%         97%
+    4: sphere table              99%         89%         80%
+    5: box table (IPT)           34%         16%          1%
+[machine]  fixed-token rows for summarize_drag.py -- do not reformat
+  MROW swarm low_2021_06 low A drag_off 1 5.7056 318.3251 0.5974 318.3768
+  MROW swarm low_2021_06 low A drag_off 2 14.3338 1724.1210 1.2825 1724.1811
+  MROW swarm low_2021_06 low A drag_off 3 21.7049 4379.2511 1.7689 4379.3052
+  MROW swarm low_2021_06 low A drag_off 4 26.6360 8143.1453 2.1828 8143.1892
+  MROW swarm low_2021_06 low A drag_off 5 27.8155 12893.7617 2.3103 12893.7919
+  MROW swarm low_2021_06 low A drag_off 6 28.2501 18699.5629 2.2350 18699.5843
+  MROW swarm low_2021_06 low A drag_off 7 29.8330 25788.4863 2.6907 25788.5037
+  MROW swarm low_2021_06 low A cd_2p3 1 1.3304 60.5927 0.6130 60.6104
+  MROW swarm low_2021_06 low A cd_2p3 2 2.2144 250.2758 1.3618 250.2893
+  MROW swarm low_2021_06 low A cd_2p3 3 2.9406 455.9153 1.9517 455.9290
+  MROW swarm low_2021_06 low A cd_2p3 4 3.7236 633.2903 2.6544 633.3068
+  MROW swarm low_2021_06 low A cd_2p3 5 4.8877 676.4283 3.0098 676.4527
+  MROW swarm low_2021_06 low A cd_2p3 6 6.1837 657.3993 3.2129 657.4362
+  MROW swarm low_2021_06 low A cd_2p3 7 6.8493 750.1898 3.9813 750.2316
+  MROW swarm low_2021_06 low A cd_fit 1 1.2166 51.0782 0.6137 51.0964
+  MROW swarm low_2021_06 low A cd_fit 2 2.0490 194.9002 1.3653 194.9158
+  MROW swarm low_2021_06 low A cd_fit 3 2.8892 306.6486 1.9599 306.6685
+  MROW swarm low_2021_06 low A cd_fit 4 4.1578 347.7810 2.6739 347.8161
+  MROW swarm low_2021_06 low A cd_fit 5 5.7541 219.0049 3.0400 219.1016
+  MROW swarm low_2021_06 low A cd_fit 6 7.3583 78.0256 3.2567 78.4394
+  MROW swarm low_2021_06 low A cd_fit 7 8.0726 218.1693 4.0403 218.3559
+  MROW swarm low_2021_06 low A sphere 1 1.0234 2.2758 0.6173 2.5706
+  MROW swarm low_2021_06 low A sphere 2 3.0056 101.6722 1.3830 101.7260
+  MROW swarm low_2021_06 low A sphere 3 5.4501 464.5767 2.0021 464.6129
+  MROW swarm low_2021_06 low A sphere 4 9.0663 1125.7274 2.7737 1125.7673
+  MROW swarm low_2021_06 low A sphere 5 12.7053 2181.6110 3.1946 2181.6504
+  MROW swarm low_2021_06 low A sphere 6 16.6984 3552.0201 3.4808 3552.0610
+  MROW swarm low_2021_06 low A sphere 7 19.4778 5083.2162 4.3428 5083.2554
+  MROW swarm low_2021_06 low A box 1 4.0563 211.6709 0.2776 211.7100
+  MROW swarm low_2021_06 low A box 2 13.0780 1309.0988 0.4818 1309.1642
+  MROW swarm low_2021_06 low A box 3 23.2264 3686.4138 0.5493 3686.4871
+  MROW swarm low_2021_06 low A box 4 36.8005 7294.5135 0.8809 7294.6064
+  MROW swarm low_2021_06 low A box 5 53.3583 12218.9485 0.8712 12219.0651
+  MROW swarm low_2021_06 low A box 6 77.9257 18372.7188 0.8287 18372.8841
+  MROW swarm low_2021_06 low A box 7 108.8096 25646.4722 1.3801 25646.7031
+  MFIT swarm low_2021_06 A 2.38928 5.702337e-03 419.000 5.0
+  MSCREEN swarm low_2021_06 A 1069.982 48.064 CLEAN
+------------------------------------------------------------------------------
+--- Swarm B ---
+------------------------------------------------------------------------------
+[parse]
+  Swarm B (SP3 id L48), SP3-d, 8 daily files
+  time system GPS -> TAI via the locked GPS + 19 s route; coordinate system IGb14 -> Frame.ITRF
+  69120 records on the delivered 10 s grid; subsampled to 60 s -> 11520 epochs
+  span: 2021-06-17T00:00:19 -> 2021-06-24T23:59:19 TAI
+[parser checks]
+  t0 anchor: 2021-06-17T00:00:19 vs GPS midnight on 2021-06-17 = 2021-06-17T00:00:19 TAI (offset +0.000 s)
+  from_iso(to_iso()) == epoch for all 11520: True
+  grid uniformity: max |dt - 60 s| = 0.000e+00 s
+  |r| 6868.9..6886.8 km (altitude ~501 km); |v| 7576.1..7611.4 m/s (Earth-fixed)
+[t0 sanity]  ITRF -> EME2000 -> ITRF, isolated from dynamics
+  |dr| = 2.134e-09 m, |dv| = 5.483e-12 m/s (bound 5e-08 m)
+[tables]  shipped a-priori tables at this window's conditions
+  arc-mean conditions over 169 samples: r 6879.4 km, rho 8.855e-14 kg/m^3 (min 3.312e-14, max 1.932e-13)
+  shipped tables there: sphere Cd 2.972 -> CdA 2.9720 m^2 on A_ref 1.0000000
+  box per-face Cd: ram 3.404 / side 0.088 / leeward 0.000 -> face-sum CdA 5.1572 m^2
+  [axis check]  Sigma Cd_i*A_i by which body face rides the wind:
+    +Y ram, the wired mapping :   5.157 m^2  <- must be smallest
+    +X ram (nadir/zenith face):  18.073 m^2  (wrong)
+    +Z ram (slant-side face)  :  18.073 m^2  (wrong)
+    wired mapping smallest: PASS
+[Cd fit]  golden section on the FULL 7-day along-track RMS (stderr trace)
+  coarse scan (7 evaluations over [1.50, 5.00])
+            Cd     along RMS (m)
+        1.5000          1266.746
+        2.0833           378.577
+        2.6667           521.607
+        3.2500          1411.215
+        3.8333          2303.276
+        4.4167          3192.595
+        5.0000          4084.142
+  fitted Cd = 2.32831 on A_ref = 1.0000000 m^2, B = Cd*A/m = 5.556835e-03 m^2/kg
+  23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (1120 s wall)
+[runs]  5 propagations, 7-day arc from t0, output 60 s, high_precision
+    (the Cd = 2.3 run goes 8.00 d so it also feeds the screen below)
+    1: drag off                  35 s wall
+    2: drag on (Cd=2.3)          54 s wall
+    3: drag on (Cd fit)          48 s wall
+    4: sphere table              45 s wall
+    5: box table (IPT)           65 s wall
+[screen deg-5]  the ONLY gate on this leg -- Swarm has no THR1B analogue
+  drag-on Cd = 2.3 over the full 8.00-day load: signal 131.0 m, departure 39.1 m (29.8%) -> REVIEW -- kink against the pre-registered 10% bar
+  RECORDED AS WEAK EVIDENCE. This gate missed both known-real burns in Chunk 2 (0.8 % / 1.9 %), because it normalizes by an unfitted Cd = 2.3 along-track error of tens of kilometres. A CLEAN here does not establish a quiet window, and an undetected maneuver stays a live risk on the rows below. The bar is not re-fitted (contract).
+[per-day]  propagated - truth, ITRF RIC RMS (m). Day N = [N-1 d, N d] ALONE, never accumulated from t0.
+  config                day      radial         along       cross            3D
+  1: drag off             1        1.78         86.97        0.36         86.99
+                          2        4.39        458.19        0.93        458.21
+                          3        6.75       1161.40        1.37       1161.42
+                          4        8.42       2155.12        1.71       2155.14
+                          5        9.73       3405.32        2.07       3405.33
+                          6       11.18       4934.73        2.60       4934.74
+                          7       12.49       6808.10        3.45       6808.11
+  2: drag on (Cd=2.3)     1        0.83         16.44        0.35         16.47
+                          2        2.00         58.00        0.89         58.04
+                          3        3.08         95.56        1.29         95.61
+                          4        4.02        117.36        1.56        117.44
+                          5        5.05         94.15        1.82         94.30
+                          6        6.11         49.44        2.26         49.87
+                          7        7.39         31.03        2.98         32.04
+  3: drag on (Cd fit)     1        0.82         15.40        0.35         15.42
+                          2        1.99         52.63        0.89         52.67
+                          3        3.07         81.69        1.29         81.76
+                          4        4.02         91.54        1.55         91.64
+                          5        5.07         54.45        1.82         54.71
+                          6        6.14         26.65        2.25         27.44
+                          7        7.42         60.46        2.97         60.99
+  4: sphere table         1        0.77          4.64        0.34          4.72
+                          2        2.07         60.12        0.88         60.16
+                          3        3.36        214.45        1.26        214.48
+                          4        4.71        474.57        1.51        474.60
+                          5        6.23        867.29        1.75        867.31
+                          6        7.66       1367.31        2.16       1367.34
+                          7        9.13       1930.73        2.84       1930.75
+  5: box table (IPT)      1        1.37         70.31        0.30         70.32
+                          2        4.20        433.27        0.81        433.29
+                          3        7.16       1207.00        1.10       1207.03
+                          4       10.43       2371.77        1.07       2371.79
+                          5       14.16       3949.11        0.88       3949.13
+                          6       18.50       5910.77        0.74       5910.79
+                          7       23.48       8225.68        0.78       8225.71
+[read]  the contract's horizons, days 1, 3, 7
+  drag signal: day-1 drag-off 3D RMS 87.0 m against the ~4 m/day conservative floor -> 22x
+  removed fraction of the drag-off signal, per day (no verdict column -- this part has no benchmark):
+    config                     day 1       day 3       day 7
+    2: drag on (Cd=2.3)          81%         92%        100%
+    4: sphere table              95%         82%         72%
+    5: box table (IPT)           19%         -4%        -21%
+[machine]  fixed-token rows for summarize_drag.py -- do not reformat
+  MROW swarm low_2021_06 low B drag_off 1 1.7760 86.9669 0.3572 86.9857
+  MROW swarm low_2021_06 low B drag_off 2 4.3880 458.1902 0.9264 458.2122
+  MROW swarm low_2021_06 low B drag_off 3 6.7542 1161.4042 1.3750 1161.4246
+  MROW swarm low_2021_06 low B drag_off 4 8.4219 2155.1196 1.7138 2155.1367
+  MROW swarm low_2021_06 low B drag_off 5 9.7312 3405.3171 2.0664 3405.3316
+  MROW swarm low_2021_06 low B drag_off 6 11.1790 4934.7261 2.5991 4934.7395
+  MROW swarm low_2021_06 low B drag_off 7 12.4860 6808.0961 3.4460 6808.1084
+  MROW swarm low_2021_06 low B cd_2p3 1 0.8290 16.4445 0.3466 16.4690
+  MROW swarm low_2021_06 low B cd_2p3 2 2.0017 58.0024 0.8867 58.0437
+  MROW swarm low_2021_06 low B cd_2p3 3 3.0767 95.5566 1.2877 95.6148
+  MROW swarm low_2021_06 low B cd_2p3 4 4.0173 117.3622 1.5560 117.4413
+  MROW swarm low_2021_06 low B cd_2p3 5 5.0528 94.1473 1.8233 94.3004
+  MROW swarm low_2021_06 low B cd_2p3 6 6.1100 49.4438 2.2591 49.8711
+  MROW swarm low_2021_06 low B cd_2p3 7 7.3924 31.0327 2.9784 32.0398
+  MROW swarm low_2021_06 low B cd_fit 1 0.8220 15.3956 0.3462 15.4214
+  MROW swarm low_2021_06 low B cd_fit 2 1.9936 52.6263 0.8858 52.6715
+  MROW swarm low_2021_06 low B cd_fit 3 3.0707 81.6890 1.2861 81.7568
+  MROW swarm low_2021_06 low B cd_fit 4 4.0234 91.5357 1.5536 91.6373
+  MROW swarm low_2021_06 low B cd_fit 5 5.0747 54.4473 1.8198 54.7136
+  MROW swarm low_2021_06 low B cd_fit 6 6.1394 26.6456 2.2544 27.4365
+  MROW swarm low_2021_06 low B cd_fit 7 7.4203 60.4597 2.9721 60.9858
+  MROW swarm low_2021_06 low B sphere 1 0.7664 4.6425 0.3437 4.7178
+  MROW swarm low_2021_06 low B sphere 2 2.0677 60.1223 0.8755 60.1642
+  MROW swarm low_2021_06 low B sphere 3 3.3552 214.4475 1.2628 214.4775
+  MROW swarm low_2021_06 low B sphere 4 4.7136 474.5727 1.5106 474.5985
+  MROW swarm low_2021_06 low B sphere 5 6.2336 867.2863 1.7531 867.3104
+  MROW swarm low_2021_06 low B sphere 6 7.6622 1367.3147 2.1608 1367.3379
+  MROW swarm low_2021_06 low B sphere 7 9.1326 1930.7310 2.8433 1930.7547
+  MROW swarm low_2021_06 low B box 1 1.3677 70.3087 0.3030 70.3227
+  MROW swarm low_2021_06 low B box 2 4.1972 433.2714 0.8076 433.2925
+  MROW swarm low_2021_06 low B box 3 7.1585 1207.0043 1.1040 1207.0260
+  MROW swarm low_2021_06 low B box 4 10.4306 2371.7688 1.0723 2371.7920
+  MROW swarm low_2021_06 low B box 5 14.1624 3949.1093 0.8837 3949.1348
+  MROW swarm low_2021_06 low B box 6 18.4961 5910.7654 0.7379 5910.7944
+  MROW swarm low_2021_06 low B box 7 23.4761 8225.6753 0.7836 8225.7088
+  MFIT swarm low_2021_06 B 2.32831 5.556835e-03 419.000 5.0
+  MSCREEN swarm low_2021_06 B 131.026 39.089 REVIEW
+  wall time: 2460 s

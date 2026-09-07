@@ -16,7 +16,7 @@ is to measure whether either mechanism *deserves* a contract amendment):
   B. **Age-weighted measurements.** sigma(age) = base * exp(age_days / tau):
      a fading-memory fit — long-arc B* observability and fresh elements in
      ONE fit (the single-fit rival of the two-stage transplant; the follow-up
-     question lives in ``docs/tle-fit-strategy-findings.md``).
+     question lives in ``tle-fit-strategy-findings.md``, same folder).
 
 Same day-7 anchor / days 7-10 forecast as probe 1, so rows compare directly
 across probes.

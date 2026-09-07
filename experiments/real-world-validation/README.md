@@ -27,7 +27,7 @@ last:
 (relationship pins; `box_and_panels` geometry upgrade **deferred**), and the
 Chunk 4 wrap-up shipped the pinned tests
 (`tests/propagation/test_real_world_*.py`, `tests/tle/test_fitter_real_world.py`),
-the findings doc (`docs/real-world-validation-findings.md`), and the README
+the findings doc (`docs/validation-findings.md`), and the README
 Validation note. Chunks 5 and 6 are order-independent follow-ons on their own
 branches off `main`; the build plan stays active.
 
@@ -87,7 +87,7 @@ progress to stderr.
 ## Findings at a glance
 
 Full tables and readings live in the leg READMEs (the committed `results.txt`
-files are the raw evidence); `docs/real-world-validation-findings.md`
+files are the raw evidence); `docs/validation-findings.md`
 consolidates them.
 
 | Leg | Headline | Where |
@@ -102,12 +102,21 @@ consolidates them.
 | Fitting-span sweep | 2-day `fitting_span` default **empirically vindicated**; regime rule: weak drag → hold a calibrated B\*, strong drag → fit B\* on ~2 d | `gracefo/README.md` sweep subsection |
 | State path | free **iff** the ballistic coefficient is calibrated (single-digit-%); uncalibrated Cd costs 7× and no fit diagnostic can see it; a-priori tables can't meet the bar | `gracefo/README.md` state-path subsection |
 
+**DSMC band correction (2026-08-24):** the "A-priori Cd tables" row's
+DSMC-credible read cites a band withdrawn in full — see `gracefo/README.md`
+"DSMC band correction."
+
 ## Conventions
 
 - **Raw truth files are never committed** (`data/` is gitignored); committed
   evidence is each leg's README + results files.
 - Evidence numbers are deterministic (same code, truth files, orekit-data);
   only wall-clock timings vary between runs — `run_all.py --verify` masks them.
+- **`--verify` leaves its scratch directory behind, deliberately.** It runs into
+  a fresh `rwv-verify-*` under the OS temp dir (`%TEMP%`, `/tmp`) and never
+  removes it, so after a diff you can still open the regenerated file that
+  produced it. Nothing reads them again and no committed evidence references
+  one, so they are safe to delete at any time; clearing them is a manual step.
 - **Evidence is frozen at its v0.7.2 numbers** — the historical record of what
   was measured against the table that shipped then. The Chunk 5 leeward floor
   (v0.7.3) regenerated `box_face_cd_default.npz`, so a post-v0.7.3 `--verify`

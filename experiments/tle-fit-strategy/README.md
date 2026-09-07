@@ -17,9 +17,13 @@ duplicated verbatim from `run_fit_vs_catalog.py`. Same rhythm as the study:
 reference-only, not shipped, not in CI, outside `testpaths`; committed results
 regenerated from these scripts at promotion time.
 
-The user-facing distillation is **`docs/tle-fitting-playbook.md`**; the open
+The user-facing distillation was **`docs/tle-fitting-playbook.md`**; the open
 follow-on questions (second-satellite validation, the fading-memory decision)
-are **`docs/tle-fit-strategy-findings.md`**.
+were **`docs/tle-fit-strategy-findings.md`**. Both were relocated here
+2026-08-24 (extended-validation Chunk 22) as **`tle-fitting-playbook.md`** and
+**`tle-fit-strategy-findings.md`** — unchanged, single-satellite-era content.
+The study that tested and revised them is `docs/validation-findings.md`
+§14/§16/§17; the current recipe is **`docs/tle-fitting-playbook-updated.md`**.
 
 ## Method
 
@@ -80,8 +84,9 @@ against in Chunk 6).
    +2/+3/+4 d rows of the experiment) and matched the transplant class in
    active (fitted 3 d tau = 1 d: 1309 m at +3 d). tau is a sensitive free
    parameter (tau 0.75 vs 1.0 d: 1.75× at +3 d). Whether this deserves a
-   §1.2 amendment is the open question in
-   `docs/tle-fit-strategy-findings.md`.
+   §1.2 amendment was the open question in `tle-fit-strategy-findings.md`;
+   resolved provisionally to PROMOTE with a caveat by the extended-validation
+   study (`docs/validation-findings.md` §14/§16).
 7. **Every refit crushes a stale catalog TLE** — the ~6-day-stale catalog row
    reads 2.2 km (+3 d quiet) and 37 km (+3 d active) against 1.0–1.2 km for
    the playbook arms: `fit_tle` as a *TLE refresher* for an operator with
@@ -93,11 +98,31 @@ against in Chunk 6).
 ## Caveats
 
 One satellite (GRACE-FO 1, ~500 km, polar), one window per regime, 4 anchors
-quiet/active + 1 storm anchor. The r/s thresholds (0.05 / 0.1) are calibrated
-on this data — margins are wide (6× / 23×) but single-satellite. References
-are truth-grade (the 1.2 Trajectory path); State-path users stack
-reference-model error on top. Validation routes: see
-`docs/tle-fit-strategy-findings.md`.
+quiet/active + 1 storm anchor — **no moderate-activity anchor was ever
+sampled here**. The r/s thresholds (0.05 / 0.1) are calibrated on this data —
+margins are wide (6× / 23×) but single-satellite. References are truth-grade
+(the 1.2 Trajectory path); State-path users stack reference-model error on
+top. Validation routes: see `tle-fit-strategy-findings.md` (same folder).
+
+**Post-hoc: why the thresholds didn't fully transfer (2026-08-24).** The
+extended-validation study (`docs/validation-findings.md` §14) found this
+experiment's frozen r/s gate redundant against a fixed `arm_transplant`
+default (`[bench-2]` MISS: always-`arm_transplant` scored 30/30 against the
+gate's 26/30) and misclassified one window by up to 4.02× (`moderate_2022_04`,
+r = 0.07383). Two properties of this experiment's own evidence base explain
+why, without needing new data:
+
+- **No moderate regime was ever sampled**, only quiet/active/storm (above).
+  Measured r clustered at 0.15–1.14 (quiet) vs 0.020–0.024 (active); the 0.05
+  threshold sits in the *untested gap* between those clusters, not at a
+  measured boundary — and `moderate_2022_04`'s r = 0.07383 lands exactly in
+  that gap.
+- **No fixed-arm baseline was ever measured.** Every probe here scores the
+  gate's regime-switching choice against the naive default or a stale
+  catalog TLE, never against "always pick one arm." A gate that agrees with
+  the best regime-specific arm on one anchor per regime is indistinguishable,
+  at 4 anchors, from a single arm that happens to win everywhere — which is
+  what the extended-validation study found at 10 windows.
 
 ## Running
 

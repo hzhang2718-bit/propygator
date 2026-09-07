@@ -7,8 +7,9 @@
 > only the shipped §1.2 surface — nothing here amends a contract. Evidence
 > base: **one satellite** (GRACE-FO 1, ~500 km polar), one window per drag
 > regime; the thresholds below are indicative, not calibrated universals.
-> Future validation routes: `docs/tle-fit-strategy-findings.md`. Walkthrough:
-> `notebooks/07_tle_fitting.ipynb` §9.
+> Future validation routes: `tle-fit-strategy-findings.md` (same folder, since
+> both were relocated here 2026-08-24 from `docs/` by extended-validation
+> Chunk 22). Walkthrough: `notebooks/07_tle_fitting.ipynb` §9.
 
 ## The problem this solves
 

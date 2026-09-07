@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-06
+
+### Added
+
+- An extended validation study that examines the numerical propagator during
+drag-significant runs and tests propygator's TLE fitting mechanisms and playbook.
+- Ran 1-day arc propagations on the GRACE-FO twin using fitted Cd, sphere Cd, and
+box Cd. The resulting RMS values are similar, as expected. The fitted Cd values also
+agree well.
+- Ran 14-day drag-significant propagations on GRACE-FO C, Swarm A, and Swarm B with
+drag off, Cd = 2.3, Cd = fitted, sphere Cd, and box Cd. The results are analyzed and
+compiled in the experiment's README.
+- Ran TLE fitting tests over the 10 windows to test the fidelity of naive 2-day fits,
+the TLE playbook, the catalog TLE, fitting from state, and fading memory fits. The
+results are then parsed and compared against stated benchmarks.
+- Compiled findings in `docs/validation-findings.md`. Formerly
+`docs/real-world-validation-findings.md`.
+- Revised the TLE fitting playbook to reflect new evidence and findings.
+- Revised the showcase notebook to incorporate new findings.
+- Added regression tests for this study.
+
+### Fixed
+
+- Withdrew the DSMC statement from the real-world validation study after a closer
+read revealed that the cited paper does not support the previously claimed Cd band.
+
 ## [0.8.0] - 2026-07-26
 
 ### Added
