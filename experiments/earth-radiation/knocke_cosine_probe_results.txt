@@ -1,0 +1,34 @@
+orekit_jpype version: 13.1.7.1
+spacecraft: sphere A=1.0 m^2, Cr=1.5, m=200.0 kg
+epoch: 2026-01-01T00:00:00 UTC, angularResolution 1 deg
+
+LEO eclipse (a=6778 km, i=51.6 deg, nu=90)
+  elements 6841, solar flux 1413.99 W/m^2
+  live Orekit           8.6622e-09 m/s^2
+  replica as coded      8.6622e-09  (replica/live 1.0000)
+  replica cosine fixed  4.3661e-09
+  as-coded inflation    1.984x
+  flux-weighted mean e  0.5525 (as coded) / 0.5511 (fixed)
+  IR-only anchor at that e: 4.3157e-09  -> fixed/anchor 1.012
+
+LEO lit     (a=6778 km, i=51.6 deg, nu=0)
+  elements 6841, solar flux 1413.99 W/m^2
+  live Orekit           1.4333e-08 m/s^2
+  replica as coded      1.4333e-08  (replica/live 1.0000)
+  replica cosine fixed  7.2100e-09
+  as-coded inflation    1.988x
+  flux-weighted mean e  0.7677 (as coded) / 0.7691 (fixed)
+  IR-only anchor at that e: 6.0347e-09  -> fixed/anchor 1.195
+
+GEO         (a=42164 km, i=0.1 deg, nu=0)
+  elements 28801, solar flux 1413.99 W/m^2
+  live Orekit           2.4108e-10 m/s^2
+  replica as coded      2.4108e-10  (replica/live 1.0000)
+  replica cosine fixed  2.0007e-10
+  as-coded inflation    1.205x
+  flux-weighted mean e  0.7086 (as coded) / 0.7150 (fixed)
+  IR-only anchor at that e: 1.4498e-10  -> fixed/anchor 1.380
+
+READ: replica/live = 1.0000 validates the replica; the inflation column is
+the cosAlpha defect's cost. In eclipse (albedo zero) the cosine-fixed value
+matches the closed-form anchor to ~1 percent, so no third defect remains.
