@@ -22,7 +22,7 @@ Rockets* 50(3), 556–571 (2013) — in the form ADBSat ships as
 alpha       = (1 - theta) * alpha_clean + theta
 theta       = K_L * P_O / (1 + K_L * P_O)
 K_L         = s_o * K_Lo + K_Lf                          [torr^-1]
-P_O         = 0.5 * rho_O * V^2 * Cd_sphere(s) / 133.322 [torr]
+P_O         = 0.5 * rho_O * V^2 * Cd_sphere(s) / (101325/760) [torr]
 alpha_clean = K_s * mu / (1 + mu)^2
 mu          = m_bar / m_s
 E_r         = 0.5 * m_O * V^2
@@ -35,8 +35,9 @@ s_o         = ( sqrt(pi*k*T_ab*E_r) * (erf((sqrt(E_b)-sqrt(E_r))/sqrt(k*T_ab))
 ```
 
 `Cd_sphere(s)` is the existing incident-only sphere form already in
-`_sphere_cd_species`; `m_bar` is the number-weighted mean molecular mass; `s` is
-the bulk speed ratio on `m_bar`.
+`_sphere_cd_species`; `m_bar` is the number-weighted mean molecular mass over the
+same seven `_SPECIES`, anomalous oxygen excluded (ADBSat `environment.m`'s
+default); `s` is the bulk speed ratio on `m_bar`.
 
 | symbol | value |
 |---|---|
@@ -46,11 +47,15 @@ the bulk speed ratio on `m_bar`.
 | `T_ab` transition temperature | 93.31 K |
 | `K_Lo` / `K_Lf` | 5e6 / 3e4 torr^-1 |
 
-`exp` in `zeta` and in `s_o`'s `exp(E_b/(k*T_ab))` must be clamped at the double
-overflow bound — unclamped they reach `inf` and the difference becomes `NaN`.
+`s_o`'s second numerator term underflows to `0` below ~4.15 km/s and to `NaN`
+above it, so evaluate it as the exact equivalent `k*T_ab * (exp(-E_r/(k*T_ab)) -
+exp(-(sqrt(E_b)-sqrt(E_r))^2/(k*T_ab)))`.
 
 The model has no free parameter, so `ANCHOR_ALPHA` and
 `_calibrate_accommodation_K` are deleted rather than retuned.
+
+SESAM is published for spherical and randomly tumbling objects; applying its α per
+flat face at arbitrary incidence follows ADBSat and is an extension of the paper.
 
 ## 3. Deliberate deviation from ADBSat
 
@@ -75,7 +80,9 @@ surface that serves them.
 4. Both generators' `CROSS_VALIDATION_MAX_REL_PCT` re-measured.
 5. The α-dependent `drag-coefficient-verification` and `ecef-attitude-benefit`
    evidence regenerated.
-6. Documents updated; no file still claims the α = 0.90 anchor.
+6. Both validation studies' α-dependent `run_all.py` groups regenerated to a green
+   `--verify` (§8).
+7. Documents updated; no file still claims the α = 0.90 anchor.
 
 ## 6. Invariants (analytic — check cell by cell)
 
@@ -93,20 +100,39 @@ plan's Chunk 3 measures and records them.
 
 ## 7. Acceptance
 
-- The port reproduces ADBSat `accom_SESAM.m` α on a shared case set, evaluated
-  with ADBSat's speed convention so §3 is not in the comparison.
+- The port reproduces a transcription of ADBSat `accom_SESAM.m` α to better than
+  1e-6 relative on a shared case set, the transcription driven with ADBSat's own
+  constants, species set and speed convention so §3 and the constant differences
+  are not in the comparison, and carrying §2's exact `s_o` term because the
+  published one cannot be evaluated in double precision.
 - Generator and experiment-kernel α agree to machine precision.
 - Both cross-validators pass at ≪ 1 %.
 - `pre-commit run --all-files` and the full suite green.
 
-## 8. Frozen evidence
+## 8. Study evidence — regenerated, not frozen
 
-`v0.7.2` real-world-validation and `v0.8.1` extended-validation numbers are **not**
-recomputed. Each study README gains a one-line conflict note stating that the
-shipped tables no longer reproduce its figures. In
-`experiments/real-world-validation/README.md` that note supersedes the existing
-"Expected — do not regenerate" bullet, which is scoped to a below-printed-precision
-effect and does not survive this change.
+Leaving `run_all.py --verify` red in two studies is not an acceptable end state, so
+this is an authorized recomputation of frozen evidence — the second, after `v0.8.2`.
+Only the groups whose drivers load a table are re-run:
+
+| study | regenerate | leave untouched |
+|---|---|---|
+| extended-validation | `noise`, `drag_01..10`, `swarm_01..10`, `drag_summary` | `screen`, `tle_01..10`, `tle_summary`, `tle_bench` |
+| real-world-validation | `drag`, `state-path` | `lageos`, `fit`, `sweep` |
+
+The untouched groups' drivers reference no table — in `run_fit_vs_catalog.py` the
+tables are reached only inside `_run_state_path`. Within a regenerated file only the
+a-priori-table rows move; the drag-off and fitted-Cd rows carry no α. The
+table-derived numbers in `docs/validation-findings.md` §1–8 and §9–17 are restated
+from the re-run, the "Expected — do not regenerate" bullet in
+`experiments/real-world-validation/README.md` is retired, and that README's `v0.8.2`
+leeward-floor `--verify` narrative becomes historical.
+
+**Pre-registered reading.** If the corrected sphere table no longer beats a naive
+`Cd = 2.3` in the storm window, that is a finding, not a regression: restate §9–17,
+both experiment READMEs, the root `README.md` and `notebooks/00_showcase.ipynb`, and
+re-pin `SPHERE_RATIO_BOUND` to the measured relationship. Recorded before the run so
+the outcome is not chosen after seeing it.
 
 ## 9. Out of scope
 
