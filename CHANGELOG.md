@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-07
+
+### Fixed
+
+ - Regenerated the drag results for the real-world validation experiment.
+ The v0.7.3 leeward floor caused a change in the experiment's numbers, and
+ run_all.py --verify failed.
+ - Incorporated the new numbers into the findings documents.
+ The shift is numerical, and there are no finding changes.
+
 ## [0.8.1] - 2026-09-06
 
 ### Added
@@ -51,7 +61,7 @@ read revealed that the cited paper does not support the previously claimed Cd ba
   Covariance symmetry check was loosened during testing to prevent rejections of
   valid TLE fits.
 - Experiment exploring a decision matrix for getting the most out of the TLE fitter.
-  The results are confirmative and documented in docs/ and the TLE fitting notebook.
+  The results are confirmatory and documented in docs/ and the TLE fitting notebook.
 - Experiment exploring the "fading memory" (age-weighted) TLE fitting process. The idea
   is deemed worth further exploration. However, it is not implemented as of now because
   early results are inconclusive against a pre-registered bar and whether it is truly
@@ -98,7 +108,7 @@ read revealed that the cited paper does not support the previously claimed Cd ba
   possible exceptions during geomagnetic storms.
 - Study on the GRACE-FO satellite targeting the quality of the TLE fitter.
   Conclusion: TLE fitter consistently converges on measured truth, and it performs
-  roughly as well as the catalogue TLE. A fitting span of 2 days seems optimal. Propygator
+  roughly as well as the catalog TLE. A fitting span of 2 days seems optimal. Propygator
   TLE is also accurate to 22 km under the worst-case scenario after 3 days.
   Strategic setting of the B* term during times of quiet solar activity can
   create a large improvement. Fitting from a single state generates results comparable
@@ -127,7 +137,7 @@ read revealed that the cited paper does not support the previously claimed Cd ba
 ### Added
 
 - `fit_tle` and `fit_tle_detailed` functions, which take a state or a trajectory
-  to a fitted tle through iterative fitting.
+  to a fitted TLE through iterative fitting.
 - Experiment demonstrating general success of the fitting procedure, as well as
   how fixed-point refinement can produce a seed that converges faster.
 - `TLEFitError` and progress reporting wired to `fit_tle` and `fit_tle_detailed`.

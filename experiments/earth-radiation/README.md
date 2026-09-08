@@ -164,9 +164,9 @@ emissivity and Sun-distance offset above, and it is inside the PASS band. Do not
    erp-runtime-chunk2.patch` (or replay Chunk 2 from the archived plan if the
    seams have drifted). Recalibrate the effect-envelope test bounds against the
    fixed physics.
-4. **Run the resolution benchmark** (`docs/build-plan-earth-radiation.md` Chunk
-   A3) to pick `_EARTH_RADIATION_ANGULAR_RESOLUTION` — pre-fix sweep numbers do
-   not carry over.
+4. **Run the resolution benchmark** (`docs/history/build-plan-earth-radiation.md`
+   Chunk A3) to pick `_EARTH_RADIATION_ANGULAR_RESOLUTION` — pre-fix sweep numbers
+   do not carry over.
 5. Ship as its own small branch, with the contract section's Outcome note
    updated.
 
