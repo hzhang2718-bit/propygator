@@ -88,9 +88,10 @@ surface that serves them.
 
 - α is strictly positive everywhere, and weakly greater than today's at every
   sampled state.
-- **Every θ = 90° box entry is bit-identical.** The tangential-shear term carries
-  no re-emission and so no α; a non-zero delta there means the port reached the
-  shear path.
+- **Every θ = 90° box entry agrees to ≤ 1e-15 relative.** The tangential-shear term
+  carries no re-emission and so no α, but `cos(π/2) = 6.1e-17` leaks the α-bearing
+  pressure term back in at ~1 ULP, so a larger delta — not merely a non-zero one —
+  means the port reached the shear path.
 - Windward box entries (θ < 90°) and all sphere entries decrease.
 - Leeward box entries stay ≥ 0.
 - Both grids stay inside the bands the shipped tests assert.
@@ -132,14 +133,19 @@ leeward-floor `--verify` narrative becomes historical.
 `Cd = 2.3` in the storm window, that is a finding, not a regression: restate §9–17,
 both experiment READMEs, the root `README.md` and `notebooks/00_showcase.ipynb`, and
 re-pin `SPHERE_RATIO_BOUND` to the measured relationship. Recorded before the run so
-the outcome is not chosen after seeing it.
+the outcome is not chosen after seeing it. A narrowed margin rather than a reversal
+is the expected shape; either way the reading is §1–8's measured NRLMSISE-00
+density-bias lever — the a-priori Cd was partly standing in for a density deficit —
+not a defect in the port.
 
 ## 9. Out of scope
 
 The reflected-velocity branch (Moe/Mehta 2/3 vs Koppenwallner 1/2 — both
 published; ADBSat carries ours commented out as "Mehta DRIA Flat Plate");
-anomalous oxygen in the weighting; the lift/side-force component the runtime
-discards; any axis, geometry or API change.
+anomalous oxygen in the weighting; a per-species `alpha_clean` (SESAM's `K_s` and
+`m_s` are fitted to the bulk `m_bar` convention, so per-species `mu` would void the
+calibration); the lift/side-force component the runtime discards; any axis, geometry
+or API change.
 
 ## 10. Provenance
 

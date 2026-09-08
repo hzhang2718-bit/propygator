@@ -65,7 +65,8 @@ not in the conda env.
 
 **Verify.** Every contract §6 invariant, cell by cell. Then **log** the grid deltas
 into the chunk record: mean / median / p95 / min / max for the sphere grid, the box
-θ = 0 slice and the box θ = 90 slice. The θ = 90 slice must be bit-identical.
+θ = 0 slice and the box θ = 90 slice. The θ = 90 slice must hold contract §6's
+≤ 1e-15 relative bound.
 
 ## Chunk 4 — Re-measure the cross-validations
 
