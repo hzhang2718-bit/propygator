@@ -105,7 +105,7 @@ CSSI space weather). Along-track RMS (m), the drag-dominated component:
 | Run 3 — scalar Cd fit | **1.9** | **6.4** | **119.0** | 27.4 |
 | fitted Cd (A = 1 m²) | 2.03 | 3.40 | 4.08 | 1.78 ⚠ artifact |
 | Run 4 — sphere table, no fit | 20.9 | 210.6 | 1418.2 | 545.9 |
-| Run 5 — box table, no fit (IPT-ecef) | 55.0 | 222.6 | 155.6 | 1450.9 |
+| Run 5 — box table, no fit (IPT-ecef) | 55.0 | 222.2 | 155.6 | 1450.9 |
 
 **The pipeline is proven; the remainder is density.** Run 1 clears the
 conservative floor by 11× (quiet) to 953× (storm) — the drag signal scales
@@ -152,7 +152,7 @@ table*, never the table alone:
   table ranking.
 - **The box adds only absorbable scale for this ram-dominated body:** scaling
   its Cd·A onto the fitted product collapses Run 5 onto Run 3 in every window
-  (1.85 vs 1.86 m; 6.45 vs 6.36 m; 118.6 vs 119.0 m) — the direct Checkpoint-B
+  (1.85 vs 1.86 m; 6.45 vs 6.36 m; 118.7 vs 119.0 m) — the direct Checkpoint-B
   evidence behind **deferring the `box_and_panels` geometry upgrade** (its
   non-absorbable payoff is the edge-on sail regime GRACE doesn't exercise).
   The +0.33 m length-corrected box moves the residual by ≪ the density

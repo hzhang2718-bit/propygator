@@ -199,10 +199,10 @@ noise), maneuver screen CLEAN, 0 QC-dropped records, seamless day concatenation.
 | **fitted Cd** (vs. 2.3 nominal) | **2.03** | **3.40** |
 | Run 1 vs. LAGEOS conservative floor (~4 m/day) | ~11× | ~264× |
 | **Run 4** sphere table (no fit), along-track RMS | **20.9 m** | **210.6 m** |
-| **Run 5** box table (no fit, IPT-ecef), along-track RMS | **55.0 m** | **222.6 m** |
+| **Run 5** box table (no fit, IPT-ecef), along-track RMS | **55.0 m** | **222.2 m** |
 | Run 4 / Run 5 share of the fitted ρ·Cd·A product | 1.47× / 2.23× | 0.80× / 1.21× |
 | Verify 4: box scaled onto the fitted product, along RMS | 1.85 m (Run 3: 1.86) | 6.45 m (Run 3: 6.36) |
-| Verify 5: +0.33 m length-corrected box, Δ along RMS | +2.7 m | +35.7 m |
+| Verify 5: +0.33 m length-corrected box, Δ along RMS | +2.7 m | +36.6 m |
 
 Radial and cross-track stay sub-metre (quiet) to metre-class (active); the residual
 is almost purely along-track, the classic drag signature. Reading:
@@ -275,7 +275,7 @@ Reading:
   non-absorbable fidelity for GRACE-class flight (its payoff is the edge-on sail
   regime GRACE doesn't exercise).
 - **Verify 5 — geometry-insensitivity:** the +0.33 m length-corrected box moves the
-  along-track RMS by +2.7 m (quiet) / +35.7 m (active) against density confounds of
+  along-track RMS by +2.7 m (quiet) / +36.6 m (active) against density confounds of
   53 / 216 m — the residual is density-limited, not dimension-limited.
 - One shipped-surface observation (normal fix path, low severity): the
   `box_face_default` grid's leeward half carries noise-level **negative** entries
@@ -326,7 +326,7 @@ gate); axis check PASS on both; t₀ sanity ≤ 5e-9 m.
 | **fitted Cd** (on A_ram) | **4.080 (3.97)** | **1.777 (1.73)** ⚠ artifact |
 | sphere table s / along RMS | 0.63× / 1418.2 m | 1.47× / 545.9 m |
 | box table s / along RMS | **0.97×** / 155.6 m | 2.26× / 1450.9 m |
-| Verify 4: scale-collapsed box vs Run 3 | 118.6 vs 119.0 m | 27.4 vs 27.4 m |
+| Verify 4: scale-collapsed box vs Run 3 | 118.7 vs 119.0 m | 27.4 vs 27.4 m |
 | storm-surprise (fixed Cd 3.405), along RMS | — | 1057.5 m |
 
 Readings:

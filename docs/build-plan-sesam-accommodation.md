@@ -3,7 +3,8 @@
 Working blueprint for `docs/sesam-accommodation.md`, which wins on conflict.
 Status headers are the maintainer's. Archive to `docs/history/` at close.
 
-**Precondition.** Part B of `docs/build-plan-earth-radiation.md` is closed. Chunk 3
+**Precondition.** Part B of `docs/history/build-plan-earth-radiation.md` is closed
+(shipped in `v0.8.2`, 2026-09-07), so this plan is unblocked. Chunk 3
 below moves Run 5 of the real-world-validation `drag` group far past the
 below-printed-precision leeward-floor artifact that Part B exists to reconcile, so
 closing Part B afterwards conflates two divergences of different character in one

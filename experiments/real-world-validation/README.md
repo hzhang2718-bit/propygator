@@ -117,13 +117,16 @@ DSMC-credible read cites a band withdrawn in full — see `gracefo/README.md`
   removes it, so after a diff you can still open the regenerated file that
   produced it. Nothing reads them again and no committed evidence references
   one, so they are safe to delete at any time; clearing them is a manual step.
-- **Evidence is frozen at its v0.7.2 numbers** — the historical record of what
-  was measured against the table that shipped then. The Chunk 5 leeward floor
-  (v0.7.3) regenerated `box_face_cd_default.npz`, so a post-v0.7.3 `--verify`
-  of the `drag` / `state-path` groups differs from the committed
-  `gracefo/results.txt` in exactly four `leeward -0.000` → `0.000` prints (the
-  sign of a −3.4e-11 the floor zeroed; the numeric effect on Run 5 is
-  ~1e-11 m² of Cd·A, below printed precision). Expected — do not regenerate.
+- **The `drag` group was regenerated 2026-09-07** against the v0.7.3 box table
+  (branch `study/rwv-verify-repair`); every other group stands at its v0.7.2
+  numbers. The v0.7.3 leeward floor zeroed the table's negative leeward cells —
+  a ≤ 0.0096 % change in Run 5's box face-sum Cd·A, below printed precision.
+  The output moved further (active_2023 Run 5 along-track 222.58 → 222.15 m,
+  −0.19 %) because a below-precision drag perturbation re-sequences the adaptive
+  integrator: the shift is **numerical, not a physical re-measurement**, and no
+  reading in this study changes. `state-path` reproduced identically and was not
+  regenerated. Measurement: `docs/history/build-plan-earth-radiation.md` Part B,
+  Chunk B1.
 - Shared code: `common.py` (cross-leg analysis math), `gracefo/gracefo_common.py`
   (leg config + measured anchors). Drivers stay the per-chunk entry points.
 - Reference-only: not shipped, not in CI, outside `testpaths`, excluded from
