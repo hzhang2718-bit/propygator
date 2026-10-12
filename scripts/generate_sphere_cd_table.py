@@ -75,7 +75,7 @@ DEFAULT_DENSITY_POINTS = 25
 # interpolant covers the mesh corners rather than nearest-filling them (addendum
 # sec. 5.3 -- the internal sampling is NOT a coverage claim, only the grid axes are).
 # This is the full range the two C_D models were cross-validated over (addendum
-# sec. 5, Chunk 3: experiment vs generator agree to 0.0191% across 130-1450 km).
+# sec. 5, Chunk 3: experiment vs generator agree to 0.0235% across 130-1450 km).
 DEFAULT_INTERNAL_ALT_MIN_KM = 130.0
 DEFAULT_INTERNAL_ALT_MAX_KM = 1450.0
 DEFAULT_INTERNAL_ALT_POINTS = 56  # ~24 km spacing (matches the prior sampling density)
@@ -92,7 +92,8 @@ STORM_AP_RANGE = (100.0, 400.0)
 
 # SESAM energy accommodation (Pilinski, Argrow, Palo & Bowman 2013, J. Spacecraft &
 # Rockets 50(3), 556-571; docs/sesam-accommodation.md sec. 2). Published constants;
-# the model has no free parameter. Read at call time, so a parity check can patch them.
+# the model has no free parameter. SESAM_E_B and the _SPECIES masses are fixed at
+# import, so a parity check patches those directly.
 SESAM_CITATION = (
     "Pilinski, Argrow, Palo & Bowman 2013, J. Spacecraft & Rockets 50(3), 556-571, "
     "doi:10.2514/1.A32348"
@@ -113,7 +114,7 @@ TORR = 101325.0 / 760.0  # Pa
 # cross-validation). UPDATE whenever the C_D model (physics, accommodation, or the
 # relative-speed formula) changes and the cross-validation is re-run, so the
 # shipped table never claims a stale agreement.
-CROSS_VALIDATION_MAX_REL_PCT = 0.0191
+CROSS_VALIDATION_MAX_REL_PCT = 0.0235
 
 #: pymsis NRLMSISE-00 output column order (Variable enum): total density, the
 #: species number densities, then temperature. Reconstructed here, not imported.
@@ -473,7 +474,7 @@ def generate(
             "cross_validation_max_rel_pct": CROSS_VALIDATION_MAX_REL_PCT,
             "note": (
                 "Collapse RMS stays <= 5% (green) across the full validated sweep "
-                "(overall 0.490%, storm 0.672%; addendum Chunk 1), so there is no "
+                "(overall 0.856%, storm 1.071%; cd_sphere_results.txt), so there is no "
                 "reduced-confidence region within the grid. The high-altitude end is "
                 "non-binding (drag ~ rho -> 0). Experiment-vs-generator model cross-"
                 "validation (addendum sec. 5, Chunk 3): the two C_D models' physics "

@@ -31,10 +31,10 @@ never goes stale — which is exactly the design described in `docs/features.md`
 
 | Tier | Geometry | Question | Result |
 |------|----------|----------|--------|
-| A | sphere | Does C_D collapse onto one `(radius, ρ)` surface across genuinely different epochs (season, local solar time, latitude, F10.7, Ap) **and a storm cohort**, over **~130–1400 km**? | **Yes** — scatter at matched `(radius, ρ)` ≈ **0.49 % RMS** overall (0.67 % storm-only); **every radius band PASSes** the ≤ 5 % green line, so the high-altitude cut is **non-binding** within the sweep |
-| B | box / plate | Does it still collapse **at fixed attitude**, for a cube and a thin plate from head-on to grazing? | **Yes** — ≤ ~2 % RMS even for an 80° grazing plate; all attitudes PASS |
+| A | sphere | Does C_D collapse onto one `(radius, ρ)` surface across genuinely different epochs (season, local solar time, latitude, F10.7, Ap) **and a storm cohort**, over **~130–1400 km**? | **Yes** — scatter at matched `(radius, ρ)` ≈ **0.86 % RMS** overall (1.07 % storm-only); **every radius band PASSes** the ≤ 5 % green line, so the high-altitude cut is **non-binding** within the sweep |
+| B | box / plate | Does it still collapse **at fixed attitude**, for a cube and a thin plate from head-on to grazing? | **Yes** — ≤ ~2.1 % RMS even for an 80° grazing plate; all attitudes PASS |
 
-Both are an order of magnitude under the 15–30 % thermospheric density-model
+Both are well under the 15–30 % thermospheric density-model
 uncertainty that dominates total drag error, so keying C_D on `(radius, density)`
 is sound. That the collapse stays green across the whole 130–1400 km sweep is the
 expected outcome (addendum §2/§4): the high-altitude limit is soft because drag
@@ -44,7 +44,7 @@ expected outcome (addendum §2/§4): the high-altitude limit is soft because dra
 
 | File | Role |
 |------|------|
-| `cd_core.py` | Sphere C_D: Sentman/DRIA closed form, per-species mass-flux weighting over NRLMSISE-00, SESAM-style Langmuir accommodation keyed on atomic-O coverage. Also holds the shared validity-domain helpers: the forward `geocentric_radius()` map (mirrored from the table generator), the green/red thresholds, and `collapse_rms_by_radius()` / `print_collapse_report()`. Shared by both experiments. |
+| `cd_core.py` | Sphere C_D: Sentman/DRIA closed form, per-species mass-flux weighting over NRLMSISE-00, SESAM energy accommodation (Pilinski et al. 2013; `docs/sesam-accommodation.md`). Also holds the shared validity-domain helpers: the forward `geocentric_radius()` map (mirrored from the table generator), the green/red thresholds, and `collapse_rms_by_radius()` / `print_collapse_report()`. Shared by both experiments. |
 | `cd_sphere_experiment.py` | Tier A. Dense ~130–1400 km sweep keyed on **geocentric radius**, with a storm cohort, testing the `(radius, ρ)` collapse two ways (per-band scatter vs coded thresholds + a train/test interpolant). Writes `cd_time_independence.png`. |
 | `cd_box.py` | Tier B per-face flat-plate C_D (Schaaf–Chambre / Sentman). Self-check: integrating panels over a sphere reproduces `cd_core` to < 0.1 %. |
 | `cd_box_experiment.py` | Tier B. The same radius-keyed collapse test at fixed attitude (cube + plate), with the storm cohort and coded thresholds. Writes `cd_tierB.png`. |
@@ -53,7 +53,7 @@ expected outcome (addendum §2/§4): the high-altitude limit is soft because dra
 | `cd_box_benefit_estimate.py` | **Tier B cheap benefit estimate (Chunk 1) → GO/NO-GO Checkpoint A.** Sun-pointing LEO sail from a kinematic orbit + analytic Sun (no Orekit, no integrator); BoxFace `CdA(t) = Σ Cd_i(θ_i)·A_i` vs the best-fit Tier-A scalar × windward projected area, residual after recalibration, swept over β. Writes `cd_box_benefit_estimate.png`. |
 | `kn_floor.py` | **Knudsen low-altitude floor (Chunk 2).** The model-validity instrument the collapse study is blind to (addendum §2): composition-weighted mean free path λ from per-species NRLMSISE-00 densities + a documented hard-sphere σ table, `Kn = λ/L`, and `floor_altitude(L)` — the `Kn = 10` free-molecular crossing scanned at a conservative high-activity atmosphere. The method the runtime re-implements (addendum §6.3). |
 | `kn_floor_experiment.py` | Sweeps `floor_altitude(L)` over 0.1–30 m (CubeSat → station) with the λ hand-check, the monotonicity check, and the conservative-vs-mid-activity direction check. Writes `kn_floor.png`. |
-| `cross_validate_models.py` | **Model cross-validation + Phase-2 band (Chunk 3, addendum §5/§4).** Drives *both* `cd_core.py` and the shipped generator's `_sphere_cd_*` internals (imported from `scripts/generate_sphere_cd_table.py`) off one identical set of NRLMSISE-00 rows and asserts the two independent reconstructions agree ≪ 1%; reconciles the accommodation anchor (Langmuir K) and the relative-speed formula first; prints the derived validity band. |
+| `cross_validate_models.py` | **Model cross-validation + Phase-2 band (Chunk 3, addendum §5/§4).** Drives *both* `cd_core.py` and the shipped generator's `_sphere_cd_*` internals (imported from `scripts/generate_sphere_cd_table.py`) off one identical set of NRLMSISE-00 rows and asserts the two independent reconstructions agree ≪ 1%; reconciles the SESAM accommodation (identical α on shared inputs) and the relative-speed formula first; prints the derived validity band. |
 | `cross_validate_box_face.py` | **Tier B `BoxFaceCd` per-face cross-validation (Chunk 3, contract Evidence-pipeline 3).** The box twin: drives *both* the experiment per-face kernel (`cd_box.cd_panel_species` via `cd_box_faces`) and the shipped generator's `_face_cd_*` internals (imported from `scripts/generate_box_face_cd_table.py`) off one identical set of NRLMSISE-00 rows. Asserts the shared closed form (pressure **and** shear) to machine precision, then the force-relevant assembled `CdA = Σ Cd_i·A_i` for a convex box + plate swept over attitude × radius × density to ≪ 1%, plus a secondary max-absolute per-face gate. The §5-equivalence invariant that lets the Chunk-1/2 evidence transfer to the shipped `box_face_cd_default.npz`. |
 | `cd_box_benefit_study.py` | **Tier B rigorous benefit study (Chunk 6, contract Evidence-pipeline 4) → final GO/NO-GO.** The hybrid "propagate in the conda env" twin of the Chunk-1 cheap estimate: the **real** `propagate_numerical` of the Sun-pointing sail, Tier A (best-fit constant Cd) vs `BoxFaceCd.default()`, comparing along-track divergence and the residual that survives best-fit constant-Cd recalibration. **Runs in the propygator conda env (JVM + orekit-data), NOT this venv** — the only scripts here that do (this + the edge-on companion). Writes `cd_box_benefit_study.png`. |
 | `cd_box_benefit_study_edgeon.py` | **Tier B edge-on companion study (Chunk 6, application-specific).** The physics inverts when the sail is held *edge-on* (`InPlaneTracking`) instead of Sun-pointing: the large faces' projected area collapses, so tangential **shear** (which the projected-area Tier A model omits) dominates. Reports along-track divergence vs *physical* Tier A (Cd=2.2 and `VariableCd.sphere`), the best-fit constant Cd (whose value shows whether it is physical), and drag-vs-SRP magnitude. Conda env. Writes `cd_box_benefit_study_edgeon.png`. |
@@ -110,7 +110,7 @@ entirely; it is gitignored.
 If `Activate.ps1` is blocked by PowerShell's execution policy, allow it for the
 current session only: `Set-ExecutionPolicy -Scope Process RemoteSigned`.
 
-## Results (local venv run, 2026-06-14)
+## Results (local venv run, 2026-10-12, SESAM accommodation)
 
 Exact stdout from the run that produced the committed figures (regenerate any time
 with the `> ...results.txt` redirect in step 4). Collapse "thickness" is the RMS %
@@ -120,44 +120,42 @@ graded against green ≤ 5 % / red ≥ 30 %.
 **Tier A — sphere** (5360 points: 67 epochs incl. 12 storm × 80 altitudes,
 130–1400 km; radius 6490–7778 km):
 
-- *Per-band scatter* rises gently from **0.15 %** RMS near 125 km to **~0.66 %**
-  around 850 km, then plateaus ~0.55–0.6 % out to 1400 km. **Overall 0.490 %**,
-  **storm-cohort 0.672 %** — **every band PASSes** the 5 % green line, so there is
+- *Per-band scatter* rises from **0.10 %** RMS near 125 km to a peak of **1.41 %**
+  around 850 km, then eases to ~0.8–1.1 % out to 1400 km. **Overall 0.856 %**,
+  **storm-cohort 1.071 %** — **every band PASSes** the 5 % green line, so there is
   **no high-altitude cut within the swept range** (the high limit is non-binding).
 - *Operational* — table built on 33 epochs, applied to the 34 held-out epochs:
-  residual **mean +0.364 %, RMS 2.061 %**, 95th |·| 3.95 %, max |·| 13.81 % (n = 2565).
+  residual **mean +0.599 %, RMS 2.217 %**, 95th |·| 4.00 %, max |·| 12.27 % (n = 2565).
 
 **Reading the middle panel (the "fork").** In `cd_time_independence.png` the centre
 plot (C_D vs density, coloured by radius) splits into two arms at the low-density /
 high-altitude end. That fork is the **oxygen→helium composition transition** seen
-through the accommodation coefficient α: where atomic O dominates the gas, the SESAM
-model gives α ≈ 0.9 (cold, accommodated re-emission → lower C_D); where He takes over
-(~600–1000 km up) the O coverage collapses, α → 0 (hot, un-accommodated re-emission →
-higher C_D). So one density value is populated by two *different* atmospheres, and
-C_D swings ~6 % (up to ~30 % across the full range) between them. This is the **radius
+through the accommodation coefficient α: where atomic O dominates the gas, SESAM's O
+coverage drives α toward 1 (accommodated re-emission → lower C_D); where He takes over
+at high altitude the coverage falls and α drops toward SESAM's clean-surface value
+(hotter re-emission → higher C_D; α spans 0.069–1.000 over the sweep). So one density
+value is populated by two *different* atmospheres. This is the **radius
 dependence made visible**: the panel projects the radius axis out and shows it only as
 colour, so a genuine C_D(radius) effect has to appear as branching, and the two arms
 are different colours. It is *reassuring*, not alarming — at a fixed `(radius, ρ)` the
-composition and α are pinned and C_D collapses back to one value (the < 1 % thickness
+composition and α are pinned and C_D collapses back to one value (the ≤ 1.41 % thickness
 in the right panel). The fork is exactly **why the table is keyed on `(radius, ρ)` and
-not density alone**: radius is the coordinate that says which arm you are on. (Verified
-against the data: within a fixed-density slice, corr(C_D, α) runs −0.7 to −0.99 and the
-slice is a genuine O/He mix only at the low-density end.)
+not density alone**: radius is the coordinate that says which arm you are on.
 
 **Tier B — box / plate**, collapse RMS at matched `(radius, ρ)` at fixed attitude
 (storm-only RMS and worst single-bin max in the captured stdout); all PASS, no cut:
 
 | attitude | mean C_D | RMS % | storm % |
 |----------|---------:|------:|--------:|
-| cube head-on (0°) | 3.601 | 1.004 | 1.232 |
-| cube edge-on (45°) | 4.217 | 0.622 | 0.816 |
-| cube corner-on | 4.638 | 0.374 | 0.560 |
-| plate face-on (0°) | 3.134 | 0.488 | 0.784 |
-| plate 60° | 1.298 | 0.368 | 0.533 |
-| plate 80° grazing | 0.432 | 1.977 | 2.311 |
+| cube head-on (0°) | 3.437 | 1.494 | 1.764 |
+| cube edge-on (45°) | 4.054 | 1.014 | 1.240 |
+| cube corner-on | 4.474 | 0.681 | 0.886 |
+| plate face-on (0°) | 2.970 | 0.871 | 1.165 |
+| plate 60° | 1.257 | 0.651 | 0.846 |
+| plate 80° grazing | 0.427 | 2.117 | 2.486 |
 
-Sphere overall is 0.49 %; even the 80° grazing plate stays at ~2 % — all an order
-of magnitude under the 5 % green line across the whole 130–1400 km sweep.
+Sphere overall is 0.86 %; even the 80° grazing plate stays at ~2.1 % — all at least
+2× under the 5 % green line across the whole 130–1400 km sweep.
 
 ## Low-altitude validity floor (Knudsen diagnostic, Chunk 2)
 
@@ -222,14 +220,14 @@ the two models agree at the boundary** (addendum §5 — the single most importa
 correctness constraint). `cross_validate_models.py` proves it: it drives both off
 one identical set of NRLMSISE-00 rows and compares.
 
-**Result (local venv run, 2026-06-15) — the two models agree to 0.0191 % (≪ 1 %):**
+**Result (local venv run, 2026-10-12, SESAM accommodation) — the two models agree to 0.0235 % (≪ 1 %):**
 
 | check | result |
 |-------|--------|
-| Shared algebra (per-species C_D + accommodation isotherm) | **0.00e+00** — bit-identical |
-| Accommodation anchor → Langmuir K (α = 0.90) | K matches to **0.017 %** (cd_core's hardcoded anchor `n_O = 2.64e14, T = 1284` equals live NRLMSISE-00 `2.640e14, 1284.1`) |
+| Shared algebra (per-species C_D) | **0.00e+00** — bit-identical |
+| SESAM α, 150 shared states (identical float64 rows + speed) | **0.00e+00** — bit-identical (gate < 1e-12) |
 | Relative-speed formula | exact at the equator; **≤ 0.16 %** at lat 80° — `cd_core.v_rel` uses a *spherical* radius `R⊕+alt`, the generator the true *geocentric* radius (a documented, sub-1 % difference that moves neither boundary) |
-| **End-to-end C_D, 150 shared (condition × altitude) points, 130–1450 km, lat −60..70°** | **max 0.0191 %, mean 0.0059 %** (equator subset 1e-7) — **PASS ≪ 1 %**. The range spans the full generation band (the 150–1400 km grid *plus* the internal-sampling margin), so the extended 1400 km grid claim is certified, not just the old 1200 km |
+| **End-to-end C_D, 150 shared (condition × altitude) points, 130–1450 km, lat −60..70°** | **max 0.0235 %, mean 0.0088 %** (equator subset 1e-7), each pipeline on its own speed and hence its own SESAM α — **PASS ≪ 1 %**. The range spans the full generation band (the 150–1400 km grid *plus* the internal-sampling margin), so the extended 1400 km grid claim is certified, not just the old 1200 km |
 
 So a limit derived from the experiment is safe to ship in the regenerated table
 (Chunk 4).
@@ -251,24 +249,24 @@ build plan `docs/history/build-plan-tier-b-drag.md`). Chunk 1 produces the offli
 that gates whether it is worth shipping, **before** any runtime is built.
 
 **(1) Incidence-interpolation convergence** (`cd_box_incidence_convergence.py`,
-local venv run 2026-06-27). The shipped table will store the per-face Cd on a 1-D
+local venv run 2026-10-12, SESAM accommodation). The shipped table will store the per-face Cd on a 1-D
 **θ axis over `[0, π]`** (face-flow angle; θ = 0 head-on, π⁄2 edge-on, π leeward)
 and interpolate linearly. The per-face coefficient is smooth (C∞) in θ — head-on
-Cd ≈ **2.50**, edge-on floors at **0.088** (the tangential-shear floor the contract
+Cd ≈ **2.34**, edge-on floors at **0.088** (the tangential-shear floor the contract
 predicts at ~0.07), and tapers to ~**0 by θ ≈ 110°** — so linear interpolation
 converges cleanly:
 
 | nodes | spacing | max err | RMS err |
 |------:|--------:|--------:|--------:|
-| 5 | 45.0° | 7.69 % | 3.01 % |
-| 9 | 22.5° | 2.20 % | 1.00 % |
-| 17 | 11.25° | 1.07 % | 0.32 % |
-| 33 | 5.62° | 0.35 % | 0.08 % |
-| 65 | 2.81° | 0.09 % | 0.02 % |
-| 129 | 1.41° | 0.02 % | 0.005 % |
+| 5 | 45.0° | 7.50 % | 2.94 % |
+| 9 | 22.5° | 2.13 % | 1.00 % |
+| 17 | 11.25° | 1.09 % | 0.32 % |
+| 33 | 5.62° | 0.36 % | 0.08 % |
+| 65 | 2.81° | 0.098 % | 0.02 % |
+| 129 | 1.41° | 0.025 % | 0.005 % |
 
 (errors relative to the peak per-face Cd). RMS error falls a clean **~4× per
-halving** of the spacing (ratios 3.0 → 3.2 → 3.85 → 3.98 → 3.99 — textbook
+halving** of the spacing (ratios 2.9 → 3.1 → 3.84 → 3.98 → 4.00 — textbook
 2nd-order), so a larger **uniform** grid provably hits any error target with no
 special node placement. The max-error ratio is noisier (rides the high-curvature
 "knee" near edge-on) but also ≈ 4× by the fine grids. The Cd(θ) **shape** is
@@ -277,7 +275,7 @@ transfers across the band. **Reading:** a **~33-node θ axis (≈ 5.6° spacing)
 gives < 0.4 % max / < 0.1 % RMS — the input to the Chunk-2 grid-resolution sign-off.
 
 **(2) Cheap benefit estimate → GO/NO-GO Checkpoint A** (`cd_box_benefit_estimate.py`,
-local venv run 2026-06-27). For a representative **Sun-pointing LEO drag sail**
+local venv run 2026-10-12, SESAM accommodation). For a representative **Sun-pointing LEO drag sail**
 (4 m × 4 m, 16 m²/face, m = 12 kg, A/m ≈ 1.33 m²/kg; 450 km circular, inc 51.6°,
 solar max; kinematic orbit + analytic Sun, **no Orekit / no integrator**), compare
 the per-face `CdA_BoxFace(t) = Σ Cd_i(θ_i)·A_i` against the **best-fit** Tier-A
@@ -285,25 +283,26 @@ scalar × windward projected area `Σ max(0, cos θ_i)·A_i`, swept over β:
 
 | β (Sun vs orbit plane) | best-fit c\* | surviving residual | along-track after recal | vs un-recal (Cd=2.2) |
 |---:|---:|---:|---:|---:|
-| 4.9° | 2.69 | **7.11 %** | −33.3 km / 2 d | +338 km |
-| 30.0° | 2.61 | **5.95 %** | −19.6 km / 2 d | +240 km |
-| 60.0° | 2.38 | **5.77 %** | +3.6 km / 2 d | +71 km |
+| 4.9° | 2.46 | **5.06 %** | −18.5 km / 2 d | +177 km |
+| 30.0° | 2.41 | **4.39 %** | −9.5 km / 2 d | +120 km |
+| 60.0° | 2.26 | **5.32 %** | +8.0 km / 2 d | +30 km |
 
 The surviving residual is the **work-weighted RMS of `CdA_BoxFace − c*·A_proj`** as a
 % of mean drag — and because `c*` is the least-squares optimum, it is the **minimum
 over all constant Cd**, i.e. the fraction *no* scalar can absorb. Recalibrating the
-scalar removes ~90 % of the gap (e.g. 338 km → 33 km along-track at β ≈ 5°), but a
-**coherent ~6–7 % shape residual survives**, accumulating secularly to ~33 km of
-along-track over just 2 days (~1.6 % of the total Tier-A drag effect, growing with
-mission length). That divergence is largest where the sail sweeps the full incidence
-range (low β) and is the attitude-correlated systematic a single Cd structurally
+scalar removes ~90 % of the gap (e.g. 177 km → 18.5 km along-track at β ≈ 5°), but a
+**coherent ~4–5 % shape residual survives**, accumulating secularly to ~19 km of
+along-track over just 2 days at β ≈ 5° (the script's worst case by residual %, β = 60°,
+is 0.94 % of the total Tier-A drag effect, growing with mission length). The along-track
+divergence is largest where the sail sweeps the full incidence range (low β) and is the
+attitude-correlated systematic a single Cd structurally
 cannot represent — including the edge-on shear drag that Tier-A's windward-projected
 area drops to zero. **Reading: material AND survives best-fit recalibration → a GO
 signal** for `BoxFaceCd` (the formal Checkpoint-A call is the maintainer's; the
 rigorous propagation-based study in Chunk 6 is the final confirmation).
 
 **(3) Per-face cross-validation → §5-equivalence invariant** (`cross_validate_box_face.py`,
-local venv run 2026-06-28). The experiment per-face kernel (`cd_box.cd_panel_species`
+local venv run 2026-10-12, SESAM accommodation). The experiment per-face kernel (`cd_box.cd_panel_species`
 via `cd_box_faces`) and the **shipped** generator (`scripts/generate_box_face_cd_table.py`,
 `_face_cd_*`) are **two independent reconstructions** of the same Schaaf–Chambre /
 Sentman DRIA flat-face physics. The Chunk-1/2 convergence and collapse evidence
@@ -316,13 +315,13 @@ C_D, not per-species terms:
 | check | result |
 |-------|--------|
 | Shared per-face closed form (pressure **and** shear, per species, identical inputs) | **8.9e-16** — bit-identical to machine precision across the full `[0, π]` axis |
-| Mass-flux-weighted per-face Cd (identical V, α) | **3.9e-07** — the lone He molecular-mass nuance (4.0026 vs 4.002602 amu, a trace species) |
-| Accommodation anchor → Langmuir K (α = 0.90) | **0.017 %** (shared with the sphere; both pipelines run at the shared K) |
-| **End-to-end `CdA`, 3570 (condition × altitude × attitude) points, 2 geometries, lat −60..70°** | **box 2.0×1.5×1.0** max **0.0364 %** / mean 0.0063 %; **plate 1.0×1.0×0.02** max **0.1193 %** / mean 0.0122 % — **PASS ≪ 1 %** |
-| Pure-physics `CdA` (shared speed, isolates the closed form) | **≤ 2.5e-07** — confirms the end-to-end residual is purely the speed convention |
-| Secondary: global max **absolute** per-face diff | **3.7e-04** (gate `ε_abs = 0.02`, well under the ~0.07 edge-on floor) — guards the grazing/leeward regime a relative gate cannot |
+| Mass-flux-weighted per-face Cd (identical V, α) | **3.3e-07** — consistent with pymsis's float32 rows, which this check does not cast; ungated |
+| SESAM α, 70 shared states (identical float64 rows + speed) | **0.00e+00** — bit-identical (gate < 1e-12) |
+| **End-to-end `CdA`, 3570 (condition × altitude × attitude) points, 2 geometries, lat −60..70°** | **box 2.0×1.5×1.0** max **0.0501 %** / mean 0.0092 %; **plate 1.0×1.0×0.02** max **0.1225 %** / mean 0.0146 % — **PASS ≪ 1 %** |
+| Pure-physics `CdA` (shared speed, isolates the closed form) | **≤ 1.2e-07** — confirms the end-to-end residual is purely the speed convention |
+| Secondary: global max **absolute** per-face diff | **6.9e-04** (gate `ε_abs = 0.02`, well under the ~0.07 edge-on floor) — guards the grazing/leeward regime a relative gate cannot |
 
-The headline **0.1193 %** (recorded in the table metadata as `cross_validation_max_rel_pct`)
+The headline **0.1225 %** (recorded in the table metadata as `cross_validation_max_rel_pct`)
 is dominated by the documented spherical-vs-geocentric **relative-speed radius
 convention** — the same sub-1 % effect the sphere table carries — not by the per-face
 physics, which is bit-identical. The plate's larger figure is that convention amplified
@@ -331,7 +330,7 @@ invariant holds: the convergence/validity evidence is safe to transfer to the sh
 per-face table.**
 
 **(4) Rigorous benefit study → final GO/NO-GO** (`cd_box_benefit_study.py`, conda-env
-run 2026-06-30). The propagation-based confirmation of the Chunk-1 cheap signal, using
+run 2026-10-12 on the SESAM-regenerated table). The propagation-based confirmation of the Chunk-1 cheap signal, using
 the **real** `propagate_numerical` (gravity 70×70 + Sun/Moon + NRLMSISE-00 drag + SRP).
 The same Sun-pointing sail is propagated over a **3-day** window twice — Tier A (the
 box with a scalar Cd) vs `BoxFaceCd.default()` (per-face) — identical in every other
@@ -343,23 +342,23 @@ constant Cd can absorb. Normalized against the Tier-A drag's own along-track eff
 
 | β | alt 450 km → | best-fit c\* | residual RMS | residual final / max | un-recal Cd=2.2 final | Tier-A drag effect | residual / drag effect |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 5.0° | 365 km | 2.692 | 19.2 km | 1.0 / 32.5 km | −3042 km | 6431 km | 0.02 % final, 0.28 % RMS |
-| 30.0° | 399 km | 2.614 | 16.5 km | 62.0 / 62.0 km | −1735 km | 6698 km | 0.93 % final, 0.25 % RMS |
+| 5.0° | 378 km | 2.460 | 29.7 km | 42.1 / 48.5 km | −1616 km | 6774 km | 0.62 % final, 0.43 % RMS |
+| 30.0° | 403 km | 2.424 | 22.4 km | 72.3 / 72.3 km | −889 km | 6480 km | 1.12 % final, 0.35 % RMS |
 
 **Reading (the formal SHIP/DROP call is the maintainer's).** The rigorous study
-**tempers the Chunk-1 GO signal.** Chunk 1's headline "~7 % surviving residual" is a
+**tempers the Chunk-1 GO signal.** The cheap estimate's 4.39–5.32 % surviving residual is a
 **force-level** figure (per-face `CdA` vs a best-fit-scaled projected area). At the
-**trajectory level** that does *not* become a 7 % along-track error: along-track drift
+**trajectory level** that does *not* become a ~5 % along-track error: along-track drift
 is dominated by the **secular** (orbit-averaged) drag rate, which is a pure **scale**
-that a single constant Cd captures — so the best-fit Cd absorbs **> 99 %** of the
-divergence (e.g. the −3042 km error at the textbook Cd = 2.2 collapses to ~1 km final
-at c\* = 2.69, β = 5°; the recalibration objective in the figure has a sharp minimum).
-What *survives* is the small, attitude-correlated **shape** residual: **~16–19 km RMS,
-up to ~62 km, over 3 days — well under 1 % (0.25–0.93 %) of the ~6500 km total drag
+that a single constant Cd captures — so the best-fit Cd absorbs most of the
+divergence (e.g. the −1616 km error at the textbook Cd = 2.2 collapses to −42 km final
+at c\* = 2.46, β = 5°; the recalibration objective in the figure has a sharp minimum).
+What *survives* is the small, attitude-correlated **shape** residual: **~22–30 km RMS,
+up to ~72 km, over 3 days — about 1 % (0.35–1.12 %) of the ~6500–6800 km total drag
 effect**, and an order of magnitude under the 15–30 % thermospheric density-model
 uncertainty that dominates real drag error. The residual is real and partly coherent
-(it grows secularly at β = 30°, so its *absolute* size scales with mission length), but
-its *fraction* of the drag effect stays sub-1 %. **By the contract's strict gate
+(it grows secularly at β = 30°, so its *absolute* size scales with mission length), and
+its *fraction* of the drag effect sits near 1 % (1.12 % final at β = 30°). **By the contract's strict gate
 ("material AND survives best-fit recalibration") the quantitative benefit is therefore
 borderline — leaning DROP / "marginal"** — even though the qualitative case (BoxFaceCd
 is the physically-correct model, already built/validated/tested, removes a known
@@ -368,8 +367,8 @@ maintainer makes the final call from this evidence — see the edge-on companion
 below, which shows the benefit is strongly **scenario-dependent**.
 
 **(5) Edge-on companion study (maintainer application)** (`cd_box_benefit_study_edgeon.py`,
-conda-env run 2026-06-30). The gate above used the contract's *Sun-pointing* sail,
-where shear is a <1% correction. A maintainer application — a box solar sail held
+conda-env run 2026-10-12 on the SESAM-regenerated tables). The gate above used the contract's *Sun-pointing* sail,
+where shear is a ~1% correction. A maintainer application — a box solar sail held
 **edge-on** to minimize drag (`InPlaneTracking`, the 1 m² faces parallel to the flow)
 — **inverts** that result: the large faces' projected area collapses, so drag is
 dominated by **tangential shear** on those faces, which the projected-area Tier A
@@ -379,21 +378,21 @@ entirely. Scenario: 1 m² × 1 cm box, 2 kg (A/m 0.5), 400 km circular, solar ma
 
 | quantity | value |
 |---|---|
-| BoxFace altitude | 400 → 386.9 km / 5 d |
-| along-track divergence, physical Tier A **Cd = 2.2** vs BoxFace | **−1639 km** / 5 d |
-| along-track divergence, **`VariableCd.sphere`** vs BoxFace | **−1426 km** / 5 d |
-| empirical drag underestimate (physical Tier A vs BoxFace) | **~2.1×** |
-| best-fit constant Cd | **4.74** — 2.2× textbook, **above** the free-molecular ceiling (~2.6); residual still ~103 km |
-| BoxFace drag effect vs SRP effect (5 d) | 3006 km vs 0.6 km → **drag ≫ SRP (~5000×)** |
+| BoxFace altitude | 400 → 387.1 km / 5 d |
+| along-track divergence, physical Tier A **Cd = 2.2** vs BoxFace | **−1591 km** / 5 d |
+| along-track divergence, **`VariableCd.sphere`** vs BoxFace | **−1495 km** / 5 d |
+| empirical drag underestimate (physical Tier A vs BoxFace) | **~2.0×** |
+| best-fit constant Cd | **4.57** — 2.1× textbook, **above** the free-molecular ceiling (~2.6); residual still ~35 km |
+| BoxFace drag effect vs SRP effect (5 d) | 2962 km vs 0.6 km → **drag ≫ SRP (~4900×)** |
 
 **Reading (decision deferred to the maintainer).** For an edge-on sail the verdict
 inverts the Sun-pointing one. (a) At 400 km / solar max **drag dominates SRP by
-~5000×**, so drag modeling is paramount here. (b) BoxFace predicts **~2× the drag** of
+~4900×**, so drag modeling is paramount here. (b) BoxFace predicts **~2× the drag** of
 a physically-configured Tier A (Cd = 2.2 or the shipped `VariableCd` table), a
-**~1400–1640 km** along-track divergence over 5 days. (c) **No physical constant Cd
-recovers it** — the best-fit is Cd ≈ 4.7 (above the ~2.6 ceiling propygator itself
-flags as improbable), and even that leaves ~103 km of shape residual. So unlike the
-Sun-pointing case (best-fit Cd ≈ 2.7, physical, <1% residual), the projected-area Tier
+**~1490–1590 km** along-track divergence over 5 days. (c) **No physical constant Cd
+recovers it** — the best-fit is Cd ≈ 4.6 (above the ~2.6 ceiling propygator itself
+flags as improbable), and even that leaves ~35 km of shape residual. So unlike the
+Sun-pointing case (best-fit Cd ≈ 2.4, physical, ~1% residual), the projected-area Tier
 A models here structurally miss the shear and only an above-physical fudge factor
 approximates BoxFace. **Caveat:** the effect is ~2×, **not** the ~9× a *perfect*
 edge-on hold would give — `InPlaneTracking` tracks *inertial* velocity while the flow
@@ -402,7 +401,7 @@ the large faces keep some projected area Tier A does capture; tracking the true
 relative velocity would widen the gap. The result is also specific to the
 drag-dominated 400 km / solar-max regime (higher altitude or solar min cuts drag and
 can restore SRP dominance). **This is the regime where `BoxFaceCd` is load-bearing**;
-the maintainer weighs it against the Sun-pointing (<1%) case for the ship/drop call.
+the maintainer weighs it against the Sun-pointing (~1 %) case for the ship/drop call.
 
 ## Provenance
 
@@ -410,8 +409,10 @@ The C_D model here was reconstructed in a Claude analysis sandbox (~2026-06-11).
 committed figures and the numbers in "Results" above were **regenerated locally**
 under the experiment venv on **2026-06-14** for the drag-validity addendum's
 boundary-finding expansion (Chunk 1: radius axis, 130–1400 km sweep, storm cohort,
-coded thresholds, α = 0.90) — fixed RNG seeds plus deterministic NRLMSISE-00 make
-the run reproducible (given the same `pymsis`). The scripts are **not** executed in
+coded thresholds) — fixed RNG seeds plus deterministic NRLMSISE-00 make
+the run reproducible (given the same `pymsis`). Every α-dependent result here was
+re-run on **2026-10-12** after the SESAM accommodation port (`docs/sesam-accommodation.md`).
+The venv scripts are **not** executed in
 the propygator conda env (they need `scipy` / `pymsis`, which it does not carry).
 The work originally lived in a single flat directory; it was reorganized here with
 the two tiers sharing `cd_core.py`.
@@ -421,13 +422,10 @@ the two tiers sharing `cd_core.py`.
 - **Model-based, not flight-data.** It shows that a physically reasonable
   free-molecular C_D model collapses onto `(radius, ρ)`; it presumes that model.
   Appropriate for de-risking a design choice, not a claim of absolute C_D truth.
-- **Single-anchor accommodation calibration** (α ≈ 0.90 at 400 km / solar max — a
-  commonly-accepted value: Pilinski et al. 2010 SESAM ~0.85–0.93, Moe & Moe 2005 /
-  CHAMP ~0.86–0.89; reconciled with the table generator per the drag-validity
-  addendum §5, replacing the earlier 0.82). The *collapse* conclusion is a property
-  of the mechanism — α tracks atomic-O coverage, which tracks the same heating that
-  sets density — not of the calibration constant. *(The committed `*_results.txt`
-  are now the α = 0.90 run.)*
+- **SESAM accommodation** (Pilinski et al. 2013, published constants, no free
+  parameter; shared with the table generators per `docs/sesam-accommodation.md`).
+  The *collapse* conclusion is a property of the mechanism — α tracks atomic-O
+  coverage, which tracks the same heating that sets density — not of the constants.
 - **Axis.** The collapse is now analyzed on **geocentric radius** — each sample is
   converted from its geodetic `(altitude, latitude)` via the forward closed form
   mirrored from the table generator (`geocentric_radius()`), the production axis the

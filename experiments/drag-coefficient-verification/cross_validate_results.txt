@@ -5,8 +5,8 @@ PHASE-2 DERIVED VALIDITY BAND (addendum sec. 4)
    6,528,000 m). Not extended downward -- density volatile/unvalidated
    below, and the Knudsen floor (item 3) governs low-altitude validity.
 2. UPPER table boundary (collapse cut): NONE within the swept 130-1400 km
-   (Chunk 1: collapse RMS stays <= 5% green throughout, overall 0.490%,
-   storm 0.672%). The high cut is a soft confidence label and NON-BINDING
+   (Chunk 1: collapse RMS stays <= 5% green throughout, overall 0.856%,
+   storm 1.071%). The high cut is a soft confidence label and NON-BINDING
    (drag ~ rho -> 0 up there). SIGNED-OFF grid extent: ~1400 km (radius
    7,778,000 m) -- the full green-validated sweep, so high/elliptical LEO
    above the old 1200 km ceiling no longer trips nuisance clamp warnings.
@@ -20,14 +20,9 @@ PHASE-2 DERIVED VALIDITY BAND (addendum sec. 4)
          station  L= 30.00 m  ->   222.5 km
 
 ======================================================================
-RECONCILE (i): accommodation anchor (alpha = 0.90) -> Langmuir K
+RECONCILE (i): SESAM accommodation, identical rows + speed (expect ~eps)
 ======================================================================
-  cd_core hardcoded anchor:  n_O = 2.640e+14   T = 1284.0 K
-  live NRLMSISE-00 anchor :  n_O = 2.640e+14   T = 1284.1 K
-  anchor n_O rel diff = 0.013%   T rel diff = 0.004%
-  K_exp (cd_core)   = 1.9230e+06 1/Pa
-  K_gen (generator) = 1.9227e+06 1/Pa
-  K rel diff = 0.017%   [PASS < 1%]
+  150 shared states: alpha max rel diff = 0.00e+00  [PASS < 1e-12]
 
 ======================================================================
 RECONCILE (ii): relative-speed formula
@@ -45,20 +40,18 @@ RECONCILE (ii): relative-speed formula
   constant only ~1e-5; latitude -> spherical-vs-geocentric radius)
 
 ======================================================================
-SHARED ALGEBRA: per-species C_D + accommodation (expect ~machine eps)
+SHARED ALGEBRA: per-species C_D (expect ~machine eps)
 ======================================================================
   per-species closed form: max rel diff = 0.00e+00
-  accommodation isotherm : max rel diff = 0.00e+00
 
 ======================================================================
 END-TO-END: both full C_D pipelines off identical NRLMSISE-00 rows
 ======================================================================
   150 shared (condition x altitude) points, 130-1450 km, lat -60..70
-  equator subset (shared K, pure physics): max rel diff = 1.17e-07  (radius conventions coincide)
-  shared K (physics + speed)             : max rel diff = 0.0191%  mean 0.0059%
-  physics+speed at K_exp (both models)   : max rel diff = 0.0191%  mean 0.0059%
+  equator subset (radius conventions coincide): max rel diff = 1.18e-07
+  all points (physics + speed + alpha)        : max rel diff = 0.0235%  mean 0.0088%
 
 ======================================================================
-VERDICT: the two C_D models' physics+speed agree to 0.0191% at a shared K; their independently-calibrated K agrees to 0.0170% -> full independent agreement is bounded by the product, << 1%  [PASS]
+VERDICT: the two independent C_D pipelines agree to 0.0235%, each on its own speed convention and SESAM alpha; alpha itself agrees to 0.0e+00 on shared inputs -> << 1%  [PASS]
 ======================================================================
 All sec. 5 reconciliations and the end-to-end agreement check PASS.

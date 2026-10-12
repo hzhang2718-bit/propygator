@@ -14,7 +14,7 @@ held *edge-on* to the flow (InPlaneTracking) to minimize drag.
 Why a separate study (the physics inverts). SunPointing sweeps the large face
 through the flow, so drag work is dominated by the near-face-on arc where the
 projected-area (Tier A) and per-face (Tier B) models agree -- the shear term is a
-<1% correction (that is what cd_box_benefit_study.py found). Held EDGE-ON, the large
+~1% correction (that is what cd_box_benefit_study.py found). Held EDGE-ON, the large
 faces are parallel to the flow for the whole orbit: their PROJECTED area -> ~0, so
 Tier A (Orekit BoxAndSolarArraySpacecraft, projected-area only) sees almost no drag,
 while the real physics is dominated by TANGENTIAL SHEAR on those large faces (the

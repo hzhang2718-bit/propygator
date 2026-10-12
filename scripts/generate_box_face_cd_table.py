@@ -123,7 +123,7 @@ INCIDENCE_MAX_RAD = float(np.pi)
 # (closed form, accommodation, or the relative-speed formula) changes and the
 # cross-validation is re-run, so the shipped table never claims a stale agreement
 # (mirrors generate_sphere_cd_table.CROSS_VALIDATION_MAX_REL_PCT).
-CROSS_VALIDATION_MAX_REL_PCT = 0.1193
+CROSS_VALIDATION_MAX_REL_PCT = 0.1225
 
 _DEFAULT_OUTPUT = (
     Path(__file__).resolve().parents[1] / "data" / "box_face_cd_default.npz"
@@ -419,7 +419,7 @@ def generate(
             "green_validated_through_km": float(radius_axis[-1] - gen.WGS84_A) / 1e3,
             "reduced_confidence_above_km": None,
             # Interpolation accuracy on the incidence axis (Chunk-1 convergence study).
-            "incidence_interp_max_pct_at_nodes": {"33": 0.35, "65": 0.09},
+            "incidence_interp_max_pct_at_nodes": {"33": 0.361, "65": 0.098},
             "cross_validation_max_rel_pct": CROSS_VALIDATION_MAX_REL_PCT,
             "note": (
                 "Per-face Cd is smooth (C-infinity) in theta; the Chunk-1 convergence "

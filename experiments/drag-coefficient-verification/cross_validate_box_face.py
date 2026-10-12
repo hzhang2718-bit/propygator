@@ -187,7 +187,7 @@ print("  the full [0, pi] axis (the shear term only shows up at large theta).")
 # Representative free-molecular states (V m/s, T K, alpha) spanning solar
 # max/min and accommodation extremes.
 PHYS_STATES = [
-    (7174.0, 1284.0, 0.90),  # 400 km solar max (the anchor)
+    (7174.0, 1284.0, 0.90),  # 400 km solar max
     (7300.0, 700.0, 0.50),   # cool, partial accommodation
     (7050.0, 1000.0, 0.20),  # low accommodation
     (6900.0, 900.0, 0.85),
@@ -211,8 +211,8 @@ for V, T, al in PHYS_STATES:
 print(f"  per-species per-face closed form: max abs diff = {species_abs:.2e}  "
       f"max rel diff (Cd>0.1) = {species_rel:.2e}")
 
-# Mass-flux-weighted per-face Cd off identical (V, alpha): isolates the weighting
-# path (species masses now match exactly).
+# Mass-flux-weighted per-face Cd off identical (V, alpha). The row stays pymsis
+# float32, so float32 rounding can mask the weighting path; ungated.
 anchor_row = _msis_rows(CONDITIONS[0])[5]  # a mid-band row
 V0 = v_rel(float(ALTS_KM[5]), CONDITIONS[0]["lat"])
 al0 = alpha_sesam(anchor_row, V0)
