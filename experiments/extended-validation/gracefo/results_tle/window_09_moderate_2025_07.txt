@@ -1,7 +1,7 @@
 ==============================================================================
 Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
 ==============================================================================
-[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[versions] propygator 0.8.2, orekit_jpype 13.1.4.0, numpy 2.4.6
 [data root] experiments/extended-validation/data/gracefo
 [window] moderate_2025_07, band moderate, t0 2025-07-23, 14 days landed, 14 loaded
 [space weather]  window aggregates, re-read from CSSI at runtime
@@ -32,7 +32,7 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   forecast [T, T + 7 d] on the 60 s grid, read per-day at day(s) 1, 3, 7 -- day N is [N-1 d, N d] PAST T alone, never accumulated
 [staging]  fit2 (2 d, B* free) IS the scored naive_2d row; fit3 is not scored
   fit2: 18 iters, in-arc RMS 657.1 m
-  fit3: 17 iters, in-arc RMS 662.9 m (7 s wall)
+  fit3: 17 iters, in-arc RMS 662.9 m (9 s wall)
 [gate]  the playbook's r/s trust gate, thresholds FROZEN and never re-fitted
   sigma0(fit2)      = 390.664
   sigma(BSTAR) raw  = 8.833297e-09
@@ -44,18 +44,18 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   all three arms run regardless -- the mapping is applied by summarize_tle.py, so a re-score needs no re-fit
 [runs]  13 scored configurations
     naive 2 d (shipped default)           1 s wall
-    arm: transplant fit2 B*               3 s wall
-    arm: fresh 1 d, B* = 0                2 s wall
-    arm: freshest 1 d, B* free            3 s wall
+    arm: transplant fit2 B*               4 s wall
+    arm: fresh 1 d, B* = 0                4 s wall
+    arm: freshest 1 d, B* free            4 s wall
     catalogue (Space-Track)               1 s wall
-    state path, sphere table             16 s wall
-    state path, box table (IPT)          20 s wall
-    fade tau = 0.5 d                     27 s wall
-    fade tau = 0.75 d                    10 s wall
-    fade tau = 1 d                        6 s wall
-    fade tau = 1.5 d                      4 s wall
-    fade tau = 2 d                        3 s wall
-    fade tau = 3 d                        4 s wall
+    state path, sphere table             21 s wall
+    state path, box table (IPT)          31 s wall
+    fade tau = 0.5 d                     35 s wall
+    fade tau = 0.75 d                    14 s wall
+    fade tau = 1 d                        8 s wall
+    fade tau = 1.5 d                      5 s wall
+    fade tau = 2 d                        5 s wall
+    fade tau = 3 d                        5 s wall
 [arc-end alignment]  every scored arc ends at T and spans what it reports
   naive_2d         [T - 2 d, T]: end delta +0.0e+00 s, fitted span 172800.0 s (delta +0.0e+00 s)
   arm_transplant   [T - 1 d, T]: end delta +0.0e+00 s, fitted span 86400.0 s (delta +0.0e+00 s)
@@ -80,8 +80,8 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   NOTE: staleness here is the outlier of the pull -- a weak catalog row in this window is a staleness result before it is a method result
 [state]  numerical reference vs truth over the fitted arc
   the a-priori tables cannot meet sec 1.2's single-digit-% calibration bar, so degradation roughly this size is EXPECTED -- recorded as an expectation, never a bar
-  state path, sphere table     drift RMS     549.3 m, end    1131.5 m
-  state path, box table (IPT)  drift RMS     565.4 m, end    1353.8 m
+  state path, sphere table     drift RMS     718.0 m, end    1510.0 m
+  state path, box table (IPT)  drift RMS     311.8 m, end     783.8 m
 [fade]  the age-weighted fits' own conditioning -- these rows alone run at max_iterations 800, not the shipped 100 (it caps evaluations too; this window's own demand is the evals column below)
   WEIGHTED QUANTITIES -- never compared against r < 0.05 / s < 0.1: age weighting turns sigma0 and the covariance into weighted quantities and the playbook's thresholds do not carry over (the conservative default)
   id                iters  evals        sigma0     sigma(B*)
@@ -98,8 +98,8 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   arm_zero             669.4   0.000e+00      1805.7     13461.9     74196.2
   arm_fresh            627.2   2.171e-04      2093.4     15520.4     81141.9
   catalog                  -   9.377e-05       738.2      1712.3      8525.3
-  state_sphere         657.3   8.331e-05      1979.5      5831.9     21772.7
-  state_box            657.7   1.263e-04      2335.4      7105.0     23633.7
+  state_sphere         657.2   7.674e-05      2559.4      7758.2     28661.7
+  state_box            657.6   1.164e-04      1490.3      4230.6     13324.9
   fade_tau_0p5       20080.0   2.155e-04      2514.0     16848.1     83747.2
   fade_tau_0p75       4316.5   1.273e-04      1058.4      4600.0     19232.6
   fade_tau_1          1320.4   1.063e-04       755.4      1467.9      3234.9
@@ -124,12 +124,12 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   catalog             1      155.47        702.09      166.76        738.18
                       3      323.72       1673.38      164.70       1712.34
                       7      731.26       8491.92      182.72       8525.30
-  state_sphere        1      199.59       1962.24      168.42       1979.54
-                      3      375.85       5817.28      171.68       5831.93
-                      7      784.25      21757.65      201.28      21772.71
-  state_box           1      198.34       2320.82      168.42       2335.36
-                      3      375.93       7092.97      171.72       7105.00
-                      7      792.20      23619.52      201.75      23633.66
+  state_sphere        1      199.95       2546.04      168.42       2559.43
+                      3      375.99       7747.21      171.67       7758.23
+                      7      783.51      28650.27      201.21      28661.69
+  state_box           1      198.42       1467.45      168.42       1490.35
+                      3      375.52       4210.41      171.71       4230.61
+                      7      788.26      13300.03      201.64      13324.90
   fade_tau_0p5        1      116.52       2505.25      174.88       2514.05
                       3      288.37      16844.79      171.30      16848.13
                       7      966.47      83741.44      189.59      83747.23
@@ -165,12 +165,12 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   TROW moderate_2025_07 moderate catalog 1 155.4743 702.0872 166.7592 738.1784 -1.0000 9.376500e-05
   TROW moderate_2025_07 moderate catalog 3 323.7211 1673.3753 164.6968 1712.3392 -1.0000 9.376500e-05
   TROW moderate_2025_07 moderate catalog 7 731.2587 8491.9173 182.7209 8525.3026 -1.0000 9.376500e-05
-  TROW moderate_2025_07 moderate state_sphere 1 199.5890 1962.2352 168.4202 1979.5373 657.2749 8.330500e-05
-  TROW moderate_2025_07 moderate state_sphere 3 375.8542 5817.2773 171.6762 5831.9340 657.2749 8.330500e-05
-  TROW moderate_2025_07 moderate state_sphere 7 784.2499 21757.6453 201.2831 21772.7052 657.2749 8.330500e-05
-  TROW moderate_2025_07 moderate state_box 1 198.3422 2320.8209 168.4217 2335.3619 657.7167 1.262500e-04
-  TROW moderate_2025_07 moderate state_box 3 375.9253 7092.9720 171.7241 7105.0025 657.7167 1.262500e-04
-  TROW moderate_2025_07 moderate state_box 7 792.2043 23619.5163 201.7463 23633.6591 657.7167 1.262500e-04
+  TROW moderate_2025_07 moderate state_sphere 1 199.9506 2546.0423 168.4200 2559.4290 657.2223 7.674000e-05
+  TROW moderate_2025_07 moderate state_sphere 3 375.9885 7747.2078 171.6690 7758.2257 657.2223 7.674000e-05
+  TROW moderate_2025_07 moderate state_sphere 7 783.5082 28650.2747 201.2130 28661.6924 657.2223 7.674000e-05
+  TROW moderate_2025_07 moderate state_box 1 198.4185 1467.4450 168.4213 1490.3458 657.6363 1.164100e-04
+  TROW moderate_2025_07 moderate state_box 3 375.5211 4210.4103 171.7130 4230.6095 657.6363 1.164100e-04
+  TROW moderate_2025_07 moderate state_box 7 788.2594 13300.0314 201.6395 13324.8957 657.6363 1.164100e-04
   TROW moderate_2025_07 moderate fade_tau_0p5 1 116.5250 2505.2508 174.8802 2514.0491 20079.9886 2.155100e-04
   TROW moderate_2025_07 moderate fade_tau_0p5 3 288.3726 16844.7920 171.3044 16848.1311 20079.9886 2.155100e-04
   TROW moderate_2025_07 moderate fade_tau_0p5 7 966.4725 83741.4423 189.5860 83747.2339 20079.9886 2.155100e-04
@@ -190,12 +190,12 @@ Extended validation -- Part 3 TLE fitting: window 09 moderate_2025_07 (moderate)
   TROW moderate_2025_07 moderate fade_tau_3 3 406.2697 993.1593 170.3488 1086.4802 866.2124 9.930900e-05
   TROW moderate_2025_07 moderate fade_tau_3 7 816.8737 3485.7280 197.1035 3585.5867 866.2124 9.930900e-05
   TCAT moderate_2025_07 0.425727 738.1784 221829.3915 300.5092 PASS
-  TSTATE moderate_2025_07 state_sphere 549.3261 1131.5269
-  TSTATE moderate_2025_07 state_box 565.3896 1353.7677
+  TSTATE moderate_2025_07 state_sphere 718.0223 1510.0374
+  TSTATE moderate_2025_07 state_box 311.8053 783.7919
   TFADE moderate_2025_07 fade_tau_0p5 224 240 7.226124e+01 1.022277e-07
   TFADE moderate_2025_07 fade_tau_0p75 70 84 9.600181e+01 3.733391e-08
   TFADE moderate_2025_07 fade_tau_1 35 43 1.134051e+02 1.843748e-08
   TFADE moderate_2025_07 fade_tau_1p5 19 24 1.411295e+02 7.499481e-09
   TFADE moderate_2025_07 fade_tau_2 19 20 1.651225e+02 4.523634e-09
   TFADE moderate_2025_07 fade_tau_3 19 22 2.061209e+02 2.702608e-09
-  wall time: 117 s
+  wall time: 157 s

@@ -112,7 +112,7 @@ so its Tier B GO-with-caveat verdict is re-derived, not carried. Only `kn_floor*
 carries no α dependence (`kn_floor.py` imports only `SPECIES`) — confirm that by
 inspection rather than assuming it.
 
-## Chunk 6 — Re-run the ECEF feather benefit
+## Chunk 6 — Re-run the ECEF feather benefit - Done
 
 **Goal.** `experiments/ecef-attitude-benefit/` matches the shipped table.
 

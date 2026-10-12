@@ -1,7 +1,7 @@
 ==============================================================================
 Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
 ==============================================================================
-[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[versions] propygator 0.8.2, orekit_jpype 13.1.4.0, numpy 2.4.6
 [data root] experiments/extended-validation/data/gracefo
 [window] storm_2024_08, band storm, t0 2024-08-11, 14 days landed, 14 loaded
   note: storm at day 1: storm-contaminated fit arc, calm forecast
@@ -33,7 +33,7 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   forecast [T, T + 7 d] on the 60 s grid, read per-day at day(s) 1, 3, 7 -- day N is [N-1 d, N d] PAST T alone, never accumulated
 [staging]  fit2 (2 d, B* free) IS the scored naive_2d row; fit3 is not scored
   fit2: 16 iters, in-arc RMS 634.2 m
-  fit3: 18 iters, in-arc RMS 658.7 m (4 s wall)
+  fit3: 18 iters, in-arc RMS 658.7 m (8 s wall)
 [gate]  the playbook's r/s trust gate, thresholds FROZEN and never re-fitted
   sigma0(fit2)      = 378.586
   sigma(BSTAR) raw  = 1.024429e-08
@@ -45,18 +45,18 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   all three arms run regardless -- the mapping is applied by summarize_tle.py, so a re-score needs no re-fit
 [runs]  13 scored configurations
     naive 2 d (shipped default)           1 s wall
-    arm: transplant fit2 B*               1 s wall
-    arm: fresh 1 d, B* = 0                2 s wall
-    arm: freshest 1 d, B* free            2 s wall
-    catalogue (Space-Track)               0 s wall
-    state path, sphere table             11 s wall
-    state path, box table (IPT)          14 s wall
-    fade tau = 0.5 d                      7 s wall
-    fade tau = 0.75 d                     5 s wall
-    fade tau = 1 d                        5 s wall
-    fade tau = 1.5 d                      3 s wall
-    fade tau = 2 d                        3 s wall
-    fade tau = 3 d                        2 s wall
+    arm: transplant fit2 B*               4 s wall
+    arm: fresh 1 d, B* = 0                4 s wall
+    arm: freshest 1 d, B* free            3 s wall
+    catalogue (Space-Track)               1 s wall
+    state path, sphere table             21 s wall
+    state path, box table (IPT)          30 s wall
+    fade tau = 0.5 d                     15 s wall
+    fade tau = 0.75 d                    11 s wall
+    fade tau = 1 d                       10 s wall
+    fade tau = 1.5 d                      7 s wall
+    fade tau = 2 d                        7 s wall
+    fade tau = 3 d                        6 s wall
 [arc-end alignment]  every scored arc ends at T and spans what it reports
   naive_2d         [T - 2 d, T]: end delta +0.0e+00 s, fitted span 172800.0 s (delta +0.0e+00 s)
   arm_transplant   [T - 1 d, T]: end delta +0.0e+00 s, fitted span 86400.0 s (delta +0.0e+00 s)
@@ -80,8 +80,8 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   C-D separation over that day: 199.9 km -- what a cross-tagged set would show and staleness cannot produce
 [state]  numerical reference vs truth over the fitted arc
   the a-priori tables cannot meet sec 1.2's single-digit-% calibration bar, so degradation roughly this size is EXPECTED -- recorded as an expectation, never a bar
-  state path, sphere table     drift RMS     739.5 m, end    1759.6 m
-  state path, box table (IPT)  drift RMS    2476.9 m, end    5395.7 m
+  state path, sphere table     drift RMS    1101.4 m, end    2568.7 m
+  state path, box table (IPT)  drift RMS    1933.3 m, end    4181.6 m
 [fade]  the age-weighted fits' own conditioning -- these rows alone run at max_iterations 800, not the shipped 100 (it caps evaluations too; this window's own demand is the evals column below)
   WEIGHTED QUANTITIES -- never compared against r < 0.05 / s < 0.1: age weighting turns sigma0 and the covariance into weighted quantities and the playbook's thresholds do not carry over (the conservative default)
   id                iters  evals        sigma0     sigma(B*)
@@ -98,8 +98,8 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   arm_zero             713.7   0.000e+00      4619.9     33101.4    167690.5
   arm_fresh            593.2   4.209e-04      1698.1     15430.8     92691.3
   catalog                  -   2.968e-04       678.8      2703.4     19255.1
-  state_sphere         638.4   2.627e-04      2805.4      6593.4     12671.9
-  state_box            638.3   4.038e-04      8923.3     30057.5    116702.5
+  state_sphere         638.4   2.466e-04      4091.3     10704.2     27233.8
+  state_box            638.3   3.798e-04      6959.4     23846.7     94709.5
   fade_tau_0p5        4940.7   3.339e-04       983.4      6880.3     42330.9
   fade_tau_0p75       2615.4   2.937e-04       672.2      2231.1     17070.1
   fade_tau_1          3073.9   2.892e-04       668.6      1685.7     14046.5
@@ -124,12 +124,12 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   catalog             1      105.22        653.61      150.13        678.84
                       3      275.18       2683.53      177.37       2703.43
                       7      660.83      19241.96      265.80      19255.14
-  state_sphere        1      148.96       2797.42      149.93       2805.40
-                      3      329.99       6582.62      182.49       6593.41
-                      7      692.21      12650.01      272.05      12671.86
-  state_box           1      163.03       8920.52      149.93       8923.26
-                      3      395.65      30054.32      182.61      30057.48
-                      7     1449.82     116693.13      271.81     116702.45
+  state_sphere        1      148.84       4085.82      149.93       4091.28
+                      3      326.70      10697.63      182.48      10704.17
+                      7      678.26      27224.01      272.08      27233.82
+  state_box           1      158.68       6955.97      149.93       6959.39
+                      3      374.94      23843.04      182.59      23846.69
+                      7     1142.39      94702.23      271.85      94709.51
   fade_tau_0p5        1      128.14        960.22      169.25        983.40
                       3      314.64       6869.36      226.58       6880.30
                       7      751.77      42322.92      338.42      42330.95
@@ -165,12 +165,12 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   TROW storm_2024_08 storm catalog 1 105.2158 653.6110 150.1342 678.8357 -1.0000 2.967700e-04
   TROW storm_2024_08 storm catalog 3 275.1840 2683.5299 177.3652 2703.4269 -1.0000 2.967700e-04
   TROW storm_2024_08 storm catalog 7 660.8294 19241.9578 265.8043 19255.1367 -1.0000 2.967700e-04
-  TROW storm_2024_08 storm state_sphere 1 148.9550 2797.4235 149.9254 2805.3955 638.3553 2.626800e-04
-  TROW storm_2024_08 storm state_sphere 3 329.9866 6582.6209 182.4935 6593.4128 638.3553 2.626800e-04
-  TROW storm_2024_08 storm state_sphere 7 692.2069 12650.0126 272.0531 12671.8578 638.3553 2.626800e-04
-  TROW storm_2024_08 storm state_box 1 163.0252 8920.5155 149.9285 8923.2647 638.2656 4.038100e-04
-  TROW storm_2024_08 storm state_box 3 395.6530 30054.3223 182.6135 30057.4812 638.2656 4.038100e-04
-  TROW storm_2024_08 storm state_box 7 1449.8196 116693.1292 271.8109 116702.4518 638.2656 4.038100e-04
+  TROW storm_2024_08 storm state_sphere 1 148.8377 4085.8222 149.9251 4091.2802 638.3660 2.466400e-04
+  TROW storm_2024_08 storm state_sphere 3 326.6999 10697.6259 182.4800 10704.1689 638.3660 2.466400e-04
+  TROW storm_2024_08 storm state_sphere 7 678.2577 27224.0102 272.0786 27233.8171 638.3660 2.466400e-04
+  TROW storm_2024_08 storm state_box 1 158.6825 6955.9674 149.9279 6959.3923 638.2783 3.797600e-04
+  TROW storm_2024_08 storm state_box 3 374.9369 23843.0433 182.5930 23846.6901 638.2783 3.797600e-04
+  TROW storm_2024_08 storm state_box 7 1142.3893 94702.2341 271.8544 94709.5143 638.2783 3.797600e-04
   TROW storm_2024_08 storm fade_tau_0p5 1 128.1373 960.2153 169.2523 983.4017 4940.6598 3.338900e-04
   TROW storm_2024_08 storm fade_tau_0p5 3 314.6374 6869.3639 226.5809 6880.2977 4940.6598 3.338900e-04
   TROW storm_2024_08 storm fade_tau_0p5 7 751.7722 42322.9172 338.4184 42330.9462 4940.6598 3.338900e-04
@@ -190,12 +190,12 @@ Extended validation -- Part 3 TLE fitting: window 06 storm_2024_08 (storm)
   TROW storm_2024_08 storm fade_tau_3 3 382.7149 6234.0029 185.1089 6248.4820 1745.9508 3.121300e-04
   TROW storm_2024_08 storm fade_tau_3 7 788.8542 33037.6577 279.4877 33048.2561 1745.9508 3.121300e-04
   TCAT storm_2024_08 0.099579 678.8357 200004.0756 294.6281 PASS
-  TSTATE storm_2024_08 state_sphere 739.5076 1759.6113
-  TSTATE storm_2024_08 state_box 2476.9124 5395.7036
+  TSTATE storm_2024_08 state_sphere 1101.4340 2568.6660
+  TSTATE storm_2024_08 state_box 1933.2641 4181.5745
   TFADE storm_2024_08 fade_tau_0p5 85 94 6.878506e+01 1.185192e-07
   TFADE storm_2024_08 fade_tau_0p75 61 67 8.793679e+01 4.329293e-08
   TFADE storm_2024_08 fade_tau_1 48 54 1.042165e+02 2.138427e-08
   TFADE storm_2024_08 fade_tau_1p5 32 35 1.381382e+02 8.700092e-09
   TFADE storm_2024_08 fade_tau_2 29 33 1.803981e+02 5.248421e-09
   TFADE storm_2024_08 fade_tau_3 23 24 2.711386e+02 3.135978e-09
-  wall time: 67 s
+  wall time: 138 s
