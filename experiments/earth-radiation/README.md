@@ -7,13 +7,14 @@ plan `docs/history/build-plan-additional-perturbations.md`, Chunks 2–3) is
 installable in the pinned env, so the fully-built Chunk-2 runtime was reverted
 rather than shipped, and is parked here as a patch.
 
-**Two independent defects.** The first is fixed upstream; the second is not, so
-the block stands.
+**Two independent defects.** The first is fixed upstream; the second is reported
+fixed in Orekit 13.1.9 but unmeasured here, so the block stands until the resume
+gates pass.
 
 | # | defect | status |
 |---|---|---|
 | 1 | crown loop bounded by `asin(R/r)` instead of `acos(R/r)` | **fixed in Orekit 13.1.6** (2026-06-03) |
-| 2 | Lambertian emission cosine computed as the geocentric central angle | **present in 13.1.7.1** — ERP ~1.98× hot at LEO |
+| 2 | Lambertian emission cosine computed as the geocentric central angle | **present in 13.1.7.1** — ERP ~1.98× hot at LEO; **reported fixed in 13.1.9** (2026-10-03, #2008) |
 
 **Reference-only.** Not shipped, not in CI, outside `testpaths`. Runs in a conda
 env (starts the JVM, needs orekit-data):
@@ -170,6 +171,10 @@ emissivity and Sun-distance offset above, and it is inside the PASS band. Do not
 5. Ship as its own small branch, with the contract section's Outcome note
    updated.
 
-**Upstream first.** Bug 2 has not been reported. Filing it (the one-line fix
-above, this replica as the reproduction, the measured factors) is the cheapest
-path to unblocking the feature.
+**Upstream fix (checked 2026-10-11).** Orekit 13.1.9 (2026-10-03) `changes.xml`
+carries #2008 "Replaced geocentric position vector with relative position vector in
+KnockeRediffusedForceModel" — bug 2 — and #2022 "Fixed area calculations leading to
+too-high albedo flux in KnockeRediffusedForceModel". Not yet on conda-forge as
+`orekit_jpype` (newest 13.1.8.0, needing `jpype1 1.7.1.*`). #2022 is a change the
+bug-2 replica does not model, so if `knocke_cosine_probe.py` does not read 1.000×,
+investigate before resuming.

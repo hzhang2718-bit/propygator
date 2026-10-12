@@ -4,15 +4,12 @@ Working blueprint for `docs/sesam-accommodation.md`, which wins on conflict.
 Status headers are the maintainer's. Archive to `docs/history/` at close.
 
 **Precondition.** Part B of `docs/history/build-plan-earth-radiation.md` is closed
-(shipped in `v0.8.2`, 2026-09-07), so this plan is unblocked. Chunk 3
-below moves Run 5 of the real-world-validation `drag` group far past the
-below-printed-precision leeward-floor artifact that Part B exists to reconcile, so
-closing Part B afterwards conflates two divergences of different character in one
-`--verify` diff.
+(shipped in `v0.8.2`, 2026-09-07), so this plan is unblocked.
 
-**Do not recreate or update the conda env before Chunk 7.** The installed
-`orekit_jpype` is `13.1.4.0` and a fresh env lands `13.1.7.1`, which would put two
-changes in one `--verify` diff.
+**Do not recreate or update the conda env before Chunk 7.** The `jpype1=1.5.*` pin
+holds a fresh env at the installed `orekit_jpype 13.1.4.0`, but a recreate
+re-resolves other builds (Python patch, OpenJDK build), which would put two changes
+in one `--verify` diff.
 
 ---
 
@@ -31,10 +28,11 @@ Evaluate `s_o`'s second numerator term in contract §2's exact form.
 terms for `Cd_sphere(s)` in `P_O`.
 
 **Verify — STOP gate.** A throwaway parity script drives the new `_accommodation`
-and a transcription of ADBSat `accom_SESAM.m` over one shared MSIS case set, the
-transcription driven with ADBSat's own constants, species set and speed convention
-so contract §3 and the constant differences are out of the comparison. Agreement
-below 1e-6 relative, or STOP and report.
+and a transcription of ADBSat `accom_SESAM.m` over one shared MSIS case set, both
+sides on ADBSat's constants and speed with anomalous oxygen zeroed, so contract §3
+and the constant differences are out of the comparison (`_SPECIES` fixes AMU at
+import, so the script patches it or the constants are passed in). Agreement below
+1e-6 relative, or STOP and report.
 
 ## Chunk 2 — Mirror into the experiment kernel
 
@@ -113,18 +111,21 @@ barely move while the absolute along-track figure does. Whatever moves, the
 table:
 
 - `experiments/extended-validation/` — `--only noise`, `drag_01..10`,
-  `swarm_01..10`, then `drag_summary` (~9.7 h, from the committed wall-time lines).
+  `swarm_01..10`, then `drag_summary` (~9.7 h, from the committed wall-time lines);
+  then `tle_01..10`, `tle_summary`, `tle_bench` (~19 min; their `state_sphere` /
+  `state_box` rows fly the tables).
 - `experiments/real-world-validation/` — `--only drag,state-path` (~1 h).
 
 **Reuse.** Each study's `run_all.py`; per-group `--only` is its documented default.
 
-**Do not touch.** extended-validation `screen`, `tle_01..10`, `tle_summary`,
-`tle_bench`; real-world-validation `lageos`, `fit`, `sweep` — their drivers
-reference no table, so Part 3's TLE evidence and the playbook stand unchanged.
+**Do not touch.** extended-validation `screen`; real-world-validation `lageos`,
+`fit`, `sweep` — their drivers reference no table. The playbook's recipe stands: the
+bench verdicts never read the `state_*` rows.
 
 **Verify.** `--verify` clean on every regenerated group and still clean on the
-untouched ones. Read the ten-window sphere-vs-`Cd = 2.3` outcome against contract
-§8's pre-registered reading **before** writing any document.
+untouched ones, apart from extended-validation's unmasked `[versions]` stamp line.
+Read the ten-window sphere-vs-`Cd = 2.3` outcome against contract §8's
+pre-registered reading **before** writing any document.
 
 ## Chunk 8 — Tests
 
@@ -155,7 +156,8 @@ number is Chunk 7's.
   names the anchor; a shipped public docstring, so it is not optional. No API or
   behaviour change.
 - `docs/validation-findings.md` — the table-derived numbers in §1–8 and §9–17,
-  restated from Chunk 7 (contract §8).
+  restated from Chunk 7 (contract §8), including §14's state-path rows and the
+  Checkpoint B "absorbable scale" reading.
 - `experiments/real-world-validation/README.md` — retire the "Expected — do not
   regenerate" bullet and mark the `v0.8.2` leeward-floor `--verify` narrative
   historical (contract §8).
@@ -166,11 +168,36 @@ number is Chunk 7's.
   sphere-vs-`Cd = 2.3` headline.
 - `notebooks/00_showcase.ipynb` and `07_tle_fitting.ipynb` §9 — hand-transcribed
   validation numbers, updated by hand per CLAUDE.md.
+- `scripts/generate_box_face_cd_table.py` — the "Leeward floor" docstring counts,
+  restated from Chunk 3's `leeward_floor` metadata.
 - `CLAUDE.md` as-built notes.
 
-**Verify.** From the repo root,
-`grep -rn "ANCHOR_ALPHA\|anchored .* 0\.90\|alpha = 0\.90\|SESAM α\|α anchor" README.md CLAUDE.md docs/ data/ notebooks/ scripts/ src/ tests/ experiments/ --include=*.md --include=*.py --include=*.ipynb --include=*.txt`
-returns nothing stale.
+**Verify.** Two sweeps from the repo root in Git Bash. The second doubles as this
+chunk's work list: run it first, then again at the end.
+
+1. Anchor sweep — returns nothing stale:
+   ```
+   grep -rnE "ANCHOR_ALPHA|anchor_alpha|calibrate_K|Langmuir[- ]K\b|SESAM-style|anchored .*0\.90|(alpha|α) ?= ?0\.90|SESAM α|α anchor" \
+     README.md CLAUDE.md docs/ data/ notebooks/ scripts/ src/ tests/ experiments/ \
+     --include=*.md --include=*.py --include=*.ipynb --include=*.txt \
+     --exclude-dir=history --exclude-dir=.venv-experiments \
+     --exclude=sesam-accommodation.md --exclude=build-plan-sesam-accommodation.md
+   ```
+2. Moved-number sweep — numbers that left any results file, plus their roundings,
+   searched in the prose docs; every final hit is a coincidence recorded in the
+   chunk record (on the `v0.8.2` diff it caught all six number lines that release
+   edited):
+   ```
+   git diff -U0 main -- 'experiments/*results*.txt' > /tmp/d.txt
+   grep '^-[^-]' /tmp/d.txt | grep -oE '[0-9]+\.[0-9]+' | sort -u > /tmp/old.txt
+   grep '^+[^+]' /tmp/d.txt | grep -oE '[0-9]+\.[0-9]+' | sort -u > /tmp/new.txt
+   comm -23 /tmp/old.txt /tmp/new.txt \
+     | awk -F. '{for(d=length($2);d>=1;d--){t=sprintf("%.*f",d,$0); if(length(t)>=4) print t}}' \
+     | sort -u > /tmp/moved.txt
+   [ -s /tmp/moved.txt ] && git grep -nwF -f /tmp/moved.txt -- README.md CLAUDE.md data/README.md docs/features.md \
+     docs/validation-findings.md docs/tle-fitting-playbook-updated.md \
+     'notebooks/0[07]_*.ipynb' 'experiments/*README.md'
+   ```
 
 ## Chunk 10 — Close
 
@@ -178,5 +205,6 @@ returns nothing stale.
 
 **Create/Edit.** Move both documents to `docs/history/`.
 
-**Verify.** CHANGELOG entry, version bump and release are the maintainer's;
-`v0.7.3` is the precedent for a table-regeneration patch.
+**Verify.** CHANGELOG entry, version bump and release are the maintainer's. Minor
+bump (`v0.9.0`), not a `v0.7.3`-style patch: every default-table drag value moves
+(Chunk 3 records by how much).
