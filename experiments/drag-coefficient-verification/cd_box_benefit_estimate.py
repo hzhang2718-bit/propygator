@@ -43,10 +43,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from cd_core import IDX, MU_EARTH, R_EARTH, alpha_sesam, calibrate_K, v_rel
+from cd_core import IDX, MU_EARTH, R_EARTH, alpha_sesam, v_rel
 from cd_box_faces import face_cd
-
-K = calibrate_K()
 
 # ---------------------------------------------------------------------------
 # Representative scenario (the maintainer-confirmed sail; build-plan "You
@@ -161,7 +159,7 @@ def run_beta(target_beta_deg, inc, a, n_mean, times, jds, sun_hats):
         rho[i] = row[IDX["rho"]]
         V = v_rel(ALT_KM, lat[i])
         vrel[i] = V
-        alpha = alpha_sesam(row[IDX["O"]], row[IDX["T"]], K)
+        alpha = alpha_sesam(row, V)
         T_inf = row[IDX["T"]]
         cda_bf[i] = A_FACE * (face_cd(th_plus, row, V, T_inf, alpha)
                               + face_cd(th_minus, row, V, T_inf, alpha))
