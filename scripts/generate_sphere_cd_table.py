@@ -7,8 +7,8 @@ users compute nothing (features.md §1.1 "Where the table comes from").
 
 **What it does.** It evaluates a closed-form **Sentman / DRIA** sphere Cd — the
 standard free-molecular result (Sentman 1961; Schaaf & Chambre; Moe & Moe 2005),
-with per-species mass-flux weighting and a SESAM-style energy-accommodation model
-keyed on atomic-oxygen surface coverage (Pilinski et al. 2013) — over a broad sweep
+with per-species mass-flux weighting and SESAM energy accommodation (Pilinski et al.
+2013; ``docs/sesam-accommodation.md``) — over a broad sweep
 of genuinely different thermospheric conditions (epoch, local solar time, latitude,
 F10.7, Ap) drawn from **NRLMSISE-00** (the same atmosphere model the propagator feeds
 this table at runtime). Because the sphere Cd collapses onto a single
@@ -90,20 +90,28 @@ QUIET_AP_RANGE = (2.0, 80.0)
 STORM_F107_RANGE = (200.0, 320.0)
 STORM_AP_RANGE = (100.0, 400.0)
 
-# Accommodation anchor: energy accommodation at 400 km / solar maximum.
-# 0.90 is a commonly-accepted value there: Pilinski, Argrow & Palo (2010,
-# J. Spacecraft & Rockets 47(6), 951-956) SESAM lands ~0.85-0.93, and CHAMP-
-# derived values (Moe & Moe 2005, Planet. Space Sci. 53(8), 793-801) are
-# ~0.86-0.89. Matched to the experiment's cd_core.calibrate_K anchor (reconciled
-# to 0.90 per the Feature 1.1 drag-validity addendum, section 5). The *collapse*
-# onto (radius, density) is a property of the mechanism, not this value.
-ANCHOR_ALPHA = 0.90
+# SESAM energy accommodation (Pilinski, Argrow, Palo & Bowman 2013, J. Spacecraft &
+# Rockets 50(3), 556-571; docs/sesam-accommodation.md sec. 2). Published constants;
+# the model has no free parameter. Read at call time, so a parity check can patch them.
+SESAM_CITATION = (
+    "Pilinski, Argrow, Palo & Bowman 2013, J. Spacecraft & Rockets 50(3), 556-571, "
+    "doi:10.2514/1.A32348"
+)
+ELECTRON_VOLT = 1.602176634e-19  # J
+SESAM_K_S = 2.4  # substrate coefficient (Goodman, hemisphere-averaged)
+SESAM_M_S_AMU = 65.0  # surface molecule mass [amu]
+SESAM_E_B_EV = 5.7  # adsorption energy [eV]
+SESAM_E_B = SESAM_E_B_EV * ELECTRON_VOLT  # [J]
+SESAM_T_AB = 93.31  # transition temperature [K]
+SESAM_K_LO = 5e6  # initial Langmuir parameter [1/torr]
+SESAM_K_LF = 3e4  # final Langmuir parameter [1/torr]
+TORR = 101325.0 / 760.0  # Pa
 
 # Experiment-vs-generator C_D model cross-validation agreement (addendum sec. 5,
 # Chunk 3), measured by cross_validate_models.py over the full generation range.
 # Recorded in the table metadata for provenance only (the generator does not run the
-# cross-validation). UPDATE whenever the C_D model (physics, anchor ANCHOR_ALPHA, or
-# the relative-speed formula) changes and the cross-validation is re-run, so the
+# cross-validation). UPDATE whenever the C_D model (physics, accommodation, or the
+# relative-speed formula) changes and the cross-validation is re-run, so the
 # shipped table never claims a stale agreement.
 CROSS_VALIDATION_MAX_REL_PCT = 0.0191
 
@@ -165,6 +173,15 @@ def _relative_speed(
     return orbital - corotation
 
 
+def _sphere_cd_incident(s: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Incident-only Sentman sphere Cd at speed ratio ``s`` (no re-emission term)."""
+    from scipy.special import erf  # generation-only dependency (see requirements)
+
+    return (2.0 * s**2 + 1.0) / (np.sqrt(np.pi) * s**3) * np.exp(-(s**2)) + (
+        4.0 * s**4 + 4.0 * s**2 - 1.0
+    ) / (2.0 * s**4) * erf(s)
+
+
 def _sphere_cd_species(
     speed: NDArray[np.float64],
     temperature: NDArray[np.float64],
@@ -177,15 +194,11 @@ def _sphere_cd_species(
     re-emitted flux leaves at the reflected temperature ``Tr``. Standard sphere result
     (incident + re-emission terms) — see module docstring for references.
     """
-    from scipy.special import erf  # generation-only dependency (see requirements)
-
     s = speed * np.sqrt(mass / (2.0 * BOLTZMANN * temperature))  # molecular speed ratio
     reflected_t = (1.0 - alpha) * mass * speed * speed / (
         3.0 * BOLTZMANN
     ) + alpha * WALL_TEMPERATURE
-    incident = (2.0 * s**2 + 1.0) / (np.sqrt(np.pi) * s**3) * np.exp(-(s**2)) + (
-        4.0 * s**4 + 4.0 * s**2 - 1.0
-    ) / (2.0 * s**4) * erf(s)
+    incident = _sphere_cd_incident(s)
     re_emission = (2.0 * np.sqrt(np.pi) / (3.0 * s)) * np.sqrt(
         reflected_t / temperature
     )
@@ -211,35 +224,72 @@ def _sphere_cd_total(
     return numerator / denominator
 
 
-def _calibrate_accommodation_K(msis_run, anchor_alpha: float) -> float:
-    """Pick the Langmuir K so accommodation hits ``anchor_alpha`` at 400 km / solar max.
-
-    Derives the anchor's atomic-O number density and temperature live from NRLMSISE-00
-    (rather than hardcoding reference numbers), then inverts the Langmuir isotherm
-    ``theta = K P /(1 + K P)`` at the chosen coverage.
-    """
-    anchor = np.asarray(
-        msis_run(
-            [np.datetime64("2002-07-01T12:00")],
-            [0.0],
-            [0.0],
-            [400.0],
-            [200.0],
-            [200.0],
-            [[15.0] * 7],
-            version=0,
-        )
-    ).reshape(-1, 11)[0]
-    partial_pressure_O = anchor[_COL["O"]] * BOLTZMANN * anchor[_COL["T"]]
-    return float((anchor_alpha / (1.0 - anchor_alpha)) / partial_pressure_O)
-
-
 def _accommodation(
-    n_atomic_O: NDArray[np.float64], temperature: NDArray[np.float64], langmuir_K: float
+    msis_rows: NDArray[np.float64], speed: NDArray[np.float64]
 ) -> NDArray[np.float64]:
-    """SESAM-style energy accommodation from atomic-oxygen Langmuir surface coverage."""
-    partial_pressure_O = n_atomic_O * BOLTZMANN * temperature
-    return langmuir_K * partial_pressure_O / (1.0 + langmuir_K * partial_pressure_O)
+    """SESAM energy accommodation (``docs/sesam-accommodation.md`` sec. 2).
+
+    Atomic-O Langmuir coverage ``theta`` blends a clean-surface Goodman coefficient
+    toward 1: ``alpha = (1 - theta) * alpha_clean + theta``. ``m_bar`` is the
+    number-weighted mean mass over the seven ``_SPECIES`` (anomalous O excluded).
+    """
+    from scipy.special import erf  # generation-only dependency (see requirements)
+
+    temperature = msis_rows[:, _COL["T"]]
+    number_total = np.zeros_like(speed)
+    mass_total = np.zeros_like(speed)
+    for column, mass in _SPECIES.values():
+        number_density = msis_rows[:, column]
+        valid = np.isfinite(number_density) & (number_density > 0.0)
+        number_density = np.where(valid, number_density, 0.0)
+        number_total += number_density
+        mass_total += number_density * mass
+    m_bar = mass_total / number_total
+
+    o_column, m_o = _SPECIES["O"]
+    n_o = msis_rows[:, o_column]
+    n_o = np.where(np.isfinite(n_o) & (n_o > 0.0), n_o, 0.0)
+    s = speed * np.sqrt(m_bar / (2.0 * BOLTZMANN * temperature))  # bulk speed ratio
+    pressure_o = 0.5 * n_o * m_o * speed**2 * _sphere_cd_incident(s) / TORR  # [torr]
+
+    # Sticking probability s_o. The published second numerator term,
+    # kT*exp(-(E_b+E_r)/kT)*(exp(E_b/kT) - zeta), underflows/overflows in double
+    # precision; this is its exact equivalent (contract sec. 2).
+    kt = BOLTZMANN * SESAM_T_AB
+    e_r = 0.5 * m_o * speed**2
+    root = np.sqrt(np.pi * kt * e_r)
+    erf_r = erf(np.sqrt(e_r / kt))
+    gap = np.sqrt(SESAM_E_B) - np.sqrt(e_r)
+    s_o = (
+        root * (erf(gap / np.sqrt(kt)) + erf_r)
+        + kt * (np.exp(-e_r / kt) - np.exp(-(gap**2) / kt))
+    ) / (root * (erf_r + 1.0) + kt * np.exp(-e_r / kt))
+
+    langmuir_k = s_o * SESAM_K_LO + SESAM_K_LF
+    coverage = langmuir_k * pressure_o / (1.0 + langmuir_k * pressure_o)
+    mu = m_bar / (SESAM_M_S_AMU * AMU)
+    alpha_clean = SESAM_K_S * mu / (1.0 + mu) ** 2
+    return (1.0 - coverage) * alpha_clean + coverage
+
+
+def _accommodation_metadata() -> dict[str, object]:
+    """Accommodation provenance shared by both table generators' metadata."""
+    return {
+        "model": (
+            "SESAM: alpha = (1 - theta) * alpha_clean + theta; atomic-O Langmuir "
+            "coverage theta, Goodman clean-surface alpha_clean on the seven-species "
+            "m_bar (anomalous O excluded), driven by the co-rotating relative speed"
+        ),
+        "citation": SESAM_CITATION,
+        "constants": {
+            "K_s": SESAM_K_S,
+            "m_s_amu": SESAM_M_S_AMU,
+            "E_b_eV": SESAM_E_B_EV,
+            "T_ab_K": SESAM_T_AB,
+            "K_Lo_per_torr": SESAM_K_LO,
+            "K_Lf_per_torr": SESAM_K_LF,
+        },
+    }
 
 
 # --- condition sweep + regrid ----------------------------------------------
@@ -310,12 +360,6 @@ def generate(
 
     rng = np.random.default_rng(seed)
     conditions = _sample_conditions(n_conditions, rng, storm_fraction)
-    langmuir_K = _calibrate_accommodation_K(msis.run, ANCHOR_ALPHA)
-    logger.info(
-        "Calibrated Langmuir K = %.3e 1/Pa (anchor alpha=%.2f)",
-        langmuir_K,
-        ANCHOR_ALPHA,
-    )
 
     # Sample geodetic altitudes spanning the radius grid with edge margin, so the
     # regrid interpolant covers the mesh corners rather than relying on nearest-fill.
@@ -345,7 +389,7 @@ def generate(
         rows = rows[finite]
         radius_m = _geocentric_radius(altitudes_km[finite] * 1e3, np.radians(lat))
         speed = _relative_speed(radius_m, np.radians(lat))
-        alpha = _accommodation(rows[:, _COL["O"]], rows[:, _COL["T"]], langmuir_K)
+        alpha = _accommodation(rows, speed)
         cd = _sphere_cd_total(rows, speed, alpha)
         radii.append(radius_m)
         densities.append(rows[:, _COL["rho"]])
@@ -381,8 +425,7 @@ def generate(
     n_storm = sum(bool(c["storm"]) for c in conditions)
     metadata: dict[str, object] = {
         "model": "Sentman/DRIA sphere Cd, mass-flux weighted over NRLMSISE-00 species",
-        "accommodation": "SESAM Langmuir on atomic-O coverage",
-        "anchor_alpha": ANCHOR_ALPHA,
+        "accommodation": _accommodation_metadata(),
         "atmosphere": "NRLMSISE-00 (pymsis)",
         "axes": "radius_axis [m] (geocentric), density_axis [kg/m^3] (total)",
         # The GRID AXES are the validated-band coverage claim (addendum sec. 4/5.3):

@@ -13,7 +13,7 @@ in one `--verify` diff.
 
 ---
 
-## Chunk 1 — Port SESAM into the generator
+## Chunk 1 — Port SESAM into the generator - Done
 
 **Goal.** `generate_sphere_cd_table` computes α by SESAM; the anchor machinery is gone.
 

@@ -9,8 +9,8 @@ free-molecular drag (``general-upgrades-1.md`` "Tier B Drag"). This script produ
 that array once; end users compute nothing.
 
 **What it does.** It is the per-face twin of ``scripts/generate_sphere_cd_table.py``.
-It reuses that script's Tier-A model wholesale -- the SESAM/Langmuir energy
-accommodation (anchored alpha = 0.90 at 400 km / solar max), the geocentric-radius and
+It reuses that script's Tier-A model wholesale -- the SESAM energy accommodation
+(``docs/sesam-accommodation.md``), the geocentric-radius and
 atmosphere-relative-speed maps, the NRLMSISE-00 condition sweep, and the
 ``(radius, density)`` validated band -- so the box table shares the sphere table's
 gas-surface assumptions exactly (cross-table coherence). The genuinely **new** part is
@@ -120,7 +120,7 @@ INCIDENCE_MAX_RAD = float(np.pi)
 # shared per-face closed form is bit-identical (8.9e-16); this end-to-end CdA figure is
 # dominated by the documented spherical-vs-geocentric relative-speed convention (the
 # same sub-1% effect the sphere table records). UPDATE whenever the per-face physics
-# (closed form, anchor ANCHOR_ALPHA, or the relative-speed formula) changes and the
+# (closed form, accommodation, or the relative-speed formula) changes and the
 # cross-validation is re-run, so the shipped table never claims a stale agreement
 # (mirrors generate_sphere_cd_table.CROSS_VALIDATION_MAX_REL_PCT).
 CROSS_VALIDATION_MAX_REL_PCT = 0.1193
@@ -239,7 +239,7 @@ def generate(
     """Build the ``(radius, density, incidence) -> Cd`` grid plus provenance metadata.
 
     Heavy, generation-only imports (``pymsis``, ``scipy``) happen here so ``--help``
-    runs in the bare propygator env. The condition sweep, accommodation calibration,
+    runs in the bare propygator env. The condition sweep, accommodation model,
     and radius/speed maps are reused from the sphere generator; only the per-face Cd
     and the third (incidence) axis are new.
     """
@@ -248,12 +248,6 @@ def generate(
 
     rng = np.random.default_rng(seed)
     conditions = gen._sample_conditions(n_conditions, rng, storm_fraction)
-    langmuir_K = gen._calibrate_accommodation_K(msis.run, gen.ANCHOR_ALPHA)
-    logger.info(
-        "Calibrated Langmuir K = %.3e 1/Pa (anchor alpha=%.2f)",
-        langmuir_K,
-        gen.ANCHOR_ALPHA,
-    )
 
     # Sample geodetic altitudes spanning the radius grid with edge margin, so the
     # per-slice regrid interpolant covers the mesh corners rather than nearest-filling.
@@ -283,9 +277,7 @@ def generate(
         rows = rows[finite]
         radius_m = gen._geocentric_radius(altitudes_km[finite] * 1e3, np.radians(lat))
         speed = gen._relative_speed(radius_m, np.radians(lat))
-        alpha = gen._accommodation(
-            rows[:, gen._COL["O"]], rows[:, gen._COL["T"]], langmuir_K
-        )
+        alpha = gen._accommodation(rows, speed)
         cd = _face_cd_total(rows, speed, alpha, incidence_axis)
         radii.append(radius_m)
         densities.append(rows[:, gen._COL["rho"]])
@@ -370,10 +362,7 @@ def generate(
             "tangential shear, DRIA), mass-flux weighted over NRLMSISE-00 species; "
             "referenced to full face area, keyed on face-flow angle theta in [0, pi]"
         ),
-        "accommodation": (
-            "SESAM Langmuir on atomic-O coverage (shared with the sphere table)"
-        ),
-        "anchor_alpha": gen.ANCHOR_ALPHA,
+        "accommodation": gen._accommodation_metadata(),
         "atmosphere": "NRLMSISE-00 (pymsis)",
         "axes": (
             "radius_axis [m] (geocentric), density_axis [kg/m^3] (total), "
