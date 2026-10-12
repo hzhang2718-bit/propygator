@@ -46,7 +46,7 @@ HEADLINE
 Empirical drag underestimate of physical Tier A vs BoxFace: ~2.0x
 A user running physical Tier A (Cd=2.2 or VariableCd) mis-predicts the
 along-track by ~1591 km over 5 days; recovering it needs Cd~4.6 (above the physical range).
-(Not the idealized ~9x: InPlaneTracking tracks INERTIAL velocity, but the
+(Short of a perfect edge-on hold: InPlaneTracking tracks INERTIAL velocity, but the
  flow is Earth-relative (co-rotation), so the sail sits a few deg off exact
  edge-on -- the large faces keep some projected area Tier A does capture.)
 At this altitude/epoch, BoxFace drag is 4896.4x the SRP effect, so drag DOMINATES SRP.
@@ -56,5 +56,5 @@ READING (NOT the decision -- the SHIP/DROP call is the maintainer's):
   constant Cd recovers it. If drag matters vs SRP here (see #3), this is
   BoxFaceCd's load-bearing use case.
 
-Total wall time: 266 s
+Total wall time: 248 s
 Saved figure: cd_box_benefit_study_edgeon.png

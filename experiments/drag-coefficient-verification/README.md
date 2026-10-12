@@ -394,8 +394,8 @@ recovers it** — the best-fit is Cd ≈ 4.6 (above the ~2.6 ceiling propygator 
 flags as improbable), and even that leaves ~35 km of shape residual. So unlike the
 Sun-pointing case (best-fit Cd ≈ 2.4, physical, ~1% residual), the projected-area Tier
 A models here structurally miss the shear and only an above-physical fudge factor
-approximates BoxFace. **Caveat:** the effect is ~2×, **not** the ~9× a *perfect*
-edge-on hold would give — `InPlaneTracking` tracks *inertial* velocity while the flow
+approximates BoxFace. **Caveat:** the ~2× is measured with inertial tracking, short of a
+*perfect* edge-on hold — `InPlaneTracking` tracks *inertial* velocity while the flow
 is Earth-relative (co-rotation), leaving the sail a few degrees off exact edge-on, so
 the large faces keep some projected area Tier A does capture; tracking the true
 relative velocity would widen the gap. The result is also specific to the

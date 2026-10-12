@@ -251,7 +251,7 @@ def main() -> None:
     print(f"along-track by ~{abs(f_cd22)/1e3:.0f} km over {WINDOW_DAYS:.0f} days; "
           f"recovering it needs Cd~{c_star:.1f} "
           f"({'above' if c_star > PHYSICAL_CD_CEIL else 'within'} the physical range).")
-    print(f"(Not the idealized ~9x: InPlaneTracking tracks INERTIAL velocity, but the")
+    print(f"(Short of a perfect edge-on hold: InPlaneTracking tracks INERTIAL velocity, but the")
     print(f" flow is Earth-relative (co-rotation), so the sail sits a few deg off exact")
     print(f" edge-on -- the large faces keep some projected area Tier A does capture.)")
     print(f"At this altitude/epoch, BoxFace drag is {drag_vs_srp:.1f}x the SRP effect, "

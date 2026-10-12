@@ -1,7 +1,7 @@
 ============================================================================
 ECEF InPlaneTracking BENEFIT STUDY (feathered sail: inertial vs ecef ref)
 ============================================================================
-propygator 0.4.0; real propagate_numerical;
+propygator 0.8.2; real propagate_numerical;
 ecef leg = SHIPPED InPlaneTracking(velocity_reference='ecef'); cross-check
 leg = the Chunk-1 CustomAttitude stand-in (hardcoded omega_earth wind)
 Sail: 1.0 x 1.0 m (1.0 m^2 faces), edge 0.01 m, m=0.5 kg, A/m=2.00 m^2/kg
@@ -11,13 +11,13 @@ Forces: gravity 70x70 + Sun/Moon + NRLMSISE-00 drag + SRP; BoxFaceCd
 Predicted inertial-leg max AoA ~ 3.75 deg (out-of-plane wind)
 
 ... propagating inertial leg (InPlaneTracking) ...
-    12 s
+    20 s
 ... propagating feathered leg (SHIPPED InPlaneTracking ecef) ...
-    17 s
+    29 s
 ... propagating cross-check leg (CustomAttitude ecef stand-in) ...
-    31 s
+    61 s
 ... propagating no-drag (SRP+gravity) and gravity-only baselines ...
-    12 s
+    19 s
 
 ----------------------------------------------------------------------------
 RESULTS
@@ -27,20 +27,20 @@ RESULTS
      feathered leg: max 0.0000 deg  (~0 up to the diagnostic wind's pole-offset scale)
 
 (b) Assembled per-face CdA at representative density rho=1.0e-12 kg/m^3 (diagnostic):
-     inertial leg : mean 0.2170 m^2, max 0.2364, min 0.1951
-     feathered leg: mean 0.1955 m^2, max 0.1962, min 0.1949
+     inertial leg : mean 0.2129 m^2, max 0.2317, min 0.1918
+     feathered leg: mean 0.1922 m^2, max 0.1930, min 0.1916
      mean-CdA ratio inertial/feathered = 1.11x
 
 (c) PRIMARY -- along-track over the window:
-     divergence feathered-vs-inertial : final    -272.7 km, max    272.7 km
-     inertial-leg drag effect (vs no-drag) : final    2414.7 km
-     feathered-leg drag effect (vs no-drag): final    2157.1 km
+     divergence feathered-vs-inertial : final    -262.7 km, max    262.7 km
+     inertial-leg drag effect (vs no-drag) : final    2368.5 km
+     feathered-leg drag effect (vs no-drag): final    2119.8 km
      -> feathering to the true wind cuts the drag effect by ~1.12x
      SRP effect (no-drag vs gravity-only)  : final      -0.2 km
-     drag(inertial)/SRP = 10590.7x
+     drag(inertial)/SRP = 10387.9x
 
 (d) Shipped-mode vs CustomAttitude stand-in cross-check:
-     along-track shipped - stand-in: final    -0.01 km, max    0.02 km
+     along-track shipped - stand-in: final     0.04 km, max    0.04 km
      (expected small vs the (c) divergence: the two ecef legs differ
       only by the stand-in's hardcoded-omega pole offset)
 
@@ -48,12 +48,12 @@ RESULTS
 HEADLINE
 ----------------------------------------------------------------------------
 Over 5 days the attitude REFERENCE alone (inertial vs ecef) moves
-this sail 273 km along-track (max 273 km) -- the drag effect drops ~1.12x when
+this sail 263 km along-track (max 263 km) -- the drag effect drops ~1.12x when
 feathered to the true co-rotating flow (shipped mode; agrees with the
-Chunk-1 stand-in to 0.02 km max along-track).
+Chunk-1 stand-in to 0.04 km max along-track).
 READING: Checkpoint A (GO) was called on the Chunk-1 stand-in run (2 kg:
   -63.3 km / 5 d, 1.12x). This Chunk-4 refresh re-measures with the
   SHIPPED mode at the 0.5 kg sail mass -- the numbers the docs quote.
 
-Total wall time: 75 s
+Total wall time: 131 s
 Saved figure: ecef_feather_benefit.png

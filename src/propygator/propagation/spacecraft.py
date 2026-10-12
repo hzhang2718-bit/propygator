@@ -496,18 +496,18 @@ class BoxFaceCd:
     attitude-correlated, so its orbit-level benefit depends on how the body flies.
     For **face-on / nadir-held / tumbling / Sun-pointing** flight a best-fit
     *physical* constant Cd (or :class:`VariableCd`) absorbs almost all of it
-    (< 1 % along-track over a multi-day LEO run), and ``BoxFaceCd`` is not worth its
+    (~1 % along-track over a multi-day LEO run), and ``BoxFaceCd`` is not worth its
     per-substep cost. Its load-bearing case is **grazing / edge-on flight of a
     high-area-to-mass flat plate** (a solar / drag sail), where the tangential shear
     dominates: a physical constant Cd *under*-predicts along-track by a factor of ~2
-    that a recalibrated scalar cannot absorb (~1400-1640 km / 5 d at 400 km, solar
-    max; best-fit Cd ~= 4.7 still leaves a ~100 km residual). That non-absorbable
-    regime is why it ships. The ~2x is measured with :class:`InPlaneTracking` at its
-    default *inertial* velocity reference, so the body sat a few degrees off the true
-    Earth-relative flow (the idealized perfectly-edge-on benefit is larger, ~9x).
+    that no physical scalar can absorb (~1490-1590 km / 5 d at 400 km, solar max;
+    the best-fit Cd ~= 4.6 is above the free-molecular range and still leaves a
+    ~35 km residual). That non-absorbable regime is why it ships. The ~2x is measured
+    with :class:`InPlaneTracking` at its default *inertial* velocity reference, so the
+    body sat a few degrees off the true Earth-relative flow.
     ``InPlaneTracking(velocity_reference="ecef")`` now closes that gap — it holds the
     plate exactly on the co-rotating flow, a real but modest further refinement
-    (~1.12x drag-effect cut, −273 km along-track / 5 d, for a 1 m² / 0.5 kg sail on a
+    (~1.12x drag-effect cut, −263 km along-track / 5 d, for a 1 m² / 0.5 kg sail on a
     500 km SSO at solar max; inclination-dependent, vanishing for equatorial
     prograde). Evidence: ``experiments/ecef-attitude-benefit/``.
     """
