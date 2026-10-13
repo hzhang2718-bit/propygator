@@ -124,7 +124,7 @@ barely move while the absolute along-track figure does. Whatever moves, the
 Restate the same paragraph's Sun-pointing "< 1 %" claim from
 `cd_box_benefit_study_results.txt` (now 1.12 % final).
 
-## Chunk 7 — Regenerate the two studies' α-dependent evidence
+## Chunk 7 — Regenerate the two studies' α-dependent evidence - Done
 
 **Goal.** `run_all.py --verify` is green in both studies (contract §8).
 
@@ -148,7 +148,22 @@ untouched ones, apart from extended-validation's unmasked `[versions]` stamp lin
 Read the ten-window sphere-vs-`Cd = 2.3` outcome against contract §8's
 pre-registered reading **before** writing any document.
 
-## Chunk 8 — Tests
+**Record (2026-10-13).** Every regenerated file moved only table-fed rows; baseline
+`--verify` clean on the untouched groups (`screen` bar its `[versions]` line), spot-check
+`--verify` clean on rwv `drag` and extval `tle_01` at `42ea058`.
+
+- §8 trigger **not fired**: the sphere still beats `Cd = 2.3` on day 1 of every storm
+  window (`storm_2026_01` day-1 ratio 0.54 → 0.30), but its lead narrowed in
+  `moderate_2022_04`, `storm_2024_08`, `intense_2024_11`, `storm_2025_05`,
+  `moderate_2025_07` (day-1 ratio ~0.4–0.7 → 0.71–0.86).
+- Same split everywhere: sphere better in low windows, worse once drag is active; box
+  better in every window and leg.
+- Checkpoint B re-read unchanged — the scaled box still collapses onto Run 3 in all
+  four rwv windows.
+- Table-noise still 12/12 HIT.
+- Swarm `window_03` wall-time lines read ~7.5 h (machine sleep); numbers unaffected.
+
+## Chunk 8 — Tests - Done
 
 **Goal.** Suite green, pins honest.
 
@@ -160,7 +175,9 @@ Cd raises the residual toward its 400 m ceiling), and `FACE_SUM_BAND_M2` in
 `tests/propagation/test_real_world_gracefo.py`. `test_numerical.py` (1163, 1294) and
 `test_public_surface.py` (137) are structural — confirm rather than re-pin. Re-pin
 only against Chunk 7's measured values, keeping the repo's
-measured-times-generous-margin policy.
+measured-times-generous-margin policy. Both bounds are expected to hold; their
+"measured" comments (34.7 m / 0.544; 227.7 / 233.0 m) are stale and need re-measuring
+at the tests' 600 s cadence.
 
 ## Chunk 9 — Documents
 
@@ -179,7 +196,9 @@ number is Chunk 7's.
   behaviour change.
 - `docs/validation-findings.md` — the table-derived numbers in §1–8 and §9–17,
   restated from Chunk 7 (contract §8), including §14's state-path rows and the
-  Checkpoint B "absorbable scale" reading.
+  Checkpoint B "absorbable scale" reading; the sphere-leads headline stands but with
+  Chunk 7's narrower margins, and the active/storm sphere Cd (2.49 / 2.37) now sits
+  below the withdrawn "DSMC band" floor that `run_gracefo.py` still prints.
 - `experiments/real-world-validation/README.md` — retire the "Expected — do not
   regenerate" bullet and mark the `v0.8.2` leeward-floor `--verify` narrative
   historical (contract §8).

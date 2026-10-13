@@ -24,9 +24,9 @@ active_2023 --emit-fixture`` (a Chunk 23 addition to that driver, mirroring
 MAS1B (which the fixture does not carry).
 
 Measured here (600 s cadence; the committed 60 s-cadence study values in
-brackets): RMS_sphere(C) 227.7 m [226.6], RMS_sphere(D) 233.0 m [232.1], ratio
-0.977 [0.976] against the contract's 20% bar. The cadence difference moves the
-ratio by < 0.2 pp, well inside the margin below.
+brackets; SESAM tables, 2026-10-13): RMS_sphere(C) 290.5 m [288.8], RMS_sphere(D)
+295.4 m [293.9], ratio 0.983 [0.982] against the contract's 20% bar. The
+cadence difference moves the ratio by < 0.2 pp, well inside the margin below.
 """
 
 from __future__ import annotations
@@ -651,9 +651,10 @@ CR = 1.3
 MASS_C_KG = 596.546
 MASS_D_KG = 597.153
 
-# Measured (600 s cadence): RMS_sphere(C) 227.7 m, RMS_sphere(D) 233.0 m.
+# Measured (600 s cadence): RMS_sphere(C) 290.5 m, RMS_sphere(D) 295.4 m. A
+# sanity band only: a drag-off run lands near 1 km.
 RMS_BAND_M = (100.0, 400.0)
-# Measured ratio 0.977 against the contract's own 20% bar; 30% absorbs the
+# Measured ratio 0.983 against the contract's own 20% bar; 30% absorbs the
 # 60 s -> 600 s cadence difference with room to spare.
 RATIO_TOL = 0.30
 
