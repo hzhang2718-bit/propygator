@@ -38,13 +38,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from cd_core import IDX, alpha_sesam, calibrate_K, v_rel
+from cd_core import IDX, alpha_sesam, v_rel
 from cd_box_faces import face_cd, face_cd_curve
 
-K = calibrate_K()
-
 # Representative MSIS state for the headline convergence numbers: 400 km / solar
-# max -- the SESAM accommodation anchor (alpha ~ 0.90), the canonical drag point.
+# max, the canonical drag point.
 ANCHOR_DATE = np.datetime64("2002-07-01T12:00")
 ANCHOR_ALT_KM = 400.0
 ANCHOR_LAT = 0.0
@@ -69,7 +67,7 @@ def msis_state(date, alt_km, lat, lon, f107, ap):
                  version=0)
     ).reshape(-1, 11)[0]
     V = v_rel(alt_km, lat)
-    alpha = alpha_sesam(row[IDX["O"]], row[IDX["T"]], K)
+    alpha = alpha_sesam(row, V)
     return row, V, alpha
 
 

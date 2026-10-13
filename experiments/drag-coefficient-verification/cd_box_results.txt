@@ -2,11 +2,11 @@ Generated 50 epochs (10 storm) x 80 altitudes (130-1400 km) per attitude
 thresholds: green <= 5% / red >= 30% (collapse thickness on the geocentric-radius axis)
 
 attitude                  mean C_D     RMS%   storm%    max%   cut(km)  verdict
-cube head-on (0deg)          3.601    1.004    1.232    5.10    none    [PASS]
-cube edge-on (45deg)         4.217    0.622    0.816    3.06    none    [PASS]
-cube corner-on               4.638    0.374    0.560    2.59    none    [PASS]
-plate face-on (0deg)         3.134    0.488    0.784    4.12    none    [PASS]
-plate 60deg                  1.298    0.368    0.533    2.28    none    [PASS]
-plate 80deg grazing          0.432    1.977    2.311   12.95    none    [PASS]
+cube head-on (0deg)          3.437    1.494    1.764    7.87    none    [PASS]
+cube edge-on (45deg)         4.054    1.014    1.240    5.34    none    [PASS]
+cube corner-on               4.474    0.681    0.886    3.53    none    [PASS]
+plate face-on (0deg)         2.970    0.871    1.165    4.13    none    [PASS]
+plate 60deg                  1.257    0.651    0.846    3.53    none    [PASS]
+plate 80deg grazing          0.427    2.117    2.486   13.79    none    [PASS]
 
 Saved figure.

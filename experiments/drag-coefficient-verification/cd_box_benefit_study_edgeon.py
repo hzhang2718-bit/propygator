@@ -14,7 +14,7 @@ held *edge-on* to the flow (InPlaneTracking) to minimize drag.
 Why a separate study (the physics inverts). SunPointing sweeps the large face
 through the flow, so drag work is dominated by the near-face-on arc where the
 projected-area (Tier A) and per-face (Tier B) models agree -- the shear term is a
-<1% correction (that is what cd_box_benefit_study.py found). Held EDGE-ON, the large
+~1% correction (that is what cd_box_benefit_study.py found). Held EDGE-ON, the large
 faces are parallel to the flow for the whole orbit: their PROJECTED area -> ~0, so
 Tier A (Orekit BoxAndSolarArraySpacecraft, projected-area only) sees almost no drag,
 while the real physics is dominated by TANGENTIAL SHEAR on those large faces (the
@@ -251,7 +251,7 @@ def main() -> None:
     print(f"along-track by ~{abs(f_cd22)/1e3:.0f} km over {WINDOW_DAYS:.0f} days; "
           f"recovering it needs Cd~{c_star:.1f} "
           f"({'above' if c_star > PHYSICAL_CD_CEIL else 'within'} the physical range).")
-    print(f"(Not the idealized ~9x: InPlaneTracking tracks INERTIAL velocity, but the")
+    print(f"(Short of a perfect edge-on hold: InPlaneTracking tracks INERTIAL velocity, but the")
     print(f" flow is Earth-relative (co-rotation), so the sail sits a few deg off exact")
     print(f" edge-on -- the large faces keep some projected area Tier A does capture.)")
     print(f"At this altitude/epoch, BoxFace drag is {drag_vs_srp:.1f}x the SRP effect, "

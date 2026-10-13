@@ -38,12 +38,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa
-from cd_core import (cd_total, calibrate_K, IDX, R_EARTH, geocentric_radius,
+from cd_core import (cd_total, IDX, R_EARTH, geocentric_radius,
                      collapse_rms_by_radius, print_collapse_report,
                      GREEN_RMS_PCT, RED_RMS_PCT)
 
 rng = np.random.default_rng(7)
-K = calibrate_K()
 
 # Dense sweep on the production axis: ~130-1400 km, modestly above the ~1200 km
 # table ceiling (addendum sec. 3.2). 80 points keeps each radius bin well populated.
@@ -92,7 +91,7 @@ for ci, c in enumerate(conds):
         rho = m[IDX["rho"]]
         if not np.isfinite(rho) or rho <= 0:
             continue
-        cd, alpha = cd_total(m, alt, c["lat"], K)
+        cd, alpha = cd_total(m, alt, c["lat"])
         r = float(geocentric_radius(alt, c["lat"]))     # production axis
         rows.append((alt, r, rho, cd, alpha, ci, c["storm"]))
 

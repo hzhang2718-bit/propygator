@@ -16,10 +16,9 @@ The study Chunk 4 pins (docs/history/build-plan-real-world-validation.md; eviden
 
 Tolerance policy (build-plan Chunk 4, binding): measured x generous margin.
 Measured (results.txt active_2023, 2026-07-12): t0 diff 3.9e-9 m; drag-off
-day-1 3D RMS 1058 m; drag-on/drag-off ratio 0.325; face-sum 4.18 m^2 vs
-13.02 / 8.22 m^2 for the two wrong-axis mappings. The Chunk 5
-``box_face_default`` leeward floor-at-zero regeneration moves the face-sum by
-~1e-7 m^2 — far inside the band.
+day-1 3D RMS 1058 m; drag-on/drag-off ratio 0.325. Face-sum re-measured on
+the SESAM box table (2026-10-13): 3.85 m^2 vs 11.68 / 7.43 m^2 for the two
+wrong-axis mappings (4.18 / 13.02 / 8.22 on the pre-SESAM table).
 """
 
 from __future__ import annotations
@@ -67,7 +66,7 @@ BOX_X_M, BOX_Y_M, BOX_Z_M = 0.780, 3.123, 1.3165
 # Fixed table inputs (the scratch-probe idiom) — no orekit-data dependence.
 FACE_SUM_RADIUS_M = 6.876e6
 FACE_SUM_DENSITY = 1e-12
-FACE_SUM_BAND_M2 = (3.3, 5.2)  # measured 4.18
+FACE_SUM_BAND_M2 = (3.3, 5.2)  # measured 3.85
 
 
 def test_gracefo_drag_signal_and_pipeline(orekit):

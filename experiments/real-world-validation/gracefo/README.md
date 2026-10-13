@@ -17,7 +17,7 @@ called on the quiet/active numbers; Runs 4 & 5 are the direct geometry
 evidence.** The storm window is the density stress case and the **box-table sign
 test**: the physical Cd is near-constant across windows, so the fitted-Cd swing
 measures density bias, and the storm decides whether the box table's persistent
-over-prediction (2.23× → 1.21× of the fitted ρ·Cd·A product, quiet → active) is
+over-prediction (2.10× → 1.12× of the fitted ρ·Cd·A product, quiet → active) is
 density bias — its sign flips — or genuine geometric over-drag — it persists.
 It is also the only window exercising NRLMSISE-00's ap-driven storm terms (the
 other windows sit at daily Ap 2–4).
@@ -183,7 +183,8 @@ length-corrected (that would swap a traceable dimension for a fictitious one); t
 
 Full tables in `results.txt` (regenerated 2026-07-15 from the reorganized
 drivers — every number reproduced identically; the quiet/active blocks gained
-the per-day space-weather context in the rerun); Checkpoint B reads the
+the per-day space-weather context in the rerun; table rows restated 2026-10-13
+from the SESAM-table regeneration); Checkpoint B reads the
 along-track RMS row and the fitted Cd. Both windows: t0 sanity ~4e-9 m (frame/time conversion clean to float
 noise), maneuver screen CLEAN, 0 QC-dropped records, seamless day concatenation.
 
@@ -198,11 +199,11 @@ noise), maneuver screen CLEAN, 0 QC-dropped records, seamless day concatenation.
 | **Run 3** Cd-fit, along-track RMS | **1.9 m** | **6.4 m** |
 | **fitted Cd** (vs. 2.3 nominal) | **2.03** | **3.40** |
 | Run 1 vs. LAGEOS conservative floor (~4 m/day) | ~11× | ~264× |
-| **Run 4** sphere table (no fit), along-track RMS | **20.9 m** | **210.6 m** |
-| **Run 5** box table (no fit, IPT-ecef), along-track RMS | **55.0 m** | **222.2 m** |
-| Run 4 / Run 5 share of the fitted ρ·Cd·A product | 1.47× / 2.23× | 0.80× / 1.21× |
-| Verify 4: box scaled onto the fitted product, along RMS | 1.85 m (Run 3: 1.86) | 6.45 m (Run 3: 6.36) |
-| Verify 5: +0.33 m length-corrected box, Δ along RMS | +2.7 m | +36.6 m |
+| **Run 4** sphere table (no fit), along-track RMS | **17.1 m** | **273.7 m** |
+| **Run 5** box table (no fit, IPT-ecef), along-track RMS | **49.3 m** | **127.1 m** |
+| Run 4 / Run 5 share of the fitted ρ·Cd·A product | 1.39× / 2.10× | 0.74× / 1.12× |
+| Verify 4: box scaled onto the fitted product, along RMS | 1.84 m (Run 3: 1.86) | 6.45 m (Run 3: 6.36) |
+| Verify 5: +0.33 m length-corrected box, Δ along RMS | +2.7 m | +36.5 m |
 
 Radial and cross-track stay sub-metre (quiet) to metre-class (active); the residual
 is almost purely along-track, the classic drag signature. Reading:
@@ -241,42 +242,42 @@ fitted Cd is restated as × 1.0/1.027):
 
 | Cd on A_ram = 1.027 m² | quiet_2019 | active_2023 |
 |---|---|---|
-| `VariableCd.sphere_default` (arc mean) | 2.92 | 2.70 |
-| `BoxFaceCd.default` (face-sum / A_ram) | 4.42 | 4.06 |
+| `VariableCd.sphere_default` (arc mean) | 2.75 | 2.49 |
+| `BoxFaceCd.default` (face-sum / A_ram) | 4.17 | 3.75 |
 | fitted (Run 3, restated) | 1.98 | 3.32 |
 | DSMC physical band (Mehta 2013; arXiv 2503.21651) | 2.65–4.5 | 2.65–4.5 |
 
 Reading:
 
-- **Both tables are physically credible.** The sphere sits just above the DSMC
-  band's low edge in both windows; the box lands *inside* the band (4.42 / 4.06,
-  under the 4.5 top — the plan allowed it to exceed; it didn't). The box's larger
+- **Both tables are physically credible.** The sphere sits around the DSMC
+  band's low edge (above it quiet, below it active); the box lands *inside* the
+  band (4.17 / 3.75, under the 4.5 top). The box's larger
   Cd is the extra edge-on skin friction a sphere structurally cannot see — the
   more complete model, not an over-estimate.
 - **The no-fit residuals are density-limited by construction** (an orbit constrains
-  only ρ·Cd·A). Quiet: both tables over-predict drag (1.47× / 2.23× the fitted
+  only ρ·Cd·A). Quiet: both tables over-predict drag (1.39× / 2.10× the fitted
   product) — NRLMSISE-00 over-models deep-solar-minimum density, so the physically
-  *better* box Cd produces the *worse* orbit (55.0 vs 20.9 m along-track). That is
-  the finding, not a defect. Active: the tables **bracket** the truth (0.80× /
-  1.21×), which is why their residuals are similar magnitude with opposite sign
-  (−481 / +486 m signed along-track at 24 h).
+  *better* box Cd produces the *worse* orbit (49.3 vs 17.1 m along-track). That is
+  the finding, not a defect. Active: the tables **bracket** the truth (0.74× /
+  1.12×), so their residuals have opposite sign (−622 / +272 m signed
+  along-track at 24 h), the box nearer 1.0 and smaller.
 - **The axis convention is proven live** (build-plan Verify 1, gate figures
   recomputed from the refined geometry): the wired +Y-on-wind face-sum is
-  4.54 m² (quiet arc) vs. 14.27 / 8.99 m² for the two wrong-axis mappings, and the
+  4.28 m² (quiet arc) vs. 13.22 / 8.37 m² for the two wrong-axis mappings, and the
   propagation-level check — predicted vs. realized signed along-track @ 24 h from
-  `s = CdA_table/CdA_fit` — agrees to 2–11 % across both runs and both windows.
+  `s = CdA_table/CdA_fit` — agrees to 2–12 % across both runs and both windows.
   The plan's remembered "≈ 6 m² (≈ 4.3 on A_ram)" gate traced to the superseded
   probe geometry, as its ISSUE note suspected; the recomputed numbers are
-  **4.54 m² / 4.42 on A_ram**.
+  **4.28 m² / 4.17 on A_ram**.
 - **Verify 4 — the collapse test:** one propagation with the box Cd·A scaled onto
-  the fitted product lands at 1.85 m (Run 3: 1.86 m) quiet and 6.45 m (6.36 m)
+  the fitted product lands at 1.84 m (Run 3: 1.86 m) quiet and 6.45 m (6.36 m)
   active — a single scalar absorbs the box's structure *completely* for this
   ram-dominated body. Direct proof the `box_and_panels` upgrade would add no
   non-absorbable fidelity for GRACE-class flight (its payoff is the edge-on sail
   regime GRACE doesn't exercise).
 - **Verify 5 — geometry-insensitivity:** the +0.33 m length-corrected box moves the
-  along-track RMS by +2.7 m (quiet) / +36.6 m (active) against density confounds of
-  53 / 216 m — the residual is density-limited, not dimension-limited.
+  along-track RMS by +2.7 m (quiet) / +36.5 m (active) against density confounds of
+  47 / 121 m — the residual is density-limited, not dimension-limited.
 - One shipped-surface observation (normal fix path, low severity): the
   `box_face_default` grid's leeward half carries noise-level **negative** entries
   (min −5.8e-4; the whole θ=π slice is ≤ 0). Harmless in the table path (≤ 0.01 %
@@ -296,9 +297,9 @@ Reading:
   sphere-equivalent already explains the residuals (a single scalar Cd drives the
   along-track residual to single-metre-class in both windows), and Verify 4 shows
   the wind-aligned `BoxFaceCd` box, scaled onto the same fitted product, lands
-  *exactly* on Run 3 (1.85 vs 1.86 m; 6.45 vs 6.36 m) — the box adds only
+  *exactly* on Run 3 (1.84 vs 1.86 m; 6.45 vs 6.36 m) — the box adds only
   absorbable scale for this ram-dominated body. The box table itself is validated
-  as physically sound (DSMC-consistent, 4.42/4.06 on A_ram inside the 2.65–4.5
+  as physically sound (DSMC-consistent, 4.17/3.75 on A_ram inside the 2.65–4.5
   band). Default hold: **defer** the fitted `box_and_panels` upgrade; its
   non-absorbable payoff belongs to the edge-on sail regime.
 - **Storm-window stress case** — noted at the call, **elected 2026-07-13 as
@@ -324,34 +325,32 @@ gate); axis check PASS on both; t₀ sanity ≤ 5e-9 m.
 | **Run 2** drag-on Cd = 2.3, along RMS | **1664.9 m** | **341.2 m** |
 | **Run 3** Cd-fit, along RMS | **119.0 m** | **27.4 m** |
 | **fitted Cd** (on A_ram) | **4.080 (3.97)** | **1.777 (1.73)** ⚠ artifact |
-| sphere table s / along RMS | 0.63× / 1418.2 m | 1.47× / 545.9 m |
-| box table s / along RMS | **0.97×** / 155.6 m | 2.26× / 1450.9 m |
-| Verify 4: scale-collapsed box vs Run 3 | 118.7 vs 119.0 m | 27.4 vs 27.4 m |
+| sphere table s / along RMS | 0.59× / 1545.6 m | 1.38× / 441.0 m |
+| box table s / along RMS | **0.92×** / 315.7 m | 2.12× / 1293.4 m |
+| Verify 4: scale-collapsed box vs Run 3 | 118.8 vs 119.0 m | 27.4 vs 27.4 m |
 | storm-surprise (fixed Cd 3.405), along RMS | — | 1057.5 m |
 
 Readings:
 
 - **The sign test → density bias confirmed (the Chunk 2c headline).** Across
   quiet → active → storm-peak the fitted Cd on A_ram climbs **1.98 → 3.32 →
-  3.97** while the box table's own prediction *falls* 4.42 → 4.06 → 3.88
+  3.97** while the box table's own prediction *falls* 4.17 → 3.75 → 3.67
   (hotter atmosphere → slightly lower physical Cd) — the two cross during the
-  storm, and the box's share of the fitted ρ·Cd·A product goes **2.23× → 1.21×
-  → 0.97×**. The box table's persistent over-prediction in the first two
+  storm, and the box's share of the fitted ρ·Cd·A product goes **2.10× → 1.12×
+  → 0.92×**. The box table's persistent over-prediction in the first two
   windows was NRLMSISE-00 density bias (hot at solar minimum, ≈unbiased at
   solar max, cold at storm peak), not geometric over-drag. The density-bias
   lever spans 2.0× while physical Cd moved ~10 % the other way — the
   attribution is unambiguous.
 - **The table ranking reversed** — the error-cancellation caveat demonstrated
-  in both directions: quiet, sphere beats box (20.9 vs 55.0 m); storm peak, box
-  beats sphere by 9× (155.6 vs 1418.2 m) and nearly matches the *fitted* run.
-  The Run 4 vs Run 5 ordering is set by the window's density bias, never by
-  table fidelity — and s = 0.97 does *not* validate the box absolutely (still
-  one confounded ρ·Cd·A product; if the true trapezoid Cd is mid-DSMC-band,
-  the model ran ~13 % cold and the box still over-drags by ~10–20 %, masked).
-  Footnote: the peak-arc Run 5 consistency line shows a sign mismatch
-  (predicted −227 m, realized +125 m) — expected, since |s−1| ≈ 3 % sits below
-  the storm's time-varying noise floor (Run 3 itself wanders ±360 m); Run 4's
-  7.5 % agreement still proves the mapping.
+  in both directions: quiet, sphere beats box (17.1 vs 49.3 m); storm peak, box
+  beats sphere (315.7 vs 1545.6 m). The Run 4 vs Run 5 ordering is set by the
+  window's density bias, never by table fidelity — and s = 0.92 does *not*
+  validate the box absolutely (still one confounded ρ·Cd·A product).
+  Footnote: the peak-arc Run 5 consistency line agrees only to ~2× (predicted
+  −635 m, realized −303 m) — expected, since |s−1| ≈ 8 % sits near the
+  storm's time-varying noise floor (Run 3 itself wanders ±360 m); Run 4's
+  6.5 % agreement still proves the mapping.
 - **The scalar-Cd fit degrades as predicted at storm peak**: 119 m along-track
   vs 1.9 / 6.4 m (quiet/active) — an hour-scale time-varying density bias one
   scalar cannot absorb. This is the storm caveat number for the solar-sail use
@@ -565,11 +564,11 @@ doubles as its own drift twin with no internal-grid caveat.
 | Trajectory path (truth reference) | 4,493 | 2,072 |
 | State path, Cd 2.3 nominal | 4,954 | 15,285 |
 | State path, the window's Run-3 fitted Cd | 4,681 | **1,147** |
-| State path, sphere table (native) | 5,632 | 9,484 |
-| external route, sphere table (the equivalence twin) | 5,630 | 9,484 |
-| external route, box table (IPT-ecef) | 7,172 | 9,284 |
-| native-vs-external deltas, sphere pair (all columns) | ≤ 1.9 m | ≤ 0.5 m |
-| reference drift over the fit window (nominal / fitted / sphere / box), RMS | 28 / 7 / 86 / 217 m | 1,435 / 128 / 922 / 730 m |
+| State path, sphere table (native) | 5,450 | 12,213 |
+| external route, sphere table (the equivalence twin) | 5,448 | 12,215 |
+| external route, box table (IPT-ecef) | 6,916 | 5,226 |
+| native-vs-external deltas, sphere pair (all columns) | ≤ 1.9 m | ≤ 1.9 m |
+| reference drift over the fit window (nominal / fitted / sphere / box), RMS | 28 / 7 / 71 / 196 m | 1,435 / 128 / 1,164 / 367 m |
 
 Readings:
 
@@ -603,8 +602,7 @@ Readings from the a-priori-table rows (2026-07-15):
 
 - **The construction-time equivalence is now measured, not assumed.** Native
   State path vs the external propagate-then-fit route on the identical sphere
-  config: every column agrees to ≤ 1.9 m (quiet) / ≤ 0.5 m (active), B\* to
-  2e-8 — measurement-placement noise against a ~600 m SGP4 floor and
+  config: every column agrees to ≤ 1.9 m in both windows, B\* to 2e-8 — measurement-placement noise against a ~600 m SGP4 floor and
   multi-km forecast errors. The two delivery paths are the same fit. That
   validates the remedy for a real §1.2 limitation this extension surfaced:
   the State path has no attitude parameter (its internal reference is pinned
@@ -615,24 +613,24 @@ Readings from the a-priori-table rows (2026-07-15):
 - **The shipped tables are not "calibrated" in the State-path sense.** They
   are physically credible (Chunk 2b, DSMC-consistent) but carry the window's
   density confound, and the fit pays for it: active, sphere/box land at
-  9,484 / 9,284 m at +3 d — ~4.5× the twin, between calibrated (1,147) and
-  nominal (15,285), exactly as their ±20% product errors (0.80× / 1.21×)
-  predict. Quiet, the tables cost +25% / +60% over the twin (5.6 / 7.2 vs
-  4.5 km) — every quiet configuration stays dominated by the quiet-window
+  12,213 / 5,226 m at +3 d — 5.9× / 2.5× the twin, between calibrated (1,147)
+  and nominal (15,285), in step with their −26% / +12% product errors
+  (0.74× / 1.12×). Quiet, the tables cost +21% / +54% over the twin (5.4 / 6.9
+  vs 4.5 km) — every quiet configuration stays dominated by the quiet-window
   fitted-B\* runaway (the sweep's finding), so the table penalty is a
   second-order effect there.
 - **The compounding mechanism is symmetric in sign** — the box row is the
-  study's first *over*-decay point: its fitted B\* (2.34e-4) skews above the
-  twin's (2.05e-4) exactly as the sphere's (1.57e-4) skews below, mirroring
-  the drift directions, with near-equal magnitudes because |0.80−1| ≈
-  |1.21−1|. The forecast penalty tracks |ρ·Cd·A error|, not its sign.
+  study's first *over*-decay point: its fitted B\* (2.17e-4) skews above the
+  twin's (2.05e-4) as the sphere's (1.45e-4) skews below, mirroring the drift
+  directions, and the larger sphere error (|0.74−1| vs |1.12−1|) carries the
+  larger penalty. The forecast penalty tracks |ρ·Cd·A error|, not its sign.
 - **The transfer is ~linear, and it quantifies "calibrated":** active-window
-  cost above the calibrated row ≈ 0.4–0.5 km per % of product error (20% →
-  ~8.3 km, 32% → ~14.1 km above the 1,147 m base); quiet ≈ 20–25 m per %.
-  So at solar max the State path needs a single-digit-% ballistic
-  coefficient to stay near the truth-reference twin — a bar the a-priori
-  tables' density confound (±20% at solar max, ×1.5–2.2 in deep minimum)
-  structurally cannot meet. The tables buy physical plausibility, not
+  cost above the calibrated row ≈ 0.34–0.44 km per % of product error
+  (12% → ~4.1 km, 26% → ~11.1 km, 32% → ~14.1 km above the 1,147 m base);
+  quiet ≈ 20–25 m per %. So at solar max the State path needs a single-digit-%
+  ballistic coefficient to stay near the truth-reference twin — a bar the
+  a-priori tables' density confound (−26% / +12% at solar max, ×1.4–2.1 in
+  deep minimum) structurally cannot meet. The tables buy physical plausibility, not
   State-path calibration; the guard remains a fitted/calibrated Cd or a
   truth reference.
 

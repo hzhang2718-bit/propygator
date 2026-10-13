@@ -9,8 +9,8 @@ free-molecular drag (``general-upgrades-1.md`` "Tier B Drag"). This script produ
 that array once; end users compute nothing.
 
 **What it does.** It is the per-face twin of ``scripts/generate_sphere_cd_table.py``.
-It reuses that script's Tier-A model wholesale -- the SESAM/Langmuir energy
-accommodation (anchored alpha = 0.90 at 400 km / solar max), the geocentric-radius and
+It reuses that script's Tier-A model wholesale -- the SESAM energy accommodation
+(``docs/history/sesam-accommodation.md``), the geocentric-radius and
 atmosphere-relative-speed maps, the NRLMSISE-00 condition sweep, and the
 ``(radius, density)`` validated band -- so the box table shares the sphere table's
 gas-surface assumptions exactly (cross-table coherence). The genuinely **new** part is
@@ -33,14 +33,15 @@ incidence node, since the incidence is sampled exactly at every node -- onto a c
 bound -- before the anchor prints and the write. Over the leeward half the closed
 form's erfc/exp terms nearly cancel and the *analytic* residue dips slightly negative
 for low speed-ratio (light, hot) species: the DRIA re-emission recoil projected on
-the drag axis exceeds the tiny incident drag (H reaches ~-1.6e-3 near theta ~
+the drag axis exceeds the tiny incident drag (H dips slightly negative near theta ~
 150-180 deg, and the theta = pi value is strictly negative for every species), so the
 mass-flux-weighted grid went negative where He/H dominate -- the high-altitude /
-low-density corner (pre-floor grid min -5.8e-4; 27% of entries, all at theta >=
-129 deg). Confirmed by direct evaluation 2026-07-17: an erfc-reformulated,
-cancellation-free evaluation reproduces the same negatives to ~1e-17, so they are
-model artifact, not float noise -- physically spurious, since a convex body's leeward
-faces are shielded (the closed form has no self-shadowing) and Cd_leeward -> 0+.
+low-density corner (SESAM tables: pre-floor grid min -5.4e-4; 26% of entries,
+all at theta >= 129 deg). Confirmed by direct evaluation 2026-07-17: an
+erfc-reformulated, cancellation-free evaluation reproduces the same negatives
+to ~1e-17, so they are model artifact, not float noise -- physically spurious,
+since a convex body's leeward faces are shielded (the closed form has no
+self-shadowing) and Cd_leeward -> 0+.
 The floor lives in :func:`generate` at grid assembly and **never** inside
 :func:`_face_cd_species` / :func:`_face_cd_total`: the cross-validator
 (``experiments/drag-coefficient-verification/cross_validate_box_face.py``) drives
@@ -120,10 +121,10 @@ INCIDENCE_MAX_RAD = float(np.pi)
 # shared per-face closed form is bit-identical (8.9e-16); this end-to-end CdA figure is
 # dominated by the documented spherical-vs-geocentric relative-speed convention (the
 # same sub-1% effect the sphere table records). UPDATE whenever the per-face physics
-# (closed form, anchor ANCHOR_ALPHA, or the relative-speed formula) changes and the
+# (closed form, accommodation, or the relative-speed formula) changes and the
 # cross-validation is re-run, so the shipped table never claims a stale agreement
 # (mirrors generate_sphere_cd_table.CROSS_VALIDATION_MAX_REL_PCT).
-CROSS_VALIDATION_MAX_REL_PCT = 0.1193
+CROSS_VALIDATION_MAX_REL_PCT = 0.1225
 
 _DEFAULT_OUTPUT = (
     Path(__file__).resolve().parents[1] / "data" / "box_face_cd_default.npz"
@@ -239,7 +240,7 @@ def generate(
     """Build the ``(radius, density, incidence) -> Cd`` grid plus provenance metadata.
 
     Heavy, generation-only imports (``pymsis``, ``scipy``) happen here so ``--help``
-    runs in the bare propygator env. The condition sweep, accommodation calibration,
+    runs in the bare propygator env. The condition sweep, accommodation model,
     and radius/speed maps are reused from the sphere generator; only the per-face Cd
     and the third (incidence) axis are new.
     """
@@ -248,12 +249,6 @@ def generate(
 
     rng = np.random.default_rng(seed)
     conditions = gen._sample_conditions(n_conditions, rng, storm_fraction)
-    langmuir_K = gen._calibrate_accommodation_K(msis.run, gen.ANCHOR_ALPHA)
-    logger.info(
-        "Calibrated Langmuir K = %.3e 1/Pa (anchor alpha=%.2f)",
-        langmuir_K,
-        gen.ANCHOR_ALPHA,
-    )
 
     # Sample geodetic altitudes spanning the radius grid with edge margin, so the
     # per-slice regrid interpolant covers the mesh corners rather than nearest-filling.
@@ -283,9 +278,7 @@ def generate(
         rows = rows[finite]
         radius_m = gen._geocentric_radius(altitudes_km[finite] * 1e3, np.radians(lat))
         speed = gen._relative_speed(radius_m, np.radians(lat))
-        alpha = gen._accommodation(
-            rows[:, gen._COL["O"]], rows[:, gen._COL["T"]], langmuir_K
-        )
+        alpha = gen._accommodation(rows, speed)
         cd = _face_cd_total(rows, speed, alpha, incidence_axis)
         radii.append(radius_m)
         densities.append(rows[:, gen._COL["rho"]])
@@ -370,10 +363,7 @@ def generate(
             "tangential shear, DRIA), mass-flux weighted over NRLMSISE-00 species; "
             "referenced to full face area, keyed on face-flow angle theta in [0, pi]"
         ),
-        "accommodation": (
-            "SESAM Langmuir on atomic-O coverage (shared with the sphere table)"
-        ),
-        "anchor_alpha": gen.ANCHOR_ALPHA,
+        "accommodation": gen._accommodation_metadata(),
         "atmosphere": "NRLMSISE-00 (pymsis)",
         "axes": (
             "radius_axis [m] (geocentric), density_axis [kg/m^3] (total), "
@@ -430,7 +420,7 @@ def generate(
             "green_validated_through_km": float(radius_axis[-1] - gen.WGS84_A) / 1e3,
             "reduced_confidence_above_km": None,
             # Interpolation accuracy on the incidence axis (Chunk-1 convergence study).
-            "incidence_interp_max_pct_at_nodes": {"33": 0.35, "65": 0.09},
+            "incidence_interp_max_pct_at_nodes": {"33": 0.361, "65": 0.098},
             "cross_validation_max_rel_pct": CROSS_VALIDATION_MAX_REL_PCT,
             "note": (
                 "Per-face Cd is smooth (C-infinity) in theta; the Chunk-1 convergence "

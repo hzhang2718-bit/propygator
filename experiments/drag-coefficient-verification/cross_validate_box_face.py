@@ -17,10 +17,9 @@ the Tier A check (cross_validate_models.py) asserts on TOTAL sphere Cd, not
 per-species terms.
 
 Structure (mirroring the sphere cross-validator's reconcile-first shape):
-  A. Reconcile the shared Langmuir-K calibration (the box paths inherit the same
-     accommodation model as the sphere -- cd_core.calibrate_K vs the generator's
-     live anchor -- already certified by cross_validate_models.py; re-verified
-     here for self-containedness).
+  A. Reconcile the shared SESAM accommodation (the box paths inherit the sphere's
+     model -- already certified by cross_validate_models.py; re-verified here on
+     identical float64 rows + speed for self-containedness).
   B. Shared per-face closed form: feed IDENTICAL (theta, V, T, mass, alpha) to
      both per-species evaluators and assert ~machine precision. This is the direct
      term-by-term proof the two reconstructions are the same physics -- the check
@@ -28,17 +27,15 @@ Structure (mirroring the sphere cross-validator's reconcile-first shape):
      hazard), which only shows up at large theta.
   C. End-to-end CdA over attitude x radius x density: each pipeline runs with its
      OWN conventions (experiment v_rel uses a spherical radius; the generator uses
-     the geocentric radius) at a shared K, exactly like the sphere e2e. Headline
+     the geocentric radius), hence each its own SESAM alpha, like the sphere e2e. Headline
      assertion: max relative CdA difference << 1%. Secondary: max ABSOLUTE per-face
      difference < eps_abs (well under the smallest force-relevant Cd) -- a bare
      relative per-face gate is ill-posed near grazing/leeward where Cd_i -> ~0.07
      -> 0 carries negligible force.
 
-Two benign, documented divergences (sub-1%, the same flavor cross_validate_models
-records for the sphere): (1) the relative-speed radius convention (spherical vs
-geocentric) differs ~0.1-0.3% at high latitude; (2) the He molecular mass differs
-in the 7th digit (cd_core 4.0026 vs generator 4.002602 amu) for a trace species.
-Neither moves CdA.
+One benign, documented divergence (sub-1%, the same one cross_validate_models
+records for the sphere): the relative-speed radius convention (spherical vs
+geocentric) differs ~0.1-0.3% at high latitude.
 
 Reference-only (experiment README): not shipped, not in CI, not linted/type-
 checked. Runs in the throwaway venv (docs/experiments_venv.md) with pymsis +
@@ -60,7 +57,6 @@ from cd_core import (
     IDX,
     SPECIES,
     alpha_sesam,
-    calibrate_K,
     v_rel,
 )
 
@@ -154,22 +150,27 @@ def _face_thetas(flow_hat):
 
 
 # ============================================================================
-# A. Reconcile the shared accommodation / Langmuir K (contract: shared Tier-A model)
+# A. Reconcile the shared SESAM accommodation (contract: shared Tier-A model)
 # ============================================================================
 print("=" * 72)
-print("RECONCILE: shared Langmuir K (the box inherits the Tier-A accommodation)")
+print("RECONCILE: shared SESAM alpha, identical rows + speed (expect ~eps)")
 print("=" * 72)
-K_exp = calibrate_K()  # cd_core: hardcoded 400 km / solar-max anchor
-K_gen = gen._calibrate_accommodation_K(msis.run, gen.ANCHOR_ALPHA)  # live MSIS anchor
-print(f"  K_exp (cd_core)   = {K_exp:.4e} 1/Pa")
-print(f"  K_gen (generator) = {K_gen:.4e} 1/Pa")
-print(f"  K rel diff = {rel_diff(K_exp, K_gen):.3%}   "
-      f"[{'PASS' if rel_diff(K_exp, K_gen) < 0.01 else 'FAIL'} < 1%]")
-print("  (Identical to the sphere reconcile(i); both anchor alpha=0.90. The two")
-print("  per-face pipelines below run at the shared K_exp, so K does not confound")
-print("  the physics comparison.)")
-print("  Note: species masses match except He (cd_core 4.0026 vs generator")
-print("  4.002602 amu) -- a 7th-digit difference on a trace species, sub-ppm on CdA.")
+# pymsis returns float32; cast so both sides see identical float64 inputs.
+acc_max_rel = 0.0
+n_acc = 0
+for cond in CONDITIONS:
+    rows = _msis_rows(cond).astype(np.float64)
+    finite = np.isfinite(rows[:, IDX["rho"]]) & (rows[:, IDX["rho"]] > 0.0)
+    rows = rows[finite]
+    r_geo = gen._geocentric_radius(ALTS_KM[finite] * 1e3, np.radians(cond["lat"]))
+    speed = gen._relative_speed(r_geo, np.radians(cond["lat"]))
+    alpha_g = gen._accommodation(rows, speed)
+    for i in range(rows.shape[0]):
+        acc_max_rel = max(acc_max_rel, rel_diff(alpha_sesam(rows[i], speed[i]), alpha_g[i]))
+        n_acc += 1
+print(f"  {n_acc} shared states: alpha max rel diff = {acc_max_rel:.2e}  "
+      f"[{'PASS' if acc_max_rel < 1e-12 else 'FAIL'} < 1e-12]")
+print("  (Identical to the sphere reconcile(i). Species masses match exactly.)")
 print()
 
 
@@ -186,7 +187,7 @@ print("  the full [0, pi] axis (the shear term only shows up at large theta).")
 # Representative free-molecular states (V m/s, T K, alpha) spanning solar
 # max/min and accommodation extremes.
 PHYS_STATES = [
-    (7174.0, 1284.0, 0.90),  # 400 km solar max (the anchor)
+    (7174.0, 1284.0, 0.90),  # 400 km solar max
     (7300.0, 700.0, 0.50),   # cool, partial accommodation
     (7050.0, 1000.0, 0.20),  # low accommodation
     (6900.0, 900.0, 0.85),
@@ -210,11 +211,11 @@ for V, T, al in PHYS_STATES:
 print(f"  per-species per-face closed form: max abs diff = {species_abs:.2e}  "
       f"max rel diff (Cd>0.1) = {species_rel:.2e}")
 
-# Mass-flux-weighted per-face Cd off identical (V, alpha): isolates the only
-# weighted-path difference, the He molecular-mass nuance (sub-1e-6).
+# Mass-flux-weighted per-face Cd off identical (V, alpha). The row stays pymsis
+# float32, so float32 rounding can mask the weighting path; ungated.
 anchor_row = _msis_rows(CONDITIONS[0])[5]  # a mid-band row
 V0 = v_rel(float(ALTS_KM[5]), CONDITIONS[0]["lat"])
-al0 = alpha_sesam(anchor_row[IDX["O"]], anchor_row[IDX["T"]], K_exp)
+al0 = alpha_sesam(anchor_row, V0)
 cd_exp_w = np.array(
     [face_cd(float(t), anchor_row, V0, anchor_row[IDX["T"]], al0) for t in thetas_axis]
 )
@@ -223,7 +224,7 @@ cd_gen_w = boxgen._face_cd_total(
 )[0]
 weighted_abs = float(np.abs(cd_gen_w - cd_exp_w).max())
 print(f"  mass-flux-weighted per-face Cd (identical V, alpha): max abs diff = "
-      f"{weighted_abs:.2e}  (He-mass nuance only)")
+      f"{weighted_abs:.2e}")
 print()
 
 
@@ -234,7 +235,7 @@ print("=" * 72)
 print("END-TO-END: assembled CdA = sum_i Cd_i * A_i, both pipelines, one MSIS set")
 print("=" * 72)
 print("  Experiment uses v_rel (spherical radius); generator uses the geocentric")
-print("  radius -- each its own convention, shared K_exp. Swept over a Fibonacci")
+print("  radius -- each its own convention and SESAM alpha. Swept over a Fibonacci")
 print("  fan of flow directions x radius x density for two convex geometries.")
 attitudes = _attitude_flow_dirs()
 thetas_per_att = [_face_thetas(f) for f in attitudes]
@@ -255,19 +256,20 @@ for cond in CONDITIONS:
         if not np.isfinite(rho) or rho <= 0.0:
             continue
         T = row[IDX["T"]]
-        alpha = alpha_sesam(row[IDX["O"]], T, K_exp)  # == gen._accommodation at K_exp
         V_exp = v_rel(float(alt), lat)                       # spherical radius
         r_geo = gen._geocentric_radius(np.array([alt * 1e3]), np.radians(lat))[0]
         V_gen = gen._relative_speed(np.array([r_geo]), np.radians(lat))[0]  # geocentric
+        alpha_exp = alpha_sesam(row, V_exp)
+        alpha_gen = gen._accommodation(row[None, :], np.array([V_gen]))[0]
         for thetas in thetas_per_att:
             exp_faces = np.array(
-                [face_cd(float(t), row, V_exp, T, alpha) for t in thetas]
+                [face_cd(float(t), row, V_exp, T, alpha_exp) for t in thetas]
             )
             gen_faces = boxgen._face_cd_total(
-                row[None, :], np.array([V_gen]), np.array([alpha]), thetas
+                row[None, :], np.array([V_gen]), np.array([alpha_gen]), thetas
             )[0]
             gen_faces_shared = boxgen._face_cd_total(
-                row[None, :], np.array([V_exp]), np.array([alpha]), thetas
+                row[None, :], np.array([V_exp]), np.array([alpha_exp]), thetas
             )[0]
             face_abs = max(face_abs, float(np.abs(gen_faces - exp_faces).max()))
             for name, areas in GEOMETRIES:
@@ -301,15 +303,14 @@ print()
 THRESHOLD_CDA = 0.01   # << 1% on the force-relevant CdA (matches the sphere gate)
 EPS_ABS = 0.02         # well under the smallest force-relevant per-face Cd
 EPS_MACHINE = 1e-9     # shared closed form -> machine precision
-k_rel = rel_diff(K_exp, K_gen)
 verdict = "PASS" if (overall_rel < THRESHOLD_CDA and face_abs < EPS_ABS
-                     and species_abs < EPS_MACHINE and k_rel < 0.01) else "FAIL"
+                     and species_abs < EPS_MACHINE and acc_max_rel < 1e-12) else "FAIL"
 print("=" * 72)
 print(f"VERDICT [{verdict}]: the two per-face reconstructions share the same closed")
-print(f"  form to {species_abs:.1e} (machine eps); end-to-end they agree on the")
-print(f"  force-relevant CdA to {overall_rel:.4%} (phys+speed, shared K), with the")
-print(f"  K calibration agreeing to {k_rel:.4%} -- full independent agreement is")
-print(f"  bounded by the product, << 1%. Per-face absolute agreement {face_abs:.1e}.")
+print(f"  form to {species_abs:.1e} (machine eps) and SESAM alpha to {acc_max_rel:.1e};")
+print(f"  end-to-end, each on its own speed convention and alpha, they agree on the")
+print(f"  force-relevant CdA to {overall_rel:.4%}, << 1%. Per-face absolute agreement")
+print(f"  {face_abs:.1e}.")
 print("=" * 72)
 
 assert species_abs < EPS_MACHINE, (
@@ -325,6 +326,6 @@ assert face_abs < EPS_ABS, (
     f"per-face absolute agreement {face_abs:.2e} >= {EPS_ABS} -- local per-face "
     "divergence (near grazing/leeward where a relative gate is ill-posed)"
 )
-assert k_rel < 0.01, "shared Langmuir K calibration diverged >= 1%"
+assert acc_max_rel < 1e-12, "shared SESAM accommodation is not identical"
 print("All Tier B per-face cross-validation checks PASS "
       "(the sec. 5 equivalence invariant holds for BoxFaceCd).")

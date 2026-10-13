@@ -1,7 +1,7 @@
 ==============================================================================
 Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
 ==============================================================================
-[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[versions] propygator 0.8.2, orekit_jpype 13.1.4.0, numpy 2.4.6
 [data root] experiments/extended-validation/data/gracefo
 [window] intense_2024_06, band intense, t0 2024-06-14, 14 days landed, 14 loaded
   note: 'intense' exists only in 2024, so the band is confounded with mission epoch and altitude
@@ -43,17 +43,17 @@ Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
 [runs]  13 scored configurations
     naive 2 d (shipped default)           1 s wall
     arm: transplant fit2 B*               3 s wall
-    arm: fresh 1 d, B* = 0                3 s wall
-    arm: freshest 1 d, B* free            4 s wall
+    arm: fresh 1 d, B* = 0                2 s wall
+    arm: freshest 1 d, B* free            2 s wall
     catalogue (Space-Track)               1 s wall
-    state path, sphere table             21 s wall
-    state path, box table (IPT)          27 s wall
-    fade tau = 0.5 d                     66 s wall
-    fade tau = 0.75 d                     6 s wall
-    fade tau = 1 d                        3 s wall
-    fade tau = 1.5 d                      2 s wall
-    fade tau = 2 d                        2 s wall
-    fade tau = 3 d                        2 s wall
+    state path, sphere table             11 s wall
+    state path, box table (IPT)          15 s wall
+    fade tau = 0.5 d                     38 s wall
+    fade tau = 0.75 d                     8 s wall
+    fade tau = 1 d                        6 s wall
+    fade tau = 1.5 d                      5 s wall
+    fade tau = 2 d                        5 s wall
+    fade tau = 3 d                        4 s wall
 [arc-end alignment]  every scored arc ends at T and spans what it reports
   naive_2d         [T - 2 d, T]: end delta +0.0e+00 s, fitted span 172800.0 s (delta +0.0e+00 s)
   arm_transplant   [T - 1 d, T]: end delta +0.0e+00 s, fitted span 86400.0 s (delta +0.0e+00 s)
@@ -77,8 +77,8 @@ Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
   C-D separation over that day: 200.0 km -- what a cross-tagged set would show and staleness cannot produce
 [state]  numerical reference vs truth over the fitted arc
   the a-priori tables cannot meet sec 1.2's single-digit-% calibration bar, so degradation roughly this size is EXPECTED -- recorded as an expectation, never a bar
-  state path, sphere table     drift RMS     593.1 m, end    1389.4 m
-  state path, box table (IPT)  drift RMS    2905.7 m, end    6576.4 m
+  state path, sphere table     drift RMS     311.0 m, end     755.8 m
+  state path, box table (IPT)  drift RMS    2481.2 m, end    5625.8 m
 [fade]  the age-weighted fits' own conditioning -- these rows alone run at max_iterations 800, not the shipped 100 (it caps evaluations too; this window's own demand is the evals column below)
   WEIGHTED QUANTITIES -- never compared against r < 0.05 / s < 0.1: age weighting turns sigma0 and the covariance into weighted quantities and the playbook's thresholds do not carry over (the conservative default)
   id                iters  evals        sigma0     sigma(B*)
@@ -95,8 +95,8 @@ Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
   arm_zero             611.6   0.000e+00      2030.8     14642.3     81851.6
   arm_fresh            611.6  -4.724e-06      2086.5     15164.6     84702.4
   catalog                  -   1.246e-04       967.4      2667.6     11218.3
-  state_sphere         643.2   1.918e-04      2696.5     11104.3     42888.4
-  state_box            642.4   2.979e-04     11066.8     37779.6    137618.9
+  state_sphere         643.3   1.789e-04      1730.7      7876.2     31354.2
+  state_box            642.5   2.785e-04      9524.8     32889.3    120266.1
   fade_tau_0p5       19125.7   2.540e-05      2178.7     13510.0     70674.0
   fade_tau_0p75       3737.2   1.268e-04       826.8      1761.6      7950.3
   fade_tau_1          1143.3   1.487e-04       649.2      1759.6      6909.9
@@ -121,12 +121,12 @@ Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
   catalog             1      113.72        948.77      150.82        967.39
                       3      285.94       2645.94      183.06       2667.64
                       7      626.84      11199.23      183.22      11218.25
-  state_sphere        1      154.11       2687.54      156.29       2696.49
-                      3      367.88      11096.53      191.68      11104.28
-                      7      795.23      42880.61      190.86      42888.41
-  state_box           1      181.04      11064.17      156.24      11066.75
-                      3      465.09      37776.28      191.54      37779.62
-                      7     1853.76     137606.31      191.28     137618.93
+  state_sphere        1      152.12       1716.86      156.29       1730.66
+                      3      361.17       7865.62      191.69       7876.24
+                      7      761.05      31344.40      190.82      31354.22
+  state_box           1      174.86       9521.92      156.25       9524.81
+                      3      440.06      32885.80      191.56      32889.31
+                      7     1537.53     120256.16      191.20     120266.14
   fade_tau_0p5        1      125.18       2168.71      166.15       2178.67
                       3      291.46      13505.43      199.36      13510.05
                       7      594.61      70671.16      229.94      70674.04
@@ -162,12 +162,12 @@ Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
   TROW intense_2024_06 intense catalog 1 113.7157 948.7707 150.8186 967.3900 -1.0000 1.245800e-04
   TROW intense_2024_06 intense catalog 3 285.9385 2645.9438 183.0589 2667.6375 -1.0000 1.245800e-04
   TROW intense_2024_06 intense catalog 7 626.8375 11199.2258 183.2236 11218.2509 -1.0000 1.245800e-04
-  TROW intense_2024_06 intense state_sphere 1 154.1137 2687.5372 156.2859 2696.4852 643.2070 1.918000e-04
-  TROW intense_2024_06 intense state_sphere 3 367.8795 11096.5293 191.6772 11104.2802 643.2070 1.918000e-04
-  TROW intense_2024_06 intense state_sphere 7 795.2296 42880.6097 190.8638 42888.4076 643.2070 1.918000e-04
-  TROW intense_2024_06 intense state_box 1 181.0407 11064.1679 156.2448 11066.7520 642.3941 2.978800e-04
-  TROW intense_2024_06 intense state_box 3 465.0863 37776.2757 191.5367 37779.6241 642.3941 2.978800e-04
-  TROW intense_2024_06 intense state_box 7 1853.7579 137606.3117 191.2787 137618.9305 642.3941 2.978800e-04
+  TROW intense_2024_06 intense state_sphere 1 152.1153 1716.8626 156.2910 1730.6597 643.2838 1.788600e-04
+  TROW intense_2024_06 intense state_sphere 3 361.1659 7865.6214 191.6946 7876.2420 643.2838 1.788600e-04
+  TROW intense_2024_06 intense state_sphere 7 761.0547 31344.4011 190.8161 31354.2197 643.2838 1.788600e-04
+  TROW intense_2024_06 intense state_box 1 174.8628 9521.9188 156.2523 9524.8060 642.5001 2.784700e-04
+  TROW intense_2024_06 intense state_box 3 440.0642 32885.8043 191.5621 32889.3064 642.5001 2.784700e-04
+  TROW intense_2024_06 intense state_box 7 1537.5272 120256.1578 191.1994 120266.1384 642.5001 2.784700e-04
   TROW intense_2024_06 intense fade_tau_0p5 1 125.1836 2168.7117 166.1461 2178.6660 19125.7096 2.539500e-05
   TROW intense_2024_06 intense fade_tau_0p5 3 291.4582 13505.4294 199.3629 13510.0450 19125.7096 2.539500e-05
   TROW intense_2024_06 intense fade_tau_0p5 7 594.6116 70671.1613 229.9365 70674.0368 19125.7096 2.539500e-05
@@ -187,12 +187,12 @@ Extended validation -- Part 3 TLE fitting: window 05 intense_2024_06 (intense)
   TROW intense_2024_06 intense fade_tau_3 3 391.4436 2606.4345 198.6284 2643.1387 815.8960 1.548200e-04
   TROW intense_2024_06 intense fade_tau_3 7 759.1843 11118.8441 202.8346 11146.5778 815.8960 1.548200e-04
   TCAT intense_2024_06 0.122869 967.3900 199274.9051 205.9923 PASS
-  TSTATE intense_2024_06 state_sphere 593.1443 1389.3573
-  TSTATE intense_2024_06 state_box 2905.7254 6576.3716
+  TSTATE intense_2024_06 state_sphere 311.0076 755.8391
+  TSTATE intense_2024_06 state_box 2481.2332 5625.8148
   TFADE intense_2024_06 fade_tau_0p5 381 471 7.171466e+01 1.207951e-07
   TFADE intense_2024_06 fade_tau_0p75 62 68 9.427860e+01 4.411702e-08
   TFADE intense_2024_06 fade_tau_1 29 32 1.106819e+02 2.178811e-08
   TFADE intense_2024_06 fade_tau_1p5 19 20 1.376399e+02 8.862627e-09
   TFADE intense_2024_06 fade_tau_2 19 20 1.613619e+02 5.345894e-09
   TFADE intense_2024_06 fade_tau_3 19 20 2.013850e+02 3.193847e-09
-  wall time: 161 s
+  wall time: 120 s

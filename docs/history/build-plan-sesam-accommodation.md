@@ -1,22 +1,19 @@
 # Build Plan — SESAM Accommodation
 
-Working blueprint for `docs/sesam-accommodation.md`, which wins on conflict.
+Working blueprint for `docs/history/sesam-accommodation.md`, which wins on conflict.
 Status headers are the maintainer's. Archive to `docs/history/` at close.
 
 **Precondition.** Part B of `docs/history/build-plan-earth-radiation.md` is closed
-(shipped in `v0.8.2`, 2026-09-07), so this plan is unblocked. Chunk 3
-below moves Run 5 of the real-world-validation `drag` group far past the
-below-printed-precision leeward-floor artifact that Part B exists to reconcile, so
-closing Part B afterwards conflates two divergences of different character in one
-`--verify` diff.
+(shipped in `v0.8.2`, 2026-09-07), so this plan is unblocked.
 
-**Do not recreate or update the conda env before Chunk 7.** The installed
-`orekit_jpype` is `13.1.4.0` and a fresh env lands `13.1.7.1`, which would put two
-changes in one `--verify` diff.
+**Do not recreate or update the conda env before Chunk 7.** The `jpype1=1.5.*` pin
+holds a fresh env at the installed `orekit_jpype 13.1.4.0`, but a recreate
+re-resolves other builds (Python patch, OpenJDK build), which would put two changes
+in one `--verify` diff.
 
 ---
 
-## Chunk 1 — Port SESAM into the generator
+## Chunk 1 — Port SESAM into the generator - Done
 
 **Goal.** `generate_sphere_cd_table` computes α by SESAM; the anchor machinery is gone.
 
@@ -31,12 +28,16 @@ Evaluate `s_o`'s second numerator term in contract §2's exact form.
 terms for `Cd_sphere(s)` in `P_O`.
 
 **Verify — STOP gate.** A throwaway parity script drives the new `_accommodation`
-and a transcription of ADBSat `accom_SESAM.m` over one shared MSIS case set, the
-transcription driven with ADBSat's own constants, species set and speed convention
-so contract §3 and the constant differences are out of the comparison. Agreement
-below 1e-6 relative, or STOP and report.
+and a transcription of ADBSat `accom_SESAM.m` over one shared MSIS case set, both
+sides on ADBSat's constants and speed with anomalous oxygen zeroed, so contract §3
+and the constant differences are out of the comparison (`_SPECIES` fixes AMU at
+import, so the script patches it or the constants are passed in). Agreement below
+1e-6 relative, or STOP and report.
 
-## Chunk 2 — Mirror into the experiment kernel
+**Record (2026-10-12).** PASS over 4480 MSIS states (α 0.0437–0.9999): max relative
+difference 5.0e-7 on raw float32 pymsis rows, 8.4e-16 with rows cast to float64.
+
+## Chunk 2 — Mirror into the experiment kernel - Done
 
 **Goal.** The generator and the experiment kernel carry one α, so the
 cross-validators keep comparing like with like.
@@ -53,7 +54,7 @@ reconstructions by design.
 
 **Verify.** Generator α and kernel α agree to machine precision on a shared case set.
 
-## Chunk 3 — Regenerate both tables
+## Chunk 3 — Regenerate both tables - Done
 
 **Goal.** New `.npz` at the shipped seed (`20260611`), conditions (80) and axes.
 
@@ -68,7 +69,23 @@ into the chunk record: mean / median / p95 / min / max for the sphere grid, the 
 θ = 0 slice and the box θ = 90 slice. The θ = 90 slice must hold contract §6's
 ≤ 1e-15 relative bound.
 
-## Chunk 4 — Re-measure the cross-validations
+**Run order.** 5a (venv drivers) → 4 → 3 → 5b, so the generator metadata records
+the re-measured cross-validation and collapse figures.
+
+**Record (2026-10-12).** Relative grid deltas vs the tables at `00d40f8`; axes unchanged.
+
+| grid (650 cells) | mean | median | p95 | min | max |
+|---|---:|---:|---:|---:|---:|
+| sphere | −3.81 % | −3.58 % | −0.78 % | −10.33 % | −0.30 % |
+| box θ = 0 | −5.12 % | −4.83 % | −1.15 % | −13.84 % | −0.44 % |
+| box θ = 90 | −2.7e-18 | 0 | 0 | −2.3e-16 | 0 |
+
+§6 all PASS: α > 0 over 4480 sampled states (min 0.0437); new α ≥ old everywhere
+(min gain 7.1e-4); every sphere cell and all 20,800 windward box cells decrease;
+θ = 90 max 2.3e-16 relative; box grid ≥ 0, leeward max |Δ| 6.8e-4; floored cells
+11,325 → 10,937, pre-floor min −5.77e-4 → −5.43e-4.
+
+## Chunk 4 — Re-measure the cross-validations - Done
 
 **Goal.** Both generators' `CROSS_VALIDATION_MAX_REL_PCT` describe the shipped tables.
 
@@ -77,7 +94,7 @@ update the two constants and the two `_results.txt`.
 
 **Verify.** Both agree ≪ 1 %; each constant equals its results file.
 
-## Chunk 5 — Regenerate the Tier A / Tier B evidence
+## Chunk 5 — Regenerate the Tier A / Tier B evidence - Done
 
 **Goal.** `experiments/drag-coefficient-verification/` matches the shipped tables.
 
@@ -95,7 +112,7 @@ so its Tier B GO-with-caveat verdict is re-derived, not carried. Only `kn_floor*
 carries no α dependence (`kn_floor.py` imports only `SPECIES`) — confirm that by
 inspection rather than assuming it.
 
-## Chunk 6 — Re-run the ECEF feather benefit
+## Chunk 6 — Re-run the ECEF feather benefit - Done
 
 **Goal.** `experiments/ecef-attitude-benefit/` matches the shipped table.
 
@@ -104,8 +121,10 @@ inspection rather than assuming it.
 **Verify.** Measure, do not predict: both legs fly the same table, so the ratio may
 barely move while the absolute along-track figure does. Whatever moves, the
 `features.md` §1.1 Tier B paragraph must be restated from this run.
+Restate the same paragraph's Sun-pointing "< 1 %" claim from
+`cd_box_benefit_study_results.txt` (now 1.12 % final).
 
-## Chunk 7 — Regenerate the two studies' α-dependent evidence
+## Chunk 7 — Regenerate the two studies' α-dependent evidence - Done
 
 **Goal.** `run_all.py --verify` is green in both studies (contract §8).
 
@@ -113,20 +132,38 @@ barely move while the absolute along-track figure does. Whatever moves, the
 table:
 
 - `experiments/extended-validation/` — `--only noise`, `drag_01..10`,
-  `swarm_01..10`, then `drag_summary` (~9.7 h, from the committed wall-time lines).
+  `swarm_01..10`, then `drag_summary` (~9.7 h, from the committed wall-time lines);
+  then `tle_01..10`, `tle_summary`, `tle_bench` (~19 min; their `state_sphere` /
+  `state_box` rows fly the tables).
 - `experiments/real-world-validation/` — `--only drag,state-path` (~1 h).
 
 **Reuse.** Each study's `run_all.py`; per-group `--only` is its documented default.
 
-**Do not touch.** extended-validation `screen`, `tle_01..10`, `tle_summary`,
-`tle_bench`; real-world-validation `lageos`, `fit`, `sweep` — their drivers
-reference no table, so Part 3's TLE evidence and the playbook stand unchanged.
+**Do not touch.** extended-validation `screen`; real-world-validation `lageos`,
+`fit`, `sweep` — their drivers reference no table. The playbook's recipe stands: the
+bench verdicts never read the `state_*` rows.
 
 **Verify.** `--verify` clean on every regenerated group and still clean on the
-untouched ones. Read the ten-window sphere-vs-`Cd = 2.3` outcome against contract
-§8's pre-registered reading **before** writing any document.
+untouched ones, apart from extended-validation's unmasked `[versions]` stamp line.
+Read the ten-window sphere-vs-`Cd = 2.3` outcome against contract §8's
+pre-registered reading **before** writing any document.
 
-## Chunk 8 — Tests
+**Record (2026-10-13).** Every regenerated file moved only table-fed rows; baseline
+`--verify` clean on the untouched groups (`screen` bar its `[versions]` line), spot-check
+`--verify` clean on rwv `drag` and extval `tle_01` at `42ea058`.
+
+- §8 trigger **not fired**: the sphere still beats `Cd = 2.3` on day 1 of every storm
+  window (`storm_2026_01` day-1 ratio 0.54 → 0.30), but its lead narrowed in
+  `moderate_2022_04`, `storm_2024_08`, `intense_2024_11`, `storm_2025_05`,
+  `moderate_2025_07` (day-1 ratio ~0.4–0.7 → 0.71–0.86).
+- Same split everywhere: sphere better in low windows, worse once drag is active; box
+  better in every window and leg.
+- Checkpoint B re-read unchanged — the scaled box still collapses onto Run 3 in all
+  four rwv windows.
+- Table-noise still 12/12 HIT.
+- Swarm `window_03` wall-time lines read ~7.5 h (machine sleep); numbers unaffected.
+
+## Chunk 8 — Tests - Done
 
 **Goal.** Suite green, pins honest.
 
@@ -138,9 +175,11 @@ Cd raises the residual toward its 400 m ceiling), and `FACE_SUM_BAND_M2` in
 `tests/propagation/test_real_world_gracefo.py`. `test_numerical.py` (1163, 1294) and
 `test_public_surface.py` (137) are structural — confirm rather than re-pin. Re-pin
 only against Chunk 7's measured values, keeping the repo's
-measured-times-generous-margin policy.
+measured-times-generous-margin policy. Both bounds are expected to hold; their
+"measured" comments (34.7 m / 0.544; 227.7 / 233.0 m) are stale and need re-measuring
+at the tests' 600 s cadence.
 
-## Chunk 9 — Documents
+## Chunk 9 — Documents - Done
 
 **Goal.** No document still claims the α = 0.90 anchor, and every table-derived
 number is Chunk 7's.
@@ -151,11 +190,15 @@ number is Chunk 7's.
   the addendum's "α = 0.90 reconciled in *both* `cd_core.calibrate_K` and
   `ANCHOR_ALPHA`" requirement is retired by Chunk 1 deleting both. **`docs/history/`
   is not edited** — the archive records what was true then.
+- `docs/architecture.md` — the §5 cross-validation figure (0.0191 %).
 - `src/propygator/propagation/spacecraft.py` — the `BoxFaceCd.default()` docstring
   names the anchor; a shipped public docstring, so it is not optional. No API or
   behaviour change.
 - `docs/validation-findings.md` — the table-derived numbers in §1–8 and §9–17,
-  restated from Chunk 7 (contract §8).
+  restated from Chunk 7 (contract §8), including §14's state-path rows and the
+  Checkpoint B "absorbable scale" reading; the sphere-leads headline stands but with
+  Chunk 7's narrower margins, and the active/storm sphere Cd (2.49 / 2.37) now sits
+  below the withdrawn "DSMC band" floor that `run_gracefo.py` still prints.
 - `experiments/real-world-validation/README.md` — retire the "Expected — do not
   regenerate" bullet and mark the `v0.8.2` leeward-floor `--verify` narrative
   historical (contract §8).
@@ -166,17 +209,44 @@ number is Chunk 7's.
   sphere-vs-`Cd = 2.3` headline.
 - `notebooks/00_showcase.ipynb` and `07_tle_fitting.ipynb` §9 — hand-transcribed
   validation numbers, updated by hand per CLAUDE.md.
+- `scripts/generate_box_face_cd_table.py` — the "Leeward floor" docstring counts,
+  restated from Chunk 3's `leeward_floor` metadata.
 - `CLAUDE.md` as-built notes.
 
-**Verify.** From the repo root,
-`grep -rn "ANCHOR_ALPHA\|anchored .* 0\.90\|alpha = 0\.90\|SESAM α\|α anchor" README.md CLAUDE.md docs/ data/ notebooks/ scripts/ src/ tests/ experiments/ --include=*.md --include=*.py --include=*.ipynb --include=*.txt`
-returns nothing stale.
+**Verify.** Two sweeps from the repo root in Git Bash. The second doubles as this
+chunk's work list: run it first, then again at the end.
+
+1. Anchor sweep — returns nothing stale:
+   ```
+   grep -rnE "ANCHOR_ALPHA|anchor_alpha|calibrate_K|Langmuir[- ]K\b|SESAM-style|anchored .*0\.90|(alpha|α) ?= ?0\.90|α anchor" \
+     README.md CLAUDE.md docs/ data/ notebooks/ scripts/ src/ tests/ experiments/ \
+     --include=*.md --include=*.py --include=*.ipynb --include=*.txt \
+     --exclude-dir=history --exclude-dir=.venv-experiments \
+     --exclude=sesam-accommodation.md --exclude=build-plan-sesam-accommodation.md
+   ```
+2. Moved-number sweep — numbers that left any results file, plus their roundings,
+   searched in the prose docs; every final hit is a coincidence recorded in the
+   chunk record (on the `v0.8.2` diff it caught all six number lines that release
+   edited):
+   ```
+   git diff -U0 main -- 'experiments/*results*.txt' > /tmp/d.txt
+   grep '^-[^-]' /tmp/d.txt | grep -oE '[0-9]+\.[0-9]+' | sort -u > /tmp/old.txt
+   grep '^+[^+]' /tmp/d.txt | grep -oE '[0-9]+\.[0-9]+' | sort -u > /tmp/new.txt
+   comm -23 /tmp/old.txt /tmp/new.txt \
+     | awk -F. '{for(d=length($2);d>=1;d--){t=sprintf("%.*f",d,$0); if(length(t)>=4) print t}}' \
+     | sort -u > /tmp/moved.txt
+   [ -s /tmp/moved.txt ] && git grep -nwF -f /tmp/moved.txt -- README.md CLAUDE.md data/README.md docs/features.md docs/architecture.md \
+     docs/validation-findings.md docs/tle-fitting-playbook-updated.md \
+     'notebooks/0[07]_*.ipynb' 'experiments/*README.md'
+   ```
 
 ## Chunk 10 — Close
 
 **Goal.** Plan and contract archived.
 
-**Create/Edit.** Move both documents to `docs/history/`.
+**Create/Edit.** Move both documents to `docs/history/`, and repoint every live
+`docs/sesam-accommodation.md` reference (`git grep`) to the archived path.
 
-**Verify.** CHANGELOG entry, version bump and release are the maintainer's;
-`v0.7.3` is the precedent for a table-regeneration patch.
+**Verify.** CHANGELOG entry, version bump and release are the maintainer's. Minor
+bump (`v0.9.0`), not a `v0.7.3`-style patch: every default-table drag value moves
+(Chunk 3 records by how much).

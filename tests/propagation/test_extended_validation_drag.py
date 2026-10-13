@@ -20,8 +20,8 @@ Fixture: day-1 truth PV at 600 s cadence (145 samples), emitted by
 
 Measured here (600 s cadence; the committed 60 s-cadence study values in
 brackets, ``gracefo/results_drag/window_10_storm_2026_01.txt``): drag off
-547.5 m [545.3], Cd=2.3 63.8 m [63.2], sphere table 34.7 m [34.3] -- the same
-ordering, well inside the margins below.
+547.5 m [545.3], Cd=2.3 63.8 m [63.2], sphere table 19.1 m [19.1] -- the same
+ordering, well inside the margins below (SESAM tables, 2026-10-13).
 """
 
 from __future__ import annotations
@@ -349,9 +349,9 @@ CD_NOMINAL = 2.3
 # results_drag/window_10_storm_2026_01.txt: "dry 569.914 + gas = 595.844 kg".
 MASS_KG = 595.844
 
-# Measured (600 s cadence): drag off 547.5 m, Cd=2.3 63.8 m, sphere 34.7 m.
+# Measured (600 s cadence): drag off 547.5 m, Cd=2.3 63.8 m, sphere 19.1 m.
 DRAG_OFF_BAND_M = (300.0, 900.0)
-# Measured cd23/drag_off ~ 0.116, sphere/cd23 ~ 0.544. Wide margins on both.
+# Measured cd23/drag_off ~ 0.116, sphere/cd23 ~ 0.299. Wide margins on both.
 CD23_RATIO_BOUND = 0.3
 SPHERE_RATIO_BOUND = 0.9
 

@@ -12,7 +12,8 @@
 > kept as two that have to be read together. Nothing here amends a shipped
 > contract — where either study touched shipped behavior, the outcome was
 > either "validated as documented" or a named fix chunk (Chunk 5, §8; the
-> extended-validation study's own follow-ons are §17).
+> extended-validation study's own follow-ons are §17). Table-derived numbers
+> in both studies were restated 2026-10-13 from the SESAM-table regeneration.
 
 ## 1. Why this study exists
 
@@ -104,8 +105,8 @@ CSSI space weather). Along-track RMS (m), the drag-dominated component:
 | Run 2 — drag on, Cd 2.3 | 6.0 | 343.7 | 1664.9 | 341.2 |
 | Run 3 — scalar Cd fit | **1.9** | **6.4** | **119.0** | 27.4 |
 | fitted Cd (A = 1 m²) | 2.03 | 3.40 | 4.08 | 1.78 ⚠ artifact |
-| Run 4 — sphere table, no fit | 20.9 | 210.6 | 1418.2 | 545.9 |
-| Run 5 — box table, no fit (IPT-ecef) | 55.0 | 222.2 | 155.6 | 1450.9 |
+| Run 4 — sphere table, no fit | 17.1 | 273.7 | 1545.6 | 441.0 |
+| Run 5 — box table, no fit (IPT-ecef) | 49.3 | 127.1 | 315.7 | 1293.4 |
 
 **The pipeline is proven; the remainder is density.** Run 1 clears the
 conservative floor by 11× (quiet) to 953× (storm) — the drag signal scales
@@ -131,36 +132,36 @@ independent DSMC results; detail in
 `experiments/real-world-validation/gracefo/README.md` "DSMC band correction."
 
 **The a-priori Cd tables are physically credible — and density-limited by
-construction.** With no reference Cd supplied, on A_ram: sphere table 2.92 /
-2.70 / 2.51, box table 4.42 / 4.06 / 3.88 (quiet/active/storm) — the sphere at
-the DSMC band's low edge, the box inside it (its larger Cd is the edge-on skin
-friction a sphere structurally cannot see — more complete, not over-drag).
+construction.** With no reference Cd supplied, on A_ram: sphere table 2.75 /
+2.49 / 2.37, box table 4.17 / 3.75 / 3.67 (quiet/active/storm) — the sphere
+around the DSMC band's low edge (active/storm below it), the box inside it
+(its larger Cd is the edge-on skin friction a sphere structurally cannot see
+— more complete, not over-drag).
 **DSMC band correction (2026-08-24):** see the note above — this "low edge"
 read rests on the same withdrawn citation. An orbit residual constrains only
 ρ·Cd·A, so the no-fit runs expose the *window's density bias through the
 table*, never the table alone:
 
 - **The storm sign test resolved H1.** The box table's share of the fitted
-  product ran 2.23× → 1.21× → **0.97×** (quiet → active → storm): its
+  product ran 2.10× → 1.12× → **0.92×** (quiet → active → storm): its
   persistent over-prediction in the first two windows was NRLMSISE density
   bias, not geometric over-drag — the curves cross at the storm.
 - **The Run 4 vs Run 5 ranking is set by the window, not table fidelity**
   (the error-cancellation caveat, demonstrated in both directions): quiet,
-  the sphere's too-low Cd partially cancels the hot density model and "wins"
-  (20.9 vs 55.0 m); storm-peak, the box nearly matches the *fitted* run
-  (155.6 vs 119.0 m) and beats the sphere 9×. Never read Run 4 < Run 5 as a
-  table ranking.
+  the sphere's lower Cd partially cancels the hot density model and "wins"
+  (17.1 vs 49.3 m); active and storm-peak, the box wins (127.1 vs 273.7 m;
+  315.7 vs 1545.6 m). Never read Run 4 < Run 5 as a table ranking.
 - **The box adds only absorbable scale for this ram-dominated body:** scaling
   its Cd·A onto the fitted product collapses Run 5 onto Run 3 in every window
-  (1.85 vs 1.86 m; 6.45 vs 6.36 m; 118.7 vs 119.0 m) — the direct Checkpoint-B
+  (1.84 vs 1.86 m; 6.45 vs 6.36 m; 118.8 vs 119.0 m) — the direct Checkpoint-B
   evidence behind **deferring the `box_and_panels` geometry upgrade** (its
   non-absorbable payoff is the edge-on sail regime GRACE doesn't exercise).
-  The +0.33 m length-corrected box moves the residual by ≪ the density
-  confound (geometry-insensitive, density-limited).
+  The +0.33 m length-corrected box moves the residual by less than the
+  density confound (geometry-insensitive, density-limited).
 - **The axis convention is proven live:** the wired +Y-on-wind face-sum
-  (4.54 / 4.17 / 3.98 m² per window) is far below the wrong-axis mappings
-  (~8–14 m²), and the predicted-vs-realized signed along-track at 24 h agrees
-  to 2–11 % — the realized drag matches the hand-summed face table.
+  (4.28 / 3.85 / 3.77 m² per window) is far below the wrong-axis mappings
+  (~7–13 m²), and the predicted-vs-realized signed along-track at 24 h agrees
+  to 2–12 % — the realized drag matches the hand-summed face table.
 
 **Storm findings (Chunk 2c).** A scalar Cd cannot absorb an hour-scale
 time-varying density bias: the storm-peak Run 3 lands at **119 m** vs the
@@ -239,8 +240,8 @@ twin differing only in reference source (+3 d 3D RMS, m):
 | Trajectory path (truth) | 4,493 | 2,072 |
 | State path, Cd 2.3 nominal | 4,954 | 15,285 |
 | State path, calibrated Cd (Run 3) | 4,681 | **1,147** |
-| State/external, sphere table | 5,632 / 5,630 | 9,484 / 9,484 |
-| external, box table (IPT-ecef) | 7,172 | 9,284 |
+| State/external, sphere table | 5,450 / 5,448 | 12,213 / 12,215 |
+| external, box table (IPT-ecef) | 6,916 | 5,226 |
 
 **The State path is free iff the ballistic coefficient is calibrated.** Quiet:
 +4–10 % (reference drift drowns under SGP4 noise). Active with the calibrated
@@ -258,11 +259,12 @@ truth reference.
 
 **A-priori-table rows (elected):** the no-truth persona's calibration source
 is the shipped tables — and they are *not* "calibrated" in the State-path
-sense. Active: sphere/box land ~4.5× the twin, exactly as their ±20 % product
-errors predict; the transfer is ~linear (**~0.4–0.5 km of +3 d error per % of
-ρ·Cd·A error at solar max; ~20–25 m/% quiet**), so the State path needs a
-**single-digit-% ballistic coefficient** — a bar the tables' density confound
-(±20 % at solar max, ×1.5–2.2 in deep minimum) structurally cannot meet. They
+sense. Active: sphere/box land 5.9× / 2.5× the twin, in step with their
+−26 % / +12 % product errors; the transfer is ~linear (**~0.34–0.44 km of +3 d
+error per % of ρ·Cd·A error at solar max; ~20–25 m/% quiet**), so the State
+path needs a **single-digit-% ballistic coefficient** — a bar the tables'
+density confound (−26 % / +12 % at solar max, ×1.4–2.1 in deep minimum)
+structurally cannot meet. They
 buy physical plausibility, not calibration. Two shipped-surface facts fell out:
 the **native-State-path ≡ external propagate-then-fit equivalence is now
 measured on real data** (every column ≤ 1.9 m, B\* to 2e-8), which validates
@@ -291,8 +293,8 @@ runtimes in parentheses):
   RMS inside a wide signal band (200–5,000 m; measured 1,058) and drag-on
   < 0.6× drag-off (measured 0.325) — relationships, not absolute meters; plus
   the JVM-free **box face-sum axis pin** at fixed table inputs (wired
-  +Y-on-wind mapping smallest, 4.18 m² vs 13.0/8.2 — independent of
-  orekit-data, and the Chunk 5 leeward floor moves it ~1e-7).
+  +Y-on-wind mapping smallest, 3.85 m² vs 11.7/7.4 on the SESAM table —
+  independent of orekit-data).
 - `tests/tle/test_fitter_real_world.py` (≈ 2 s) — the fit converges on the
   pinned measured day (145 PV samples); post-fit RMS < 1,500 m (measured
   ~630); identity + epoch policy hold.
@@ -315,7 +317,7 @@ the margin costs nothing). The pins prove "the wiring didn't regress", not
   Cd·A/m, so this is by design); the box run is the base-averaged rectangle
   (ram area exact, wetted side −9.5 % → ~2 % of Cd·A).
 - **The Run 4 < Run 5 quiet-window ordering is error cancellation, not table
-  fidelity** (§4) — reversed at storm peak.
+  fidelity** (§4) — reversed in the active and storm-peak windows.
 - **A fitted B\* is a fit residual**, not the catalog value nor a physical
   ballistic coefficient (§1.2's documented behavior, now shown on reality).
 - **One-week/one-day arcs per window:** the numbers characterize these arcs;
@@ -516,12 +518,12 @@ table). Four C/D ratios on 3D RMS:
 
 | window | `Cd_fit` | `RMS_Cd_fit` | `RMS_sphere` | `RMS_box` |
 |---|---|---|---|---|
-| `quiet_2019` | +1.15% | +0.79% | −2.09% | −0.91% |
-| `active_2023` | −0.53% | −6.55% | −2.38% | +2.52% |
-| `storm_2024` | −0.56% | −0.92% | −1.36% | +0.77% |
+| `quiet_2019` | +1.15% | +0.79% | −2.68% | −1.03% |
+| `active_2023` | −0.53% | −6.55% | −1.75% | +3.90% |
+| `storm_2024` | −0.56% | −0.92% | −1.24% | −8.08% |
 
 **12/12 HIT.** Every ratio clears its bar with margin — worst departure
-6.55% against a 20% bar (`RMS_Cd_fit`, active); the twin Cd ratio worst
+8.08% against a 20% bar (`RMS_box`, storm); the twin Cd ratio worst
 1.15% against a 10% bar. Both maneuver screens CLEAN on all six
 satellite-windows. Full breakdown (radial/along/cross) in
 `gracefo/results_table_noise.txt`.
@@ -544,28 +546,26 @@ benchmark**; the contract states an expectation, not a requirement, and the
 bug-hunt trigger is an *inversion* — a table run losing badly where drag is
 strong. That trigger **did not fire.**
 
-**The pattern.** In the low-activity windows (1–3) the naive `Cd = 2.3`
-performs best and the sphere table trails it; window 3, the most active of
-the three, already favors the tables. From moderate activity on (4–10) the
-sphere table generally leads and beats `Cd = 2.3`. The **box table is the
-worst performer nearly everywhere** — negative removed fraction (worse than
-drag off) in windows 1–2 on all three satellites, and rarely close to the
-sphere table when drag is strong; where it does edge the sphere table the
-win is small, with window 4 the one standout. Day-1 removed fraction of the
-drag-off signal, GRACE-FO C (`Cd=2.3` / sphere / box):
+**The pattern.** In the low-activity windows (1–3) the naive `Cd = 2.3` may
+be slightly better than the sphere table. From moderate activity on (4–10)
+the sphere table generally beats `Cd = 2.3`, by narrower margins since the
+SESAM regeneration. The **box table mostly trails** — worse than drag off
+in windows 1–2 on all three satellites, behind the sphere in the intense and
+storm windows, though it may do better in the moderate ones. Day-1 removed
+fraction of the drag-off signal, GRACE-FO C (`Cd=2.3` / sphere / box):
 
 | # | window | band | removed fraction | fitted Cd (B = Cd·A/m) |
 |---|---|---|---|---|
-| 1 | `low_2019_12` | low | 82 / 49 / −36% | 1.797 (3.00e−3) |
-| 2 | `low_2021_04` | low | 87 / 56 / −25% | 2.500 (4.17e−3) |
-| 3 | `low_2021_06` | low | 74 / 94 / 50% | 2.661 (4.44e−3) |
-| 4 | `moderate_2022_04` | moderate | 57 / 69 / 92% | 3.610 (6.03e−3) |
-| 5 | `intense_2024_06` | intense | 90 / 96 / 36% | 2.460 (4.13e−3) |
-| 6 | `storm_2024_08` | storm | 83 / 92 / 52% | 2.991 (5.02e−3) |
-| 7 | `intense_2024_11` | intense | 78 / 88 / 59% | 2.865 (4.81e−3) |
-| 8 | `storm_2025_05` | storm | 78 / 91 / 57% | 2.992 (5.03e−3) |
-| 9 | `moderate_2025_07` | moderate | 65 / 77 / 80% | 3.289 (5.53e−3) |
-| 10 | `storm_2026_01` | storm | 88 / 94 / 35% | 2.308 (3.88e−3) |
+| 1 | `low_2019_12` | low | 82 / 58 / −21% | 1.797 (3.00e−3) |
+| 2 | `low_2021_04` | low | 87 / 66 / −9% | 2.500 (4.17e−3) |
+| 3 | `low_2021_06` | low | 74 / 88 / 59% | 2.661 (4.44e−3) |
+| 4 | `moderate_2022_04` | moderate | 57 / 63 / 99% | 3.610 (6.03e−3) |
+| 5 | `intense_2024_06` | intense | 90 / 96 / 47% | 2.460 (4.13e−3) |
+| 6 | `storm_2024_08` | storm | 83 / 86 / 60% | 2.991 (5.02e−3) |
+| 7 | `intense_2024_11` | intense | 78 / 82 / 68% | 2.865 (4.81e−3) |
+| 8 | `storm_2025_05` | storm | 78 / 84 / 67% | 2.992 (5.03e−3) |
+| 9 | `moderate_2025_07` | moderate | 65 / 71 / 89% | 3.289 (5.53e−3) |
+| 10 | `storm_2026_01` | storm | 88 / 96 / 48% | 2.308 (3.88e−3) |
 
 Full per-day, per-satellite tables (including Swarm A/B) in
 `gracefo/results_drag/`, `swarm/results_drag/`, and the cross-window parse
@@ -656,8 +656,8 @@ recency-weighted axis that naturally pairs with short τ was not measured
 amendment would have to raise that ceiling to clear it.
 
 **State-path rows** (2-day arc, sphere/box table references, matching
-`naive_2d`'s span): forecast degradation tracks the reference's own drift
-from truth roughly linearly, as §5's single-window result predicted — the
+`naive_2d`'s span): forecast degradation broadly grows with the reference's
+own drift from truth, as §5's single-window result predicted — the
 a-priori tables cannot meet §1.2's single-digit-percent calibration bar.
 Full drift-vs-degradation table in `results_tle_adjudication.txt`
 `[also-recorded]`.

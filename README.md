@@ -239,9 +239,9 @@ misconception with the code's own tests:
   residual to **1.9–6.4 m/day** (calm conditions); the remainder is
   thermospheric-density uncertainty, quantified. Extended to ten GRACE-FO
   windows plus Swarm A/B as a limited-information stress case: **no single
-  a-priori Cd model wins everywhere** — a per-face drag table leads once
-  drag is active, a naive constant `Cd = 2.3` wins in quiet conditions, and
-  a box-shape table trails almost everywhere.
+  a-priori Cd model wins everywhere** — a sphere drag table generally leads
+  once drag is active, a naive constant `Cd = 2.3` may be slightly better in
+  quiet conditions, and a box-shape table mostly trails.
 - **TLE fitter** — fits measured GRACE-FO truth at ~630 m RMS and predicts at
   **operational-catalog parity** (0.8–2.1× the Space-Track TLE over +3 days).
   A single fitting recipe (2-day free-B\* fit, transplanted onto a fresh

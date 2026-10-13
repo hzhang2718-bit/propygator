@@ -1,9 +1,10 @@
 # SESAM Accommodation — Contract
 
-**Status:** proposed, not built. Binding for the energy-accommodation model shared
-by `data/sphere_cd_default.npz` and `data/box_face_cd_default.npz`. Wins over
-`docs/build-plan-sesam-accommodation.md` on conflict; `features.md` and
-`architecture.md` win over both. Archive to `docs/history/` at close.
+**Status:** built (`feature/sesam-accommodation`, 2026-10-13, `v0.9.0`); archived.
+Binding for the energy-accommodation model shared by
+`data/sphere_cd_default.npz` and `data/box_face_cd_default.npz`. Wins over
+`docs/history/build-plan-sesam-accommodation.md` on conflict; `features.md` and
+`architecture.md` win over both.
 
 ## 1. Defect
 
@@ -36,8 +37,8 @@ s_o         = ( sqrt(pi*k*T_ab*E_r) * (erf((sqrt(E_b)-sqrt(E_r))/sqrt(k*T_ab))
 
 `Cd_sphere(s)` is the existing incident-only sphere form already in
 `_sphere_cd_species`; `m_bar` is the number-weighted mean molecular mass over the
-same seven `_SPECIES`, anomalous oxygen excluded (ADBSat `environment.m`'s
-default); `s` is the bulk speed ratio on `m_bar`.
+same seven `_SPECIES` (anomalous oxygen excluded, §3); `s` is the bulk speed ratio
+on `m_bar`.
 
 | symbol | value |
 |---|---|
@@ -47,21 +48,28 @@ default); `s` is the bulk speed ratio on `m_bar`.
 | `T_ab` transition temperature | 93.31 K |
 | `K_Lo` / `K_Lf` | 5e6 / 3e4 torr^-1 |
 
-`s_o`'s second numerator term underflows to `0` below ~4.15 km/s and to `NaN`
-above it, so evaluate it as the exact equivalent `k*T_ab * (exp(-E_r/(k*T_ab)) -
+As published, `s_o`'s second numerator term underflows to `0` below ~4.15 km/s and
+to `NaN` above it (ADBSat's `realmax` clamp returns `0`), so evaluate it as the
+exact equivalent `k*T_ab * (exp(-E_r/(k*T_ab)) -
 exp(-(sqrt(E_b)-sqrt(E_r))^2/(k*T_ab)))`.
 
 The model has no free parameter, so `ANCHOR_ALPHA` and
 `_calibrate_accommodation_K` are deleted rather than retuned.
 
-SESAM is published for spherical and randomly tumbling objects; applying its α per
-flat face at arbitrary incidence follows ADBSat and is an extension of the paper.
+SESAM is published for spherical and randomly tumbling objects (K_s = 2.4 is Goodman
+averaged over a hemisphere, Eq. 19); applying its α per flat face at arbitrary
+incidence follows ADBSat and is an extension of the paper. SESAM is calibrated on
+110 to ~500 km data; above that the tables extrapolate toward `alpha_clean`.
 
-## 3. Deliberate deviation from ADBSat
+## 3. Deliberate deviations from ADBSat
 
-SESAM is driven by propygator's `_relative_speed` (co-rotation subtracted), not
-ADBSat's `sqrt(mu/(R_E+h))`. Recorded so the port is not later read as a
-transcription error.
+- SESAM is driven by propygator's `_relative_speed` (co-rotation subtracted), not
+  ADBSat's `sqrt(mu/(R_E+h))`, matching the paper's co-rotating V_r (Eqs. 3, 14).
+- `m_bar` excludes anomalous oxygen, matching the seven-species Cd weighting;
+  `accom_SESAM.m` computes its own `m_bar` including `rho(9)`, which MATLAB's
+  `'NoOxygen'` flag does not zero.
+
+Recorded so neither is later read as a transcription error.
 
 ## 4. What does not change
 
@@ -102,10 +110,10 @@ plan's Chunk 3 measures and records them.
 ## 7. Acceptance
 
 - The port reproduces a transcription of ADBSat `accom_SESAM.m` α to better than
-  1e-6 relative on a shared case set, the transcription driven with ADBSat's own
-  constants, species set and speed convention so §3 and the constant differences
-  are not in the comparison, and carrying §2's exact `s_o` term because the
-  published one cannot be evaluated in double precision.
+  1e-6 relative on a shared case set, both sides driven with ADBSat's constants and
+  speed convention and with anomalous oxygen zeroed, so §3 and the constant
+  differences are not in the comparison; the transcription carries §2's exact `s_o`
+  term because the published one cannot be evaluated in double precision.
 - Generator and experiment-kernel α agree to machine precision.
 - Both cross-validators pass at ≪ 1 %.
 - `pre-commit run --all-files` and the full suite green.
@@ -118,14 +126,18 @@ Only the groups whose drivers load a table are re-run:
 
 | study | regenerate | leave untouched |
 |---|---|---|
-| extended-validation | `noise`, `drag_01..10`, `swarm_01..10`, `drag_summary` | `screen`, `tle_01..10`, `tle_summary`, `tle_bench` |
+| extended-validation | `noise`, `drag_01..10`, `swarm_01..10`, `drag_summary`, `tle_01..10`, `tle_summary`, `tle_bench` | `screen` |
 | real-world-validation | `drag`, `state-path` | `lageos`, `fit`, `sweep` |
 
 The untouched groups' drivers reference no table — in `run_fit_vs_catalog.py` the
-tables are reached only inside `_run_state_path`. Within a regenerated file only the
-a-priori-table rows move; the drag-off and fitted-Cd rows carry no α. The
-table-derived numbers in `docs/validation-findings.md` §1–8 and §9–17 are restated
-from the re-run, the "Expected — do not regenerate" bullet in
+tables are reached only inside `_run_state_path`; the `tle_*` groups reach them
+through `tle_fit_common.state_reference` (the `state_sphere` / `state_box` rows).
+Within a regenerated file the drag-off, fitted-Cd, catalog and Trajectory-path rows
+carry no α; everything a table feeds is restated from the run, including
+real-world-validation's `[verify 4]` / `[verify 5]` box runs, so Checkpoint B's
+"absorbable scale" reading is re-read, not carried. The table-derived numbers in
+`docs/validation-findings.md` §1–8 and §9–17 are restated from the re-run, the
+"Expected — do not regenerate" bullet in
 `experiments/real-world-validation/README.md` is retired, and that README's `v0.8.2`
 leeward-floor `--verify` narrative becomes historical.
 
@@ -133,15 +145,14 @@ leeward-floor `--verify` narrative becomes historical.
 `Cd = 2.3` in the storm window, that is a finding, not a regression: restate §9–17,
 both experiment READMEs, the root `README.md` and `notebooks/00_showcase.ipynb`, and
 re-pin `SPHERE_RATIO_BOUND` to the measured relationship. Recorded before the run so
-the outcome is not chosen after seeing it. A narrowed margin rather than a reversal
-is the expected shape; either way the reading is §1–8's measured NRLMSISE-00
-density-bias lever — the a-priori Cd was partly standing in for a density deficit —
-not a defect in the port.
+the outcome is not chosen after seeing it. The reading is §1–8's measured
+NRLMSISE-00 density-bias lever — the a-priori Cd was partly standing in for a
+density deficit — not a defect in the port.
 
 ## 9. Out of scope
 
-The reflected-velocity branch (Moe/Mehta 2/3 vs Koppenwallner 1/2 — both
-published; ADBSat carries ours commented out as "Mehta DRIA Flat Plate");
+The reflected-velocity branch: SESAM is fitted with the 2/3 form (Pilinski et al.
+2013 Eqs. 10–11), so it stays; ADBSat's active 1/2 form would mismatch SESAM's α;
 anomalous oxygen in the weighting; a per-species `alpha_clean` (SESAM's `K_s` and
 `m_s` are fitted to the bulk `m_bar` convention, so per-species `mu` would void the
 calibration); the lift/side-force component the runtime discards; any axis, geometry
@@ -149,7 +160,11 @@ or API change.
 
 ## 10. Provenance
 
+Pilinski, Argrow, Palo & Bowman 2013 (doi:10.2514/1.A32348), read 2026-10-11; filed
+gitignored at `experiments/extended-validation/data/reference/`.
+
 ADBSat (GPLv3, University of Manchester), `github.com/nhcrisp/ADBSat` @ `master`,
-read 2026-09-07. Files consulted: `fmf_eq/coeff_DRIA.m`, `fmf_eq/coeff_sentman.m`,
+read 2026-09-07; `accom_SESAM.m` re-checked 2026-10-11. Files consulted:
+`fmf_eq/coeff_DRIA.m`, `fmf_eq/coeff_sentman.m`,
 `calc/calc_coeff.m`, `calc/environment.m`, `calc/ADBSatConstants.m`,
 `accom_models/accom_SESAM.m`, `accom_models/accom_goodman.m`.

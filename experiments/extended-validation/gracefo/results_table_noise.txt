@@ -2,7 +2,7 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
 ==============================================================================
 === window quiet_2019, 3 days loaded, 1-day arc ===
 ==============================================================================
-[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[versions] propygator 0.8.2, orekit_jpype 13.1.4.0, numpy 2.4.6
 [data root] experiments/real-world-validation/data/gracefo  (frozen v0.7.2 tree, read in place)
 [convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
   A_ref = 1.0013468 m^2 = Table 5 front panel 0.9551567 + boom 0.0461901 (boom folded into the ram face)
@@ -48,24 +48,24 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
   C: |dr| = 4.172e-09 m, |dv| = 7.290e-12 m/s (bound 5e-08 m)
   D: |dr| = 4.268e-09 m, |dv| = 5.225e-12 m/s (bound 5e-08 m)
 [screen tier-2 deg-5]  drag-on Cd = 2.3 over the 3-day load, so both gates cover the same span
-  C: signal 187.2 m, departure 6.7 m (3.6%) -> CLEAN  (15 s wall)
-  D: signal 191.8 m, departure 6.7 m (3.5%) -> CLEAN  (14 s wall)
+  C: signal 187.2 m, departure 6.7 m (3.6%) -> CLEAN  (22 s wall)
+  D: signal 191.8 m, departure 6.7 m (3.5%) -> CLEAN  (21 s wall)
 [C]  GRACE-FO 1 (GRACE C), mass 600.442 kg
   Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
     fitted Cd = 2.03393 on A_ref = 1.0013468 m^2, B = Cd*A/m = 3.391949e-03 m^2/kg
-    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (109 s wall)
-    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 7 s wall
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (132 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 4 s wall, sphere table 4 s wall, box table (IPT) 6 s wall
 [D]  GRACE-FO 2 (GRACE D), mass 600.449 kg
   Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
     fitted Cd = 2.01081 on A_ref = 1.0013468 m^2, B = Cd*A/m = 3.353347e-03 m^2/kg
-    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (229 s wall)
-    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 7 s wall
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (92 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 4 s wall, sphere table 4 s wall, box table (IPT) 6 s wall
 [ratios]  the four contract metrics, C/D, on 3D RMS
   metric                               C/D       dev     bar   verdict
   Cd_fit(C)/Cd_fit(D)              1.01150    +1.15%    10%   HIT
   RMS_Cd_fit(C)/RMS_Cd_fit(D)      1.00791    +0.79%    20%   HIT
-  RMS_sphere(C)/RMS_sphere(D)      0.97915    -2.09%    20%   HIT
-  RMS_box(C)/RMS_box(D)            0.99086    -0.91%    20%   HIT
+  RMS_sphere(C)/RMS_sphere(D)      0.97319    -2.68%    20%   HIT
+  RMS_box(C)/RMS_box(D)            0.98971    -1.03%    20%   HIT
   shared-mass form of the Cd ratio: 1.01151 (+1.15%) -- the per-satellite ratio above divided by the C/D mass ratio 0.999988, which is the whole of the difference between the two forms
   A non-zero deviation is expected physics, not only noise: the twins fly a 180 deg relative yaw that puts opposite ends of the same tapered bus into the wind, but the box's +/-Y faces are equal-area, so that yaw is invisible to InPlaneTracking and the model gives both twins IDENTICAL geometry. The asymmetry is in the truth and absent from the model.
 [values]  numerator and denominator of each ratio
@@ -74,27 +74,27 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
   mass (kg)                          600.442       600.449
   B = Cd*A/m (m^2/kg)           3.391949e-03  3.353347e-03
   3D RMS fitted Cd (m)                  1.95          1.93
-  3D RMS sphere table (m)              19.26         19.67
-  3D RMS box table (IPT) (m)           56.82         57.34
+  3D RMS sphere table (m)              15.56         15.99
+  3D RMS box table (IPT) (m)           51.24         51.77
 [breakdown]  1-day arc, propagated - truth, ITRF RIC RMS (m)
   sat  run                   radial       along     cross          3D
   C    fitted Cd               0.52        1.86      0.24        1.95
-  C    sphere table            0.66       19.24      0.24       19.26
-  C    box table (IPT)         1.13       56.80      0.21       56.82
+  C    sphere table            0.62       15.54      0.24       15.56
+  C    box table (IPT)         1.04       51.22      0.21       51.24
   D    fitted Cd               0.53        1.84      0.24        1.93
-  D    sphere table            0.67       19.65      0.24       19.67
-  D    box table (IPT)         1.14       57.33      0.21       57.34
+  D    sphere table            0.63       15.97      0.24       15.99
+  D    box table (IPT)         1.05       51.76      0.20       51.77
   C arc-mean conditions: r 6873.6 km, rho 8.907e-14 kg/m^3
-     shipped tables there: sphere Cd 2.918 -> CdA 2.9219 m^2; box per-face ram 3.326 / side 0.086 / leeward 0.000 -> face-sum CdA 4.6218 m^2
+     shipped tables there: sphere Cd 2.748 -> CdA 2.7518 m^2; box per-face ram 3.071 / side 0.086 / leeward 0.000 -> face-sum CdA 4.3668 m^2
      fitted CdA 2.0367 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
   D arc-mean conditions: r 6873.6 km, rho 8.907e-14 kg/m^3
-     shipped tables there: sphere Cd 2.918 -> CdA 2.9221 m^2; box per-face ram 3.326 / side 0.086 / leeward 0.000 -> face-sum CdA 4.6220 m^2
+     shipped tables there: sphere Cd 2.748 -> CdA 2.7520 m^2; box per-face ram 3.072 / side 0.086 / leeward 0.000 -> face-sum CdA 4.3669 m^2
      fitted CdA 2.0135 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
 
 ==============================================================================
 === window active_2023, 3 days loaded, 1-day arc ===
 ==============================================================================
-[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[versions] propygator 0.8.2, orekit_jpype 13.1.4.0, numpy 2.4.6
 [data root] experiments/real-world-validation/data/gracefo  (frozen v0.7.2 tree, read in place)
 [convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
   A_ref = 1.0013468 m^2 = Table 5 front panel 0.9551567 + boom 0.0461901 (boom folded into the ram face)
@@ -140,24 +140,24 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
   C: |dr| = 3.868e-09 m, |dv| = 5.400e-12 m/s (bound 5e-08 m)
   D: |dr| = 1.863e-09 m, |dv| = 3.859e-12 m/s (bound 5e-08 m)
 [screen tier-2 deg-5]  drag-on Cd = 2.3 over the 3-day load, so both gates cover the same span
-  C: signal 7172.7 m, departure 15.7 m (0.2%) -> CLEAN  (15 s wall)
-  D: signal 7281.7 m, departure 15.8 m (0.2%) -> CLEAN  (14 s wall)
+  C: signal 7172.7 m, departure 15.7 m (0.2%) -> CLEAN  (24 s wall)
+  D: signal 7281.7 m, departure 15.8 m (0.2%) -> CLEAN  (23 s wall)
 [C]  GRACE-FO 1 (GRACE C), mass 596.546 kg
   Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
     fitted Cd = 3.38339 on A_ref = 1.0013468 m^2, B = Cd*A/m = 5.679275e-03 m^2/kg
-    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (112 s wall)
-    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 7 s wall
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (173 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 8 s wall, sphere table 8 s wall, box table (IPT) 11 s wall
 [D]  GRACE-FO 2 (GRACE D), mass 597.153 kg
   Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
     fitted Cd = 3.40151 on A_ref = 1.0013468 m^2, B = Cd*A/m = 5.703875e-03 m^2/kg
-    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (113 s wall)
-    runs (1-day arc, output 60 s): fitted Cd 5 s wall, sphere table 5 s wall, box table (IPT) 8 s wall
+    23 evals, tol 0.002, bracket width 0.00138, ceiling 5.0  (169 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 7 s wall, sphere table 9 s wall, box table (IPT) 13 s wall
 [ratios]  the four contract metrics, C/D, on 3D RMS
   metric                               C/D       dev     bar   verdict
   Cd_fit(C)/Cd_fit(D)              0.99467    -0.53%    10%   HIT
   RMS_Cd_fit(C)/RMS_Cd_fit(D)      0.93445    -6.55%    20%   HIT
-  RMS_sphere(C)/RMS_sphere(D)      0.97617    -2.38%    20%   HIT
-  RMS_box(C)/RMS_box(D)            1.02515    +2.52%    20%   HIT
+  RMS_sphere(C)/RMS_sphere(D)      0.98246    -1.75%    20%   HIT
+  RMS_box(C)/RMS_box(D)            1.03902    +3.90%    20%   HIT
   shared-mass form of the Cd ratio: 0.99569 (-0.43%) -- the per-satellite ratio above divided by the C/D mass ratio 0.998983, which is the whole of the difference between the two forms
   A non-zero deviation is expected physics, not only noise: the twins fly a 180 deg relative yaw that puts opposite ends of the same tapered bus into the wind, but the box's +/-Y faces are equal-area, so that yaw is invisible to InPlaneTracking and the model gives both twins IDENTICAL geometry. The asymmetry is in the truth and absent from the model.
 [values]  numerator and denominator of each ratio
@@ -166,27 +166,27 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
   mass (kg)                          596.546       597.153
   B = Cd*A/m (m^2/kg)           5.679275e-03  5.703875e-03
   3D RMS fitted Cd (m)                  6.37          6.81
-  3D RMS sphere table (m)             226.62        232.15
-  3D RMS box table (IPT) (m)          256.78        250.48
+  3D RMS sphere table (m)             288.79        293.94
+  3D RMS box table (IPT) (m)          163.53        157.39
 [breakdown]  1-day arc, propagated - truth, ITRF RIC RMS (m)
   sat  run                   radial       along     cross          3D
   C    fitted Cd               0.86        6.30      0.33        6.37
-  C    sphere table            4.39      226.57      0.38      226.62
-  C    box table (IPT)         4.49      256.74      0.17      256.78
+  C    sphere table            5.49      288.73      0.39      288.79
+  C    box table (IPT)         2.83      163.51      0.19      163.53
   D    fitted Cd               0.86        6.75      0.33        6.81
-  D    sphere table            4.50      232.10      0.39      232.15
-  D    box table (IPT)         4.36      250.44      0.18      250.48
+  D    sphere table            5.60      293.89      0.40      293.94
+  D    box table (IPT)         2.71      157.37      0.19      157.39
   C arc-mean conditions: r 6862.9 km, rho 1.269e-12 kg/m^3
-     shipped tables there: sphere Cd 2.703 -> CdA 2.7071 m^2; box per-face ram 3.012 / side 0.082 / leeward 0.000 -> face-sum CdA 4.2539 m^2
+     shipped tables there: sphere Cd 2.492 -> CdA 2.4952 m^2; box per-face ram 2.695 / side 0.082 / leeward 0.000 -> face-sum CdA 3.9361 m^2
      fitted CdA 3.3879 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
   D arc-mean conditions: r 6862.9 km, rho 1.268e-12 kg/m^3
-     shipped tables there: sphere Cd 2.704 -> CdA 2.7072 m^2; box per-face ram 3.012 / side 0.082 / leeward 0.000 -> face-sum CdA 4.2540 m^2
+     shipped tables there: sphere Cd 2.492 -> CdA 2.4953 m^2; box per-face ram 2.695 / side 0.082 / leeward 0.000 -> face-sum CdA 3.9362 m^2
      fitted CdA 3.4061 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
 
 ==============================================================================
 === window storm_2024 (first loaded day 2024-05-11), 3 days loaded, 1-day arc ===
 ==============================================================================
-[versions] propygator 0.8.0, orekit_jpype 13.1.4.0, numpy 2.4.6
+[versions] propygator 0.8.2, orekit_jpype 13.1.4.0, numpy 2.4.6
 [data root] experiments/real-world-validation/data/gracefo  (frozen v0.7.2 tree, read in place)
 [convention]  the 2026-08-13 contract geometry -- the repo's THIRD A_ref
   A_ref = 1.0013468 m^2 = Table 5 front panel 0.9551567 + boom 0.0461901 (boom folded into the ram face)
@@ -232,24 +232,24 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
   C: |dr| = 4.755e-09 m, |dv| = 7.355e-12 m/s (bound 5e-08 m)
   D: |dr| = 4.839e-09 m, |dv| = 3.701e-12 m/s (bound 5e-08 m)
 [screen tier-2 deg-5]  drag-on Cd = 2.3 over the 3-day load, so both gates cover the same span
-  C: signal 11427.1 m, departure 45.8 m (0.4%) -> CLEAN  (16 s wall)
-  D: signal 11677.5 m, departure 45.3 m (0.4%) -> CLEAN  (19 s wall)
+  C: signal 11427.1 m, departure 45.8 m (0.4%) -> CLEAN  (23 s wall)
+  D: signal 11677.5 m, departure 45.3 m (0.4%) -> CLEAN  (22 s wall)
 [C]  GRACE-FO 1 (GRACE C), mass 596.386 kg
   Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
     fitted Cd = 4.04553 on A_ref = 1.0013468 m^2, B = Cd*A/m = 6.792554e-03 m^2/kg
-    24 evals, tol 0.002, bracket width 0.00159, ceiling 8.0  (119 s wall)
-    runs (1-day arc, output 60 s): fitted Cd 6 s wall, sphere table 7 s wall, box table (IPT) 11 s wall
+    24 evals, tol 0.002, bracket width 0.00159, ceiling 8.0  (195 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 7 s wall, sphere table 8 s wall, box table (IPT) 12 s wall
 [D]  GRACE-FO 2 (GRACE D), mass 596.963 kg
   Cd fit (golden-section on the 1-day along-track RMS; stderr trace)
     fitted Cd = 4.06829 on A_ref = 1.0013468 m^2, B = Cd*A/m = 6.824162e-03 m^2/kg
-    24 evals, tol 0.002, bracket width 0.00159, ceiling 8.0  (154 s wall)
-    runs (1-day arc, output 60 s): fitted Cd 7 s wall, sphere table 7 s wall, box table (IPT) 11 s wall
+    24 evals, tol 0.002, bracket width 0.00159, ceiling 8.0  (184 s wall)
+    runs (1-day arc, output 60 s): fitted Cd 7 s wall, sphere table 8 s wall, box table (IPT) 12 s wall
 [ratios]  the four contract metrics, C/D, on 3D RMS
   metric                               C/D       dev     bar   verdict
   Cd_fit(C)/Cd_fit(D)              0.99441    -0.56%    10%   HIT
   RMS_Cd_fit(C)/RMS_Cd_fit(D)      0.99076    -0.92%    20%   HIT
-  RMS_sphere(C)/RMS_sphere(D)      0.98638    -1.36%    20%   HIT
-  RMS_box(C)/RMS_box(D)            1.00769    +0.77%    20%   HIT
+  RMS_sphere(C)/RMS_sphere(D)      0.98759    -1.24%    20%   HIT
+  RMS_box(C)/RMS_box(D)            0.91924    -8.08%    20%   HIT
   shared-mass form of the Cd ratio: 0.99537 (-0.46%) -- the per-satellite ratio above divided by the C/D mass ratio 0.999034, which is the whole of the difference between the two forms
   A non-zero deviation is expected physics, not only noise: the twins fly a 180 deg relative yaw that puts opposite ends of the same tapered bus into the wind, but the box's +/-Y faces are equal-area, so that yaw is invisible to InPlaneTracking and the model gives both twins IDENTICAL geometry. The asymmetry is in the truth and absent from the model.
 [values]  numerator and denominator of each ratio
@@ -258,30 +258,30 @@ Extended validation -- Chunk 2: table noise, GRACE-FO C/D
   mass (kg)                          596.386       596.963
   B = Cd*A/m (m^2/kg)           6.792554e-03  6.824162e-03
   3D RMS fitted Cd (m)                119.20        120.31
-  3D RMS sphere table (m)            1463.68       1483.89
-  3D RMS box table (IPT) (m)          120.89        119.97
+  3D RMS sphere table (m)            1588.67       1608.63
+  3D RMS box table (IPT) (m)          204.09        222.03
 [breakdown]  1-day arc, propagated - truth, ITRF RIC RMS (m)
   sat  run                   radial       along     cross          3D
   C    fitted Cd               7.97      118.93      0.34      119.20
-  C    sphere table           21.90     1463.52      0.42     1463.68
-  C    box table (IPT)         8.05      120.62      0.29      120.89
+  C    sphere table           24.05     1588.49      0.44     1588.67
+  C    box table (IPT)         6.29      204.00      0.28      204.09
   D    fitted Cd               8.02      120.04      0.34      120.31
-  D    sphere table           22.22     1483.72      0.43     1483.89
-  D    box table (IPT)         7.83      119.71      0.29      119.97
+  D    sphere table           24.37     1608.45      0.45     1608.63
+  D    box table (IPT)         6.21      221.94      0.28      222.03
   C arc-mean conditions: r 6858.5 km, rho 3.894e-12 kg/m^3
-     shipped tables there: sphere Cd 2.512 -> CdA 2.5154 m^2; box per-face ram 2.715 / side 0.091 / leeward 0.000 -> face-sum CdA 4.0886 m^2
+     shipped tables there: sphere Cd 2.372 -> CdA 2.3755 m^2; box per-face ram 2.506 / side 0.091 / leeward 0.000 -> face-sum CdA 3.8787 m^2
      fitted CdA 4.0510 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
   D arc-mean conditions: r 6858.5 km, rho 3.895e-12 kg/m^3
-     shipped tables there: sphere Cd 2.512 -> CdA 2.5153 m^2; box per-face ram 2.715 / side 0.091 / leeward 0.000 -> face-sum CdA 4.0885 m^2
+     shipped tables there: sphere Cd 2.372 -> CdA 2.3755 m^2; box per-face ram 2.506 / side 0.091 / leeward 0.000 -> face-sum CdA 3.8787 m^2
      fitted CdA 4.0738 m^2 on A_ref 1.0013468; box faces: ram/leeward 1.0013 m^2 each, four sides 15.0060 m^2 total
 
 ==============================================================================
 [summary]  the four contract metrics across every window run
 ==============================================================================
   window                  Cd_fit      RMS_Cd_fit      RMS_sphere         RMS_box
-  quiet_2019            +1.15% H        +0.79% H        -2.09% H        -0.91% H
-  active_2023           -0.53% H        -6.55% H        -2.38% H        +2.52% H
-  storm_2024            -0.56% H        -0.92% H        -1.36% H        +0.77% H
+  quiet_2019            +1.15% H        +0.79% H        -2.68% H        -1.03% H
+  active_2023           -0.53% H        -6.55% H        -1.75% H        +3.90% H
+  storm_2024            -0.56% H        -0.92% H        -1.24% H        -8.08% H
   bars: Cd ratio within 10% of 1.0 (a failure warrants a bug search); RMS ratios within 20% (a departure past it demands attention, and a bug search if no non-bug explanation is found)
   12/12 metrics HIT
-  wall time: 1252 s
+  wall time: 1480 s

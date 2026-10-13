@@ -42,17 +42,19 @@ ratio 1.12×) → **GO**. The Chunk-4 refresh swapped in the shipped mode and th
 - `ecef_feather_benefit.png` — (a) AoA histories, (b) assembled per-face CdA,
   (c) along-track divergence + per-leg drag effects.
 
-## Result summary (2026-07-04 shipped-mode run, 0.5 kg)
+## Result summary (2026-10-12 run, SESAM-regenerated table, 0.5 kg)
 
 - Inertial-leg big-face AoA oscillates 0 → **3.707°** (predicted ~3.75°),
   mean 2.36°; the shipped ecef leg holds ~0 (reads 0.0000° against the
   diagnostic wind).
-- Mean per-face CdA: 0.2170 m² (inertial) vs 0.1955 m² (ecef) — **1.11×**;
-  the propagated drag effects differ by **1.12×** (2414.7 vs 2157.1 km
+- Mean per-face CdA: 0.2129 m² (inertial) vs 0.1922 m² (ecef) — **1.11×**;
+  the propagated drag effects differ by **1.12×** (2368.5 vs 2119.8 km
   along-track over 5 d) — internally consistent.
-- **Headline: the attitude reference alone moves the sail −272.7 km
+- **Headline: the attitude reference alone moves the sail −262.7 km
   along-track over 5 days** (~11 % of the total drag effect; drag dominates
-  SRP ~10,600× here).
-- **Shipped-vs-stand-in cross-check: 0.02 km max along-track over 5 days** —
+  SRP ~10,400× here).
+- **Shipped-vs-stand-in cross-check: 0.04 km max along-track over 5 days** —
   the shipped primary-slot provider and the independently-written feathered
-  law agree to the pole-offset scale, against a 273 km signal.
+  law agree to the pole-offset scale, against a 263 km signal.
+
+The 2026-07-04 run on the pre-SESAM table read −272.7 km and the same 1.12×.

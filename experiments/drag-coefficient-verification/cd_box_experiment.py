@@ -17,14 +17,13 @@ from pymsis import msis
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from cd_core import (calibrate_K, alpha_sesam, v_rel, SPECIES, IDX, R_EARTH,
+from cd_core import (alpha_sesam, v_rel, SPECIES, IDX, R_EARTH,
                      geocentric_radius, collapse_rms_by_radius,
                      band_verdict, green_crossing_radius_km,
                      GREEN_RMS_PCT, RED_RMS_PCT)
 from cd_box import cd_panel_species
 
 rng = np.random.default_rng(11)
-K = calibrate_K()
 ALTS = np.linspace(130., 1400., 80)  # km; dense sweep on the production axis (sec. 3.2)
 
 DATES = ["2003-01-15T03:00", "2008-07-21T12:00", "2014-10-05T18:00",
@@ -55,7 +54,7 @@ ATT = [
 
 def box_cd(row, alt, lat, faces, A_ref, ram_hat):
     T_inf = row[IDX["T"]]; V = v_rel(alt, lat)
-    alpha = alpha_sesam(row[IDX["O"]], T_inf, K)
+    alpha = alpha_sesam(row, V)
     total = 0.0
     for n_hat, area in faces:
         g = float(np.dot(n_hat, ram_hat))
