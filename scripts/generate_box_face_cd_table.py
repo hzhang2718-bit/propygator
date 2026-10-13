@@ -33,14 +33,15 @@ incidence node, since the incidence is sampled exactly at every node -- onto a c
 bound -- before the anchor prints and the write. Over the leeward half the closed
 form's erfc/exp terms nearly cancel and the *analytic* residue dips slightly negative
 for low speed-ratio (light, hot) species: the DRIA re-emission recoil projected on
-the drag axis exceeds the tiny incident drag (H reaches ~-1.6e-3 near theta ~
+the drag axis exceeds the tiny incident drag (H dips slightly negative near theta ~
 150-180 deg, and the theta = pi value is strictly negative for every species), so the
 mass-flux-weighted grid went negative where He/H dominate -- the high-altitude /
-low-density corner (pre-floor grid min -5.8e-4; 27% of entries, all at theta >=
-129 deg). Confirmed by direct evaluation 2026-07-17: an erfc-reformulated,
-cancellation-free evaluation reproduces the same negatives to ~1e-17, so they are
-model artifact, not float noise -- physically spurious, since a convex body's leeward
-faces are shielded (the closed form has no self-shadowing) and Cd_leeward -> 0+.
+low-density corner (SESAM tables: pre-floor grid min -5.4e-4; 26% of entries,
+all at theta >= 129 deg). Confirmed by direct evaluation 2026-07-17: an
+erfc-reformulated, cancellation-free evaluation reproduces the same negatives
+to ~1e-17, so they are model artifact, not float noise -- physically spurious,
+since a convex body's leeward faces are shielded (the closed form has no
+self-shadowing) and Cd_leeward -> 0+.
 The floor lives in :func:`generate` at grid assembly and **never** inside
 :func:`_face_cd_species` / :func:`_face_cd_total`: the cross-validator
 (``experiments/drag-coefficient-verification/cross_validate_box_face.py``) drives

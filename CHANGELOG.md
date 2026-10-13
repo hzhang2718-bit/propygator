@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-13
+
+### Changed
+
+- Shifted computation for the thermal accommodation coefficient
+(alpha) used to created the Cd tables from anchor to the
+Semi-Empirical Satellite Accommodation Model (SESAM).
+- Regenerated sphere and box Cd tables using SESAM.
+- Regenerated drag coefficient verification, ecef attitude
+benefit, real world validation, and extended validation experiments using new Cd tables. The new sphere Cd table improved in quiet solar conditions but worsened in active solar conditions. The new box Cd table improved in all conditions.
+- Updated records to reflect changes in numbers resulting from
+new Cd tables.
+
 ## [0.8.2] - 2026-09-07
 
 ### Fixed

@@ -646,8 +646,8 @@ class BoxFaceCd:
         The committed asset is produced by
         ``scripts/generate_box_face_cd_table.py`` (a maintainer step) and loaded here;
         end users compute nothing. It carries the project's shared gas-surface
-        assumptions (SESAM accommodation anchored at α = 0.90 / 400 km solar-max,
-        diffuse re-emission, 300 K wall), exactly as the Tier A sphere default. A
+        assumptions (SESAM energy accommodation per Pilinski et al. 2013, diffuse
+        re-emission, 300 K wall), exactly as the Tier A sphere default. A
         spacecraft with markedly different surface physics should supply its own table
         via :meth:`from_table` / :meth:`from_callable`. Metadata records
         ``Cd=table:box_face_default``.

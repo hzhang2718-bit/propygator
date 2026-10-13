@@ -96,15 +96,15 @@ consolidates them.
 | Ablation matrix | **all 7 toggles PASS** at their computed orders; predicted-null rows (gravity>20, planets) null at mm level | `lageos/README.md` |
 | GRACE-FO drag pipeline | scalar-Cd fit collapses along-track RMS **44 → 1.9 m** (quiet) / **1058 → 6.4 m** (active): pipeline proven, remainder is density bias | `gracefo/README.md` |
 | Fitted Cd across windows | **2.03 → 3.40 → 4.08** (quiet/active/storm on A=1 m²): the NRLMSISE-00 density-bias lever, measured | `gracefo/README.md` |
-| A-priori Cd tables | both DSMC-credible on A_ram (sphere ~2.9/2.7, box ~4.4/4.1); no-fit residuals density-limited; box adds only absorbable scale for ram-dominated GRACE (geometry upgrade deferred) | `gracefo/README.md` |
+| A-priori Cd tables | on A_ram sphere 2.75/2.49, box 4.17/3.75 (quiet/active); no-fit residuals density-limited; box adds only absorbable scale for ram-dominated GRACE (geometry upgrade deferred) | `gracefo/README.md` |
 | Storm stress (Gannon 2024) | box sign test → **H1** (density bias, not geometric over-drag); scalar-Cd fit degrades to 119 m; **NRLMSISE-00 at default switches is daily-Ap-driven** (onset smearing, `probes/probe_ap_driving.py`) | `gracefo/README.md` "Storm window" |
 | Fitter vs. catalog | converges on real data (~630 m post-fit RMS); **catalog parity** with regime-appropriate `fit_bstar` (ratios 0.83–2.10); quiet 1-day B\*-on runaway = §1.2's own guidance validated | `gracefo/README.md` "Fitter vs. catalog" |
 | Fitting-span sweep | 2-day `fitting_span` default **empirically vindicated**; regime rule: weak drag → hold a calibrated B\*, strong drag → fit B\* on ~2 d | `gracefo/README.md` sweep subsection |
 | State path | free **iff** the ballistic coefficient is calibrated (single-digit-%); uncalibrated Cd costs 7× and no fit diagnostic can see it; a-priori tables can't meet the bar | `gracefo/README.md` state-path subsection |
 
 **DSMC band correction (2026-08-24):** the "A-priori Cd tables" row's
-DSMC-credible read cites a band withdrawn in full — see `gracefo/README.md`
-"DSMC band correction."
+original DSMC-credible read cites a band withdrawn in full — see
+`gracefo/README.md` "DSMC band correction."
 
 ## Conventions
 
@@ -117,9 +117,12 @@ DSMC-credible read cites a band withdrawn in full — see `gracefo/README.md`
   removes it, so after a diff you can still open the regenerated file that
   produced it. Nothing reads them again and no committed evidence references
   one, so they are safe to delete at any time; clearing them is a manual step.
-- **The `drag` group was regenerated 2026-09-07** against the v0.7.3 box table
-  (branch `study/rwv-verify-repair`); every other group stands at its v0.7.2
-  numbers. The v0.7.3 leeward floor zeroed the table's negative leeward cells —
+- **The `drag` and `state-path` groups were regenerated 2026-10-13** against
+  the SESAM tables (branch `feature/sesam-accommodation`, SESAM contract §8);
+  `lageos`, `fit` and `sweep` load no table and stand at their v0.7.2 numbers.
+- *Historical (superseded by the SESAM regeneration):* **the `drag` group was
+  regenerated 2026-09-07** against the v0.7.3 box table
+  (branch `study/rwv-verify-repair`). The v0.7.3 leeward floor zeroed the table's negative leeward cells —
   a ≤ 0.0096 % change in Run 5's box face-sum Cd·A, below printed precision.
   The output moved further (active_2023 Run 5 along-track 222.58 → 222.15 m,
   −0.19 %) because a below-precision drag perturbation re-sequences the adaptive

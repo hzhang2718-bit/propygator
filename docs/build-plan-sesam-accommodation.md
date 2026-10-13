@@ -179,7 +179,7 @@ measured-times-generous-margin policy. Both bounds are expected to hold; their
 "measured" comments (34.7 m / 0.544; 227.7 / 233.0 m) are stale and need re-measuring
 at the tests' 600 s cadence.
 
-## Chunk 9 — Documents
+## Chunk 9 — Documents - Done
 
 **Goal.** No document still claims the α = 0.90 anchor, and every table-derived
 number is Chunk 7's.
@@ -244,7 +244,8 @@ chunk's work list: run it first, then again at the end.
 
 **Goal.** Plan and contract archived.
 
-**Create/Edit.** Move both documents to `docs/history/`.
+**Create/Edit.** Move both documents to `docs/history/`, and repoint every live
+`docs/sesam-accommodation.md` reference (`git grep`) to the archived path.
 
 **Verify.** CHANGELOG entry, version bump and release are the maintainer's. Minor
 bump (`v0.9.0`), not a `v0.7.3`-style patch: every default-table drag value moves
