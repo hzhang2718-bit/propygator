@@ -44,7 +44,7 @@ expected outcome (addendum §2/§4): the high-altitude limit is soft because dra
 
 | File | Role |
 |------|------|
-| `cd_core.py` | Sphere C_D: Sentman/DRIA closed form, per-species mass-flux weighting over NRLMSISE-00, SESAM energy accommodation (Pilinski et al. 2013; `docs/sesam-accommodation.md`). Also holds the shared validity-domain helpers: the forward `geocentric_radius()` map (mirrored from the table generator), the green/red thresholds, and `collapse_rms_by_radius()` / `print_collapse_report()`. Shared by both experiments. |
+| `cd_core.py` | Sphere C_D: Sentman/DRIA closed form, per-species mass-flux weighting over NRLMSISE-00, SESAM energy accommodation (Pilinski et al. 2013; `docs/history/sesam-accommodation.md`). Also holds the shared validity-domain helpers: the forward `geocentric_radius()` map (mirrored from the table generator), the green/red thresholds, and `collapse_rms_by_radius()` / `print_collapse_report()`. Shared by both experiments. |
 | `cd_sphere_experiment.py` | Tier A. Dense ~130–1400 km sweep keyed on **geocentric radius**, with a storm cohort, testing the `(radius, ρ)` collapse two ways (per-band scatter vs coded thresholds + a train/test interpolant). Writes `cd_time_independence.png`. |
 | `cd_box.py` | Tier B per-face flat-plate C_D (Schaaf–Chambre / Sentman). Self-check: integrating panels over a sphere reproduces `cd_core` to < 0.1 %. |
 | `cd_box_experiment.py` | Tier B. The same radius-keyed collapse test at fixed attitude (cube + plate), with the storm cohort and coded thresholds. Writes `cd_tierB.png`. |
@@ -411,7 +411,7 @@ under the experiment venv on **2026-06-14** for the drag-validity addendum's
 boundary-finding expansion (Chunk 1: radius axis, 130–1400 km sweep, storm cohort,
 coded thresholds) — fixed RNG seeds plus deterministic NRLMSISE-00 make
 the run reproducible (given the same `pymsis`). Every α-dependent result here was
-re-run on **2026-10-12** after the SESAM accommodation port (`docs/sesam-accommodation.md`).
+re-run on **2026-10-12** after the SESAM accommodation port (`docs/history/sesam-accommodation.md`).
 The venv scripts are **not** executed in
 the propygator conda env (they need `scipy` / `pymsis`, which it does not carry).
 The work originally lived in a single flat directory; it was reorganized here with
@@ -423,7 +423,7 @@ the two tiers sharing `cd_core.py`.
   free-molecular C_D model collapses onto `(radius, ρ)`; it presumes that model.
   Appropriate for de-risking a design choice, not a claim of absolute C_D truth.
 - **SESAM accommodation** (Pilinski et al. 2013, published constants, no free
-  parameter; shared with the table generators per `docs/sesam-accommodation.md`).
+  parameter; shared with the table generators per `docs/history/sesam-accommodation.md`).
   The *collapse* conclusion is a property of the mechanism — α tracks atomic-O
   coverage, which tracks the same heating that sets density — not of the constants.
 - **Axis.** The collapse is now analyzed on **geocentric radius** — each sample is

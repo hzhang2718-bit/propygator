@@ -1,9 +1,10 @@
 # SESAM Accommodation — Contract
 
-**Status:** proposed, not built. Binding for the energy-accommodation model shared
-by `data/sphere_cd_default.npz` and `data/box_face_cd_default.npz`. Wins over
-`docs/build-plan-sesam-accommodation.md` on conflict; `features.md` and
-`architecture.md` win over both. Archive to `docs/history/` at close.
+**Status:** built (`feature/sesam-accommodation`, 2026-10-13, `v0.9.0`); archived.
+Binding for the energy-accommodation model shared by
+`data/sphere_cd_default.npz` and `data/box_face_cd_default.npz`. Wins over
+`docs/history/build-plan-sesam-accommodation.md` on conflict; `features.md` and
+`architecture.md` win over both.
 
 ## 1. Defect
 

@@ -8,7 +8,7 @@ users compute nothing (features.md §1.1 "Where the table comes from").
 **What it does.** It evaluates a closed-form **Sentman / DRIA** sphere Cd — the
 standard free-molecular result (Sentman 1961; Schaaf & Chambre; Moe & Moe 2005),
 with per-species mass-flux weighting and SESAM energy accommodation (Pilinski et al.
-2013; ``docs/sesam-accommodation.md``) — over a broad sweep
+2013; ``docs/history/sesam-accommodation.md``) — over a broad sweep
 of genuinely different thermospheric conditions (epoch, local solar time, latitude,
 F10.7, Ap) drawn from **NRLMSISE-00** (the same atmosphere model the propagator feeds
 this table at runtime). Because the sphere Cd collapses onto a single
@@ -91,9 +91,9 @@ STORM_F107_RANGE = (200.0, 320.0)
 STORM_AP_RANGE = (100.0, 400.0)
 
 # SESAM energy accommodation (Pilinski, Argrow, Palo & Bowman 2013, J. Spacecraft &
-# Rockets 50(3), 556-571; docs/sesam-accommodation.md sec. 2). Published constants;
-# the model has no free parameter. SESAM_E_B and the _SPECIES masses are fixed at
-# import, so a parity check patches those directly.
+# Rockets 50(3), 556-571; docs/history/sesam-accommodation.md sec. 2). Published
+# constants; the model has no free parameter. SESAM_E_B and the _SPECIES masses are
+# fixed at import, so a parity check patches those directly.
 SESAM_CITATION = (
     "Pilinski, Argrow, Palo & Bowman 2013, J. Spacecraft & Rockets 50(3), 556-571, "
     "doi:10.2514/1.A32348"
@@ -228,7 +228,7 @@ def _sphere_cd_total(
 def _accommodation(
     msis_rows: NDArray[np.float64], speed: NDArray[np.float64]
 ) -> NDArray[np.float64]:
-    """SESAM energy accommodation (``docs/sesam-accommodation.md`` sec. 2).
+    """SESAM energy accommodation (``docs/history/sesam-accommodation.md`` sec. 2).
 
     Atomic-O Langmuir coverage ``theta`` blends a clean-surface Goodman coefficient
     toward 1: ``alpha = (1 - theta) * alpha_clean + theta``. ``m_bar`` is the

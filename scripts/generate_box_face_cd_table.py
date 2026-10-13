@@ -10,7 +10,7 @@ that array once; end users compute nothing.
 
 **What it does.** It is the per-face twin of ``scripts/generate_sphere_cd_table.py``.
 It reuses that script's Tier-A model wholesale -- the SESAM energy accommodation
-(``docs/sesam-accommodation.md``), the geocentric-radius and
+(``docs/history/sesam-accommodation.md``), the geocentric-radius and
 atmosphere-relative-speed maps, the NRLMSISE-00 condition sweep, and the
 ``(radius, density)`` validated band -- so the box table shares the sphere table's
 gas-surface assumptions exactly (cross-table coherence). The genuinely **new** part is

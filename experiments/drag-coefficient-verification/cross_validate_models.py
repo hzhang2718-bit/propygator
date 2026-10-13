@@ -14,7 +14,7 @@ NRLMSISE-00 rows at shared (radius, density, condition) points and asserts max
 relative agreement << 1% (well inside the sec. 3.1 green line).
 
 It reconciles the shared inputs first (sec. 5):
-  (i)  Accommodation -- both implement SESAM (docs/sesam-accommodation.md), which
+  (i)  Accommodation -- both implement SESAM (docs/history/sesam-accommodation.md), which
        has no free parameter. Fed identical float64 MSIS rows and speed, the two
        alphas must agree to machine precision (contract sec. 7).
   (ii) Relative-speed formula -- the Earth-rotation rate is written two ways

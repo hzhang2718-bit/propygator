@@ -2,7 +2,7 @@
 Physically-rigorous free-molecular drag coefficient (C_D) for a sphere over
 NRLMSISE-00, using the Sentman closed form with Diffuse Reflection and
 Incomplete Accommodation (DRIA), per-species mass-flux weighting, and SESAM
-energy accommodation (Pilinski et al. 2013; docs/sesam-accommodation.md).
+energy accommodation (Pilinski et al. 2013; docs/history/sesam-accommodation.md).
 
 The time-independence conclusion is a property of the *mechanism* (alpha tied to
 O coverage, which tracks the same thermospheric heating that sets density), not

@@ -1,6 +1,6 @@
 # Build Plan — SESAM Accommodation
 
-Working blueprint for `docs/sesam-accommodation.md`, which wins on conflict.
+Working blueprint for `docs/history/sesam-accommodation.md`, which wins on conflict.
 Status headers are the maintainer's. Archive to `docs/history/` at close.
 
 **Precondition.** Part B of `docs/history/build-plan-earth-radiation.md` is closed
